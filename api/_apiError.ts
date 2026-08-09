@@ -24,7 +24,7 @@ export function classifyDatabaseError(error: unknown, operation: DatabaseOperati
 
   // ── 配置类（不可重试）────────────────────────────────────────────
   if (/database_url is not set|missing.*database_url/.test(text)) {
-    return { status: 503, code: 'DATABASE_NOT_CONFIGURED', message: '服务器尚未配置数据库连接，请在 Vercel 检查 DATABASE_URL 环境变量', retryable: false };
+    return { status: 503, code: 'DATABASE_NOT_CONFIGURED', message: '服务器尚未配置数据库连接，请检查 DATABASE_URL 环境变量', retryable: false };
   }
   if (/password authentication failed|authentication failed|invalid.*credential|28p01/.test(`${text} ${code}`)) {
     return { status: 503, code: 'DATABASE_AUTH_FAILED', message: '数据库连接配置无效，请检查服务器环境变量', retryable: false };

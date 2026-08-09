@@ -14,8 +14,13 @@ function formatUptime(seconds: number): string {
 }
 
 function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes < 0) return '—';
   const mb = bytes / 1024 / 1024;
   return mb >= 1024 ? (mb / 1024).toFixed(2) + ' GB' : mb.toFixed(1) + ' MB';
+}
+
+function formatPercent(value: number | null): string {
+  return value == null || !Number.isFinite(value) ? '—' : value.toFixed(1) + '%';
 }
 
 function formatClock(epochMs: number): string {
@@ -30,6 +35,13 @@ function latencyTone(ms: number | null): string {
   if (ms <= 300) return 'is-ok';
   if (ms <= 1000) return 'is-warn';
   return 'is-err';
+}
+
+function usageTone(value: number | null, warn = 80, err = 92): 'ok' | 'warn' | 'err' | 'idle' {
+  if (value == null || !Number.isFinite(value)) return 'idle';
+  if (value >= err) return 'err';
+  if (value >= warn) return 'warn';
+  return 'ok';
 }
 
 function StatusDot({ tone }: { tone: 'ok' | 'warn' | 'err' | 'idle' }) {
@@ -82,6 +94,21 @@ export default function SystemStatusSection() {
   const queueWarn = data.mailQueue.failed > 0 || data.mailQueue.pending > 20;
   const dbTone: 'ok' | 'err' | 'warn' = !data.database.reachable ? 'err' : !data.database.schemaOk ? 'warn' : 'ok';
   const events = data.events.slice(0, 10);
+  const memUsage =
+    data.server.memory.total > 0
+      ? (1 - data.server.memory.free / data.server.memory.total) * 100
+      : null;
+  const isWindows = data.server.platform === 'win32';
+  const loadText =
+    isWindows && data.server.cpu.load1 === 0
+      ? '—'
+      : data.server.cpu.load1.toFixed(2) + ' / ' + data.server.cpu.load5.toFixed(2) + ' / ' + data.server.cpu.load15.toFixed(2);
+  const largestTables = data.database.largestTables.length
+    ? data.database.largestTables.map((item) => item.name + ' ' + formatBytes(item.sizeBytes)).join('、')
+    : '—';
+  const reqStats = data.requestStats;
+  const failedRate =
+    reqStats && reqStats.total > 0 ? (reqStats.failed / reqStats.total) * 100 : null;
 
   return (
     <section className="set-card system-status">
@@ -92,7 +119,7 @@ export default function SystemStatusSection() {
         </button>
       </div>
       <p className="set-card__lead">
-        仅超级管理员可见 · 每 30 秒自动刷新。数据全部来自当前部署实例，兼容本地化部署。
+        仅超级管理员可见 · 每 30 秒自动刷新。数据全部来自当前部署实例，兼容本地化部署与 Vercel。
       </p>
 
       <div className="system-status__summary">
@@ -112,6 +139,16 @@ export default function SystemStatusSection() {
           <b>待发 {data.mailQueue.pending}</b>
         </div>
         <div className="system-status__summary-item">
+          <StatusDot tone={usageTone(memUsage)} />
+          <span>内存</span>
+          <b>{formatPercent(memUsage)}</b>
+        </div>
+        <div className="system-status__summary-item">
+          <StatusDot tone={usageTone(data.server.cpu.usagePercent)} />
+          <span>CPU</span>
+          <b>{formatPercent(data.server.cpu.usagePercent)}</b>
+        </div>
+        <div className="system-status__summary-item">
           <StatusDot tone="ok" />
           <span>运行模式</span>
           <b>{data.service.runtime === 'vercel' ? 'Vercel' : '本地部署'}</b>
@@ -126,9 +163,17 @@ export default function SystemStatusSection() {
             <li><span>Node 版本</span><b>{data.server.node}</b></li>
             <li><span>平台 / 架构</span><b>{data.server.platform} / {data.server.arch}</b></li>
             <li><span>进程</span><b>PID {data.server.pid}</b></li>
+            <li><span>启动时间</span><b>{formatClock(data.server.startedAt)}</b></li>
             <li><span>运行时长</span><b>{formatUptime(data.server.uptimeSeconds)}</b></li>
+            <li><span>总内存</span><b>{formatBytes(data.server.memory.total)}</b></li>
+            <li><span>可用内存</span><b>{formatBytes(data.server.memory.free)}</b></li>
+            <li><span>内存使用率</span><b>{formatPercent(memUsage)}</b></li>
             <li><span>内存 RSS</span><b>{formatBytes(data.server.memory.rss)}</b></li>
             <li><span>堆使用</span><b>{formatBytes(data.server.memory.heapUsed)}</b></li>
+            <li><span>CPU 型号</span><b>{data.server.cpu.model || '—'}</b></li>
+            <li><span>CPU 核心数</span><b>{data.server.cpu.cores}</b></li>
+            <li><span>CPU 使用率</span><b>{formatPercent(data.server.cpu.usagePercent)}</b></li>
+            <li><span>负载（1/5/15 分钟）</span><b>{loadText}</b></li>
             <li><span>服务器时间</span><b>{formatClock(data.server.time.epochMs)}</b></li>
             <li><span>时区</span><b>{data.server.time.timezone}</b></li>
           </ul>
@@ -152,6 +197,14 @@ export default function SystemStatusSection() {
           <ul className="set-status__list">
             <li><span>连通性</span><b>{data.database.reachable ? '正常' : '异常'}</b></li>
             <li><span>往返延迟</span><b className={'system-status__latency ' + latencyTone(data.database.latencyMs)}>{data.database.latencyMs != null ? data.database.latencyMs + ' ms' : '—'}</b></li>
+            <li><span>PostgreSQL 版本</span><b>{data.database.version || '—'}</b></li>
+            <li><span>数据库大小</span><b>{formatBytes(data.database.sizeBytes ?? -1)}</b></li>
+            <li><span>表数量</span><b>{data.database.tables ?? '—'}</b></li>
+            <li><span>索引数量</span><b>{data.database.indexes ?? '—'}</b></li>
+            <li><span>连接（活跃/上限）</span><b>{data.database.activeConnections != null ? data.database.activeConnections + ' / ' + (data.database.maxConnections ?? '—') : '—'}</b></li>
+            <li><span>缓存命中率</span><b>{formatPercent(data.database.cacheHitRate)}</b></li>
+            <li><span>事务提交 / 回滚</span><b>{data.database.xactCommit != null ? data.database.xactCommit.toLocaleString() + ' / ' + (data.database.xactRollback ?? 0).toLocaleString() : '—'}</b></li>
+            <li><span>最大表</span><b>{largestTables}</b></li>
             <li><span>Schema</span><b>{data.database.schemaOk ? '完整' : '不匹配'}</b></li>
             <li><span>缺失表</span><b>{data.database.missingTables.length ? data.database.missingTables.join(', ') : '无'}</b></li>
             <li><span>写入闸门</span><b>{data.database.writeThrottleNextAllowedAt ? formatClock(data.database.writeThrottleNextAllowedAt) : '空闲'}</b></li>
@@ -181,6 +234,18 @@ export default function SystemStatusSection() {
             <li><span>最近错误</span><b>{data.mailQueue.lastError || '无'}</b></li>
           </ul>
         </section>
+
+        {reqStats ? (
+          <section className="system-status__section">
+            <h3>本地请求统计</h3>
+            <ul className="set-status__list">
+              <li><span>统计窗口</span><b>最近 5 分钟</b></li>
+              <li><span>请求总数</span><b>{reqStats.total}</b></li>
+              <li><span>失败数</span><b>{reqStats.failed}</b></li>
+              <li><span>失败率</span><b>{formatPercent(failedRate)}</b></li>
+            </ul>
+          </section>
+        ) : null}
 
         <section className="system-status__section system-status__section--wide">
           <h3>最近系统事件</h3>

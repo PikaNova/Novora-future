@@ -4,7 +4,7 @@
 // 兼容纯本地化部署：服务器信息全部来自 Node 运行时，不依赖 Vercel 专属能力。
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { readFileSync } from 'node:fs';
-import { hostname } from 'node:os';
+import { cpus, freemem, hostname, loadavg, totalmem } from 'node:os';
 import { authSql, ensureAuthTables, isAdminRecoveryConfigured, requireActor } from './_auth.js';
 import { assertRows, rowShape, isString, isNumberLike, isDatabaseInt8, type DatabaseInt8 } from './_validation.js';
 import { requestId, sendDatabaseError } from './_apiError.js';
@@ -102,7 +102,15 @@ async function handleHealth(req: VercelRequest, res: VercelResponse): Promise<vo
 }
 
 // ── /api/status（仅超管） ───────────────────────────────────────────
-async function collectDatabase(): Promise<{ reachable: boolean; latencyMs: number | null; schemaOk: boolean; missingTables: string[]; writeThrottleNextAllowedAt: number | null; error?: string }> {
+async function collectDatabase(): Promise<{
+  reachable: boolean; latencyMs: number | null; schemaOk: boolean; missingTables: string[];
+  writeThrottleNextAllowedAt: number | null;
+  version: string | null; sizeBytes: number | null; tables: number | null; indexes: number | null;
+  activeConnections: number | null; maxConnections: number | null;
+  cacheHitRate: number | null; xactCommit: number | null; xactRollback: number | null;
+  largestTables: Array<{ name: string; sizeBytes: number }>;
+  error?: string;
+}> {
   try {
     const started = Date.now();
     await ensureAuthTables();
@@ -120,10 +128,130 @@ async function collectDatabase(): Promise<{ reachable: boolean; latencyMs: numbe
       rowShape<{ next_allowed_at: number | string }>({ next_allowed_at: (v): v is number | string => typeof v === 'number' || typeof v === 'string' }),
       'write_throttle',
     );
-    return { reachable: true, latencyMs, schemaOk: missingTables.length === 0, missingTables, writeThrottleNextAllowedAt: throttle[0] ? Number(throttle[0].next_allowed_at) : null };
+    const [versionRows, sizeRows, countRows, connRows, statRows, xactRows, topRows] = await Promise.all([
+      authSql()`SHOW server_version`,
+      authSql()`SELECT pg_database_size(current_database())::bigint AS size`,
+      authSql()`SELECT (SELECT COUNT(*)::int FROM information_schema.tables WHERE table_schema='public') AS tables, (SELECT COUNT(*)::int FROM pg_indexes WHERE schemaname='public') AS indexes`,
+      authSql()`SELECT (SELECT COUNT(*)::int FROM pg_stat_activity) AS active, (SELECT current_setting('max_connections')::int) AS maxconn`,
+      authSql()`SELECT blks_hit::bigint AS hit, blks_read::bigint AS read FROM pg_stat_database WHERE datname=current_database()`,
+      authSql()`SELECT xact_commit::bigint AS commit, xact_rollback::bigint AS rollback FROM pg_stat_database WHERE datname=current_database()`,
+      authSql()`SELECT c.relname AS name, pg_total_relation_size(c.oid)::bigint AS size FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind IN ('r','p','m') ORDER BY size DESC LIMIT 3`,
+    ]);
+    const isNum = (v: unknown): v is number => typeof v === 'number';
+    const versionRow = assertRows(versionRows, rowShape<{ server_version: string }>({ server_version: isString }), 'pg_version')[0];
+    const sizeRow = assertRows(sizeRows, rowShape<{ size: DatabaseInt8 }>({ size: isDatabaseInt8 }), 'pg_database_size')[0];
+    const countRow = assertRows(countRows, rowShape<{ tables: number; indexes: number }>({ tables: isNum, indexes: isNum }), 'pg_counts')[0];
+    const connRow = assertRows(connRows, rowShape<{ active: number; maxconn: number }>({ active: isNum, maxconn: isNum }), 'pg_conns')[0];
+    const statRow = assertRows(statRows, rowShape<{ hit: DatabaseInt8; read: DatabaseInt8 }>({ hit: isDatabaseInt8, read: isDatabaseInt8 }), 'pg_stat')[0];
+    const xactRow = assertRows(xactRows, rowShape<{ commit: DatabaseInt8; rollback: DatabaseInt8 }>({ commit: isDatabaseInt8, rollback: isDatabaseInt8 }), 'pg_xact')[0];
+    const topRowsValid = assertRows(topRows, rowShape<{ name: string; size: DatabaseInt8 }>({ name: isString, size: isDatabaseInt8 }), 'pg_top');
+    const hit = Number(statRow?.hit ?? 0);
+    const read = Number(statRow?.read ?? 0);
+    const cacheHitRate = hit + read > 0 ? (hit / (hit + read)) * 100 : null;
+    return {
+      reachable: true,
+      latencyMs,
+      schemaOk: missingTables.length === 0,
+      missingTables,
+      writeThrottleNextAllowedAt: throttle[0] ? Number(throttle[0].next_allowed_at) : null,
+      version: versionRow?.server_version ?? null,
+      sizeBytes: sizeRow ? Number(sizeRow.size) : null,
+      tables: countRow?.tables ?? null,
+      indexes: countRow?.indexes ?? null,
+      activeConnections: connRow?.active ?? null,
+      maxConnections: connRow?.maxconn ?? null,
+      cacheHitRate,
+      xactCommit: xactRow ? Number(xactRow.commit) : null,
+      xactRollback: xactRow ? Number(xactRow.rollback) : null,
+      largestTables: topRowsValid.map((row) => ({ name: row.name, sizeBytes: Number(row.size) })),
+    };
   } catch (error) {
-    return { reachable: false, latencyMs: null, schemaOk: false, missingTables: [], writeThrottleNextAllowedAt: null, error: String(error instanceof Error ? error.message : error).slice(0, 200) };
+    return {
+      reachable: false, latencyMs: null, schemaOk: false, missingTables: [], writeThrottleNextAllowedAt: null,
+      version: null, sizeBytes: null, tables: null, indexes: null, activeConnections: null, maxConnections: null,
+      cacheHitRate: null, xactCommit: null, xactRollback: null, largestTables: [],
+      error: String(error instanceof Error ? error.message : error).slice(0, 200),
+    };
   }
+}
+
+let cpuUsageCache: { at: number; value: number | null } | null = null;
+async function currentCpuUsage(): Promise<number | null> {
+  if (cpuUsageCache && Date.now() - cpuUsageCache.at < 5000) return cpuUsageCache.value;
+  const sample = () => {
+    const list = cpus();
+    let idle = 0;
+    let total = 0;
+    for (const core of list) {
+      for (const value of Object.values(core.times)) total += value;
+      idle += core.times.idle;
+    }
+    return { idle, total };
+  };
+  const before = sample();
+  await new Promise((resolve) => setTimeout(resolve, 600));
+  const after = sample();
+  const idleDelta = after.idle - before.idle;
+  const totalDelta = after.total - before.total;
+  const value =
+    totalDelta > 0
+      ? Math.min(100, Math.max(0, 100 * (1 - idleDelta / totalDelta)))
+      : null;
+  cpuUsageCache = { at: Date.now(), value };
+  return value;
+}
+
+async function collectSystem(): Promise<{
+  hostname: string; node: string; platform: string; arch: string; pid: number;
+  uptimeSeconds: number; startedAt: number;
+  memory: { rss: number; heapUsed: number; total: number; free: number };
+  cpu: { model: string | null; cores: number; usagePercent: number | null; load1: number; load5: number; load15: number };
+  time: { iso: string; epochMs: number; timezone: string };
+}> {
+  const now = Date.now();
+  const uptimeSeconds = Math.round(process.uptime());
+  const cores = cpus();
+  const load = loadavg();
+  return {
+    hostname: hostname(),
+    node: process.version,
+    platform: process.platform,
+    arch: process.arch,
+    pid: process.pid,
+    uptimeSeconds,
+    startedAt: now - uptimeSeconds * 1000,
+    memory: {
+      rss: process.memoryUsage().rss,
+      heapUsed: process.memoryUsage().heapUsed,
+      total: totalmem(),
+      free: freemem(),
+    },
+    cpu: {
+      model: cores[0]?.model ?? null,
+      cores: cores.length,
+      usagePercent: await currentCpuUsage(),
+      load1: load[0] ?? 0,
+      load5: load[1] ?? 0,
+      load15: load[2] ?? 0,
+    },
+    time: {
+      iso: new Date(now).toISOString(),
+      epochMs: now,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    },
+  };
+}
+
+type LocalRequestStats = { windowStart: number; total: number; failed: number };
+function readLocalRequestStats(): LocalRequestStats | null {
+  const stats = (globalThis as Record<string, unknown>).__NOVORA_LOCAL_REQ_STATS__;
+  if (!stats || typeof stats !== "object") return null;
+  const typed = stats as LocalRequestStats;
+  return {
+    windowStart: Number(typed.windowStart) || 0,
+    total: Number(typed.total) || 0,
+    failed: Number(typed.failed) || 0,
+  };
 }
 
 async function collectInfra(): Promise<{ users: { total: number; active: number; pendingChangePassword: number }; roles: number; devices: { total: number; online: number; revoked: number }; plugins: number }> {
@@ -182,29 +310,21 @@ async function handleStatus(req: VercelRequest, res: VercelResponse): Promise<vo
       res.status(403).json({ ok: false, code: 'PERMISSION_DENIED', error: '仅超级管理员可查看系统状态' });
       return;
     }
-    const [database, infra, mailQueue, events, recoveryConfigured, smtp] = await Promise.all([
+    const [database, infra, mailQueue, events, recoveryConfigured, smtp, system] = await Promise.all([
       collectDatabase(),
       collectInfra(),
       collectMailQueue(),
       collectEvents(),
       isAdminRecoveryConfigured(),
       loadSmtpConfig(),
+      collectSystem(),
     ]);
     const now = Date.now();
     res.json({
       ok: true,
       fetchedAt: now,
       service: { version: appVersion(), runtime: process.env.VERCEL ? 'vercel' : 'local', region: process.env.VERCEL_REGION ?? null },
-      server: {
-        hostname: hostname(),
-        node: process.version,
-        platform: process.platform,
-        arch: process.arch,
-        pid: process.pid,
-        uptimeSeconds: Math.round(process.uptime()),
-        memory: { rss: process.memoryUsage().rss, heapUsed: process.memoryUsage().heapUsed },
-        time: { iso: new Date(now).toISOString(), epochMs: now, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone },
-      },
+      server: system,
       config: {
         databaseConfigured: Boolean(process.env.DATABASE_URL),
         adminPasswordConfigured: Boolean(process.env.ADMIN_PASSWORD),
@@ -217,6 +337,7 @@ async function handleStatus(req: VercelRequest, res: VercelResponse): Promise<vo
       infra,
       mailQueue,
       events,
+      requestStats: readLocalRequestStats(),
     });
   } catch (error) {
     sendDatabaseError(req, res, error, 'read');

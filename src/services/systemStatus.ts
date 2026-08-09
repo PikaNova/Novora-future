@@ -4,15 +4,23 @@ export type SystemStatusPayload = {
   fetchedAt: number;
   service: { version: string; runtime: 'vercel' | 'local'; region: string | null };
   server: {
-    hostname: string; node: string; platform: string; arch: string; pid: number; uptimeSeconds: number;
-    memory: { rss: number; heapUsed: number };
+    hostname: string; node: string; platform: string; arch: string; pid: number; uptimeSeconds: number; startedAt: number;
+    memory: { rss: number; heapUsed: number; total: number; free: number };
+    cpu: { model: string | null; cores: number; usagePercent: number | null; load1: number; load5: number; load15: number };
     time: { iso: string; epochMs: number; timezone: string };
   };
   config: {
     databaseConfigured: boolean; adminPasswordConfigured: boolean; deployHookConfigured: boolean;
     recoveryConfigured: boolean; smtpConfigured: boolean; smtpPreset: string | null;
   };
-  database: { reachable: boolean; latencyMs: number | null; schemaOk: boolean; missingTables: string[]; writeThrottleNextAllowedAt: number | null; error?: string };
+  database: {
+    reachable: boolean; latencyMs: number | null; schemaOk: boolean; missingTables: string[]; writeThrottleNextAllowedAt: number | null;
+    version: string | null; sizeBytes: number | null; tables: number | null; indexes: number | null;
+    activeConnections: number | null; maxConnections: number | null;
+    cacheHitRate: number | null; xactCommit: number | null; xactRollback: number | null;
+    largestTables: Array<{ name: string; sizeBytes: number }>;
+    error?: string;
+  };
   infra: {
     users: { total: number; active: number; pendingChangePassword: number };
     roles: number;
@@ -21,6 +29,7 @@ export type SystemStatusPayload = {
   };
   mailQueue: { pending: number; sending: number; sent: number; failed: number; lastError: string | null; lastSentAt: number | null };
   events: Array<{ username: string; action: string; resourceType: string; detail: unknown; createdAt: number }>;
+  requestStats?: { windowStart: number; total: number; failed: number } | null;
 };
 
 function authToken(): string {

@@ -69,9 +69,22 @@ test('BUILTIN_ROLES: class_admin permissions match the approved contract', () =>
   assert.deepEqual([...roleById('class_admin').permissions].sort(), expected);
 });
 
-test('BUILTIN_ROLES: viewer is limited to read/export permissions', () => {
+test('BUILTIN_ROLES: viewer (巡考员) is limited to read/export permissions', () => {
   const viewer = roleById('viewer');
-  assert.deepEqual([...viewer.permissions].sort(), ['major.read', 'school.read', 'weekly.export', 'weekly.read'].sort());
+  assert.equal(viewer.name, '巡考员');
+  assert.deepEqual(
+    [...viewer.permissions].sort(),
+    [
+      'alerts.read',
+      'device.read',
+      'major.export',
+      'major.read',
+      'school.read',
+      'settings.read',
+      'weekly.export',
+      'weekly.read',
+    ].sort(),
+  );
   for (const permission of viewer.permissions) {
     assert.ok(/\.(read|export)$/.test(permission), `viewer should only hold read/export permissions, found "${permission}"`);
   }

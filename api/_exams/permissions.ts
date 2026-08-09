@@ -130,9 +130,11 @@ export function sanitizeStaleSnapshot(
   current: ExamPayload,
   body: Record<string, any>,
 ): Record<string, any> {
+  // 全校范围账号直接信任完整快照（超管可改一切，无需清洗）。
   if (allScope(actor)) return body;
   let next = body;
 
+  // ── 周测计划：仅保留账号可管理班级范围内的提交，其余回退服务器当前值 ──
   if (Array.isArray(next.weeklyPlans)) {
     const submittedById = new Map(
       next.weeklyPlans.map((plan: any) => [String(plan?.id ?? ""), plan]),
@@ -158,10 +160,12 @@ export function sanitizeStaleSnapshot(
     next = { ...next, weeklyPlans: merged };
   }
 
+  // ── 年级结构：非全校账号一律以服务器当前值为准 ──
   if (Array.isArray(next.grades) && !sameJson(current.grades, next.grades)) {
     next = { ...next, grades: current.grades };
   }
 
+  // ── 班级结构：无 class_manage 全量回退；有 class_manage 按年级范围合并 ──
   if (Array.isArray(next.classes)) {
     if (!hasPermission(actor, "school.class_manage")) {
       if (!sameJson(current.classes, next.classes)) {
@@ -193,6 +197,7 @@ export function sanitizeStaleSnapshot(
     }
   }
 
+  // ── 生效周测计划映射：范围外班级回退 ──
   if (
     next.activeWeeklyPlanIdByClassId !== null &&
     typeof next.activeWeeklyPlanIdByClassId === "object" &&
@@ -216,11 +221,33 @@ export function sanitizeStaleSnapshot(
     next = { ...next, activeWeeklyPlanIdByClassId: mergedMapping };
   }
 
-  if (Array.isArray(next.majors) && !hasPermission(actor, "major.edit")) {
+  // ── 大型考试：权威合并。
+  //    有 major.edit 且目标年级/班级全部在账号范围内的提交保留；
+  //    账号自建的临时考试、范围内的提前结束保留；
+  //    其余（越权/陈旧/全校）一律回退服务器当前值。 ──
+  if (Array.isArray(next.majors)) {
     const submittedById = new Map(
       next.majors.map((major: any) => [String(major?.id ?? ""), major]),
     );
     const currentMajors = current.majors as any[];
+    const classesForMajors = Array.isArray(next.classes) ? next.classes : current.classes;
+    const classesById = new Map(
+      (classesForMajors as any[]).map((schoolClass) => [String(schoolClass?.id ?? ""), schoolClass]),
+    );
+    const majorTargetsInScope = (major: any): boolean => {
+      const gradeIds = Array.isArray(major?.targetGradeIds)
+        ? major.targetGradeIds.map(String)
+        : [];
+      const classIds = Array.isArray(major?.targetClassIds)
+        ? major.targetClassIds.map(String)
+        : [];
+      if (!gradeIds.length && !classIds.length) return false; // 全校范围：作用域账号不可管理
+      if (!gradeIds.every((id: string) => canAccessGrade(actor, id))) return false;
+      return classIds.every((id: string) => {
+        const schoolClass: any = classesById.get(id);
+        return !!schoolClass && canAccessClass(actor, String(schoolClass.gradeId ?? ""), id);
+      });
+    };
     const seen = new Set<string>();
     const merged: any[] = [];
     const canManageOwnMajor = (major: any) =>
@@ -228,9 +255,11 @@ export function sanitizeStaleSnapshot(
     const canEndScopedMajor = (currentMajor: any, submittedMajor: any) =>
       hasPermission(actor, "major.quick_create") &&
       !!submittedMajor &&
-      canControlQuickTemporaryMajorInScope(actor, currentMajor, current.classes as any[]) &&
-      canControlQuickTemporaryMajorInScope(actor, submittedMajor, next.classes as any[]) &&
+      canControlQuickTemporaryMajorInScope(actor, currentMajor, classesForMajors as any[]) &&
+      canControlQuickTemporaryMajorInScope(actor, submittedMajor, classesForMajors as any[]) &&
       isEarlyQuickMajorEnd(currentMajor, submittedMajor);
+    const canEditMajorInScope = (major: any): boolean =>
+      hasPermission(actor, "major.edit") && majorTargetsInScope(major);
 
     for (const currentMajor of currentMajors) {
       const id = String(currentMajor?.id ?? "");
@@ -240,17 +269,53 @@ export function sanitizeStaleSnapshot(
         if (submittedMajor) merged.push(submittedMajor);
       } else if (canEndScopedMajor(currentMajor, submittedMajor)) {
         merged.push(submittedMajor);
+      } else if (submittedMajor && canEditMajorInScope(submittedMajor)) {
+        merged.push(submittedMajor);
       } else {
         merged.push(currentMajor);
       }
     }
     for (const submittedMajor of next.majors) {
       if (seen.has(String(submittedMajor?.id ?? ""))) continue;
-      if (canManageOwnMajor(submittedMajor)) merged.push(submittedMajor);
+      if (canManageOwnMajor(submittedMajor) || canEditMajorInScope(submittedMajor)) {
+        merged.push(submittedMajor);
+      }
     }
     next = { ...next, majors: merged };
+
+    // title / activeMajorId / items 不信任 body：从“清洗后接受的 activeMajor”派生，
+    // 避免陈旧标题/活动考试被写入，也避免班级管理员因陈旧值触发 major.edit 校验。
+    const mergedIds = new Set(merged.map((major) => String(major?.id ?? "")));
+    const bodyActiveId = String(body.activeMajorId ?? "");
+    const bodyActiveAccepted = bodyActiveId !== "" && mergedIds.has(bodyActiveId);
+    const activeId = bodyActiveAccepted ? bodyActiveId : String(current.activeMajorId ?? "");
+    const activeMajor = merged.find((major) => String(major?.id ?? "") === activeId) ?? null;
+    next = {
+      ...next,
+      activeMajorId: activeId,
+      title: activeMajor ? String(activeMajor.name ?? "") : String(current.title ?? ""),
+      items: activeMajor && Array.isArray(activeMajor.items) ? activeMajor.items : (current.items ?? []),
+    };
   }
 
+  // ── 全局字段：非全校账号一律回退服务器当前值（校验要求全校/超管权限） ──
+  if (body.scheduleMode !== undefined && current.scheduleMode !== body.scheduleMode) {
+    next = { ...next, scheduleMode: current.scheduleMode };
+  }
+  if (
+    body.weeklyConflictPolicy !== undefined &&
+    !sameJson(current.weeklyConflictPolicy, body.weeklyConflictPolicy)
+  ) {
+    next = { ...next, weeklyConflictPolicy: current.weeklyConflictPolicy };
+  }
+  if (
+    body.initialization !== undefined &&
+    !sameJson(current.initialization, body.initialization)
+  ) {
+    next = { ...next, initialization: current.initialization };
+  }
+
+  // ── 全屏提醒：无 alerts.edit 时回退 ──
   if (
     next.alerts !== undefined &&
     !hasPermission(actor, "alerts.edit") &&
@@ -261,7 +326,6 @@ export function sanitizeStaleSnapshot(
 
   return next;
 }
-
 export function validateMutation(
   actor: AdminActor,
   current: ExamPayload,

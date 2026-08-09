@@ -28,6 +28,7 @@
     "src/services/examOutbox.ts",
     "api/_auth.ts",
     "api/login.ts",
+    "api/emailAuth.ts",
     "src/utils/renderMarkdown.ts",
     "api/globals.d.ts",
     "api/_exams/types.ts",

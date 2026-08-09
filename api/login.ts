@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { authenticateUser, checkLoginLockout, extractBearer, getActor, isAdminRecoveryConfigured, isPasswordRequired, recoverSuperAdmin, repairSuperAdmin, writeAudit } from './_auth.js';
+import { handleEmailAuth } from './emailAuth.js';
 import { requestId, sendDatabaseError } from './_apiError.js';
 import { applyCors } from './_cors.js';
 
@@ -9,6 +10,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   requestId(req, res);
   res.setHeader('Cache-Control', 'no-store');
   if (!applyCors(req, res, { methods: ['GET', 'POST'] })) return;
+  const emailAction = String(req.method === 'GET' ? (req.query?.action ?? '') : ((req.body ?? {}).action ?? ''));
+  if (['email-config', 'email-config-full', 'email-send-code', 'email-login', 'email-bind-request', 'email-bind-confirm', 'email-unbind', 'email-save-config', 'email-test-config', 'email-clear-config'].includes(emailAction)) {
+    return handleEmailAuth(req, res, emailAction);
+  }
   try {
     if (req.method === 'GET') {
       const action = String(req.query?.action ?? 'status');

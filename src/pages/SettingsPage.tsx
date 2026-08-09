@@ -18,6 +18,7 @@ import AnnouncementsSection from "../components/settings/AnnouncementsSection";
 import TelemetrySection from "../components/settings/TelemetrySection";
 import DeploymentSection from "../components/settings/DeploymentSection";
 import SchoolInfoSection from "../components/settings/SchoolInfoSection";
+import EmailServiceSection from "../components/settings/EmailServiceSection";
 import WeeklyCalendarSection from "../components/settings/WeeklyCalendarSection";
 import SubjectTrackModeSection from "../components/settings/SubjectTrackModeSection";
 import TimeSyncSection from "../components/settings/TimeSyncSection";
@@ -110,6 +111,7 @@ export default function SettingsPage() {
           </div>
         )}
         <SchoolInfoSection canEditSchool={canEditSchool} />
+        <EmailServiceSection canEditSettings={canEditSettings} canEditPolicy={canResetDatabase} />
         <WeeklyCalendarSection canEditWeekly={canEditWeekly} adminUser={adminUser} />
 
         <SubjectTrackModeSection canEditSettings={canEditSettings} />

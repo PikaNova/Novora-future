@@ -28,6 +28,7 @@ import {
 import ClassMultiPicker, { type ClassPickerOption } from "./ClassMultiPicker";
 import InlineSelect from "./InlineSelect";
 import AdminWizardSteps, { AdminWorkflowClose } from "./AdminWizardSteps";
+import AccountEmailBinding from "./AccountEmailBinding";
 import { confirmDialog } from "../services/appDialog";
 import {
   ROLE_MODULES,
@@ -1050,6 +1051,7 @@ export default function UserManagementPanel({
 
         </div>
       </div>
+      <AccountEmailBinding />
       {current?.mustChangePassword && (
         <div className="admin-info-banner admin-info-banner--warn">
           当前使用的是初始账户信息。请先设置自己的用户名和新密码，完成后重新登录。

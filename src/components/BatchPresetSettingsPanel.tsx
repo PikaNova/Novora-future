@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Clock3 } from "lucide-react";
 import Mascot from "./Mascot";
 import TimeRangePickerModal from "./TimeRangePickerModal";
-import { COMMON_EXAM_SUBJECTS, normalizeSubjectList } from "../data/subjects";
+import { COMMON_EXAM_SUBJECTS, normalizeSubjectList, normalizeSubjectName } from "../data/subjects";
 import type { MajorBatchSubjectGroup, MajorBatchTimeGroup, MajorBatchTimeSlot } from "../utils/appSettings";
 import {
   APP_SETTINGS_CHANGED_EVENT,

@@ -460,6 +460,18 @@ export async function loginAdmin(username: string, password: string): Promise<Lo
   }
 }
 
+
+export function storeAdminSession(token: string | null, expiresAt: number, user: AdminUserContext | null, firstLogin = false): void {
+  if (token) {
+    localStorage.setItem(TOKEN_KEY, token);
+    localStorage.setItem(TOKEN_EXPIRES_KEY, String(expiresAt ?? 0));
+  }
+  if (user) {
+    localStorage.setItem(ADMIN_USER_KEY, JSON.stringify(user));
+    if (firstLogin === true && user.roleId === 'grade_admin') localStorage.setItem(GRADE_ADMIN_FIRST_LOGIN_KEY, String(user.id));
+  }
+}
+
 export function hasValidLocalToken(): boolean {
   const token = localStorage.getItem(TOKEN_KEY);
   const expires = Number(localStorage.getItem(TOKEN_EXPIRES_KEY) ?? 0);

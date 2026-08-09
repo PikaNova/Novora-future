@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { SchoolClass, SchoolGrade } from "../types/school";
 import AdminModalPortal from './AdminModalPortal';
@@ -227,6 +227,15 @@ export default function UserManagementPanel({
   const [batchDeleteMode, setBatchDeleteMode] = useState(false);
   const [selectedUserIds, setSelectedUserIds] = useState<number[]>([]);
   const [batchDeleteGradeId, setBatchDeleteGradeId] = useState("");
+  const [collapsedGroups, setCollapsedGroups] = useState<
+    Record<string, boolean>
+  >({});
+  const [searchQuery, setSearchQuery] = useState("");
+  const [roleFilter, setRoleFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [menuUser, setMenuUser] = useState<string | null>(null);
+  const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
+  const [matrixDraft, setMatrixDraft] = useState<RoleDraft | null>(null);
 
   const load = async () => {
     if (!canReadUsers || current?.mustChangePassword) {
@@ -482,6 +491,66 @@ export default function UserManagementPanel({
       setBusy(false);
     }
   };
+  const selectRole = (role: ManagedRole) => {
+    setSelectedRoleId(role.id);
+    setMatrixDraft(
+      role.builtIn
+        ? null
+        : {
+            id: role.id,
+            name: role.name,
+            description: role.description,
+            permissions: role.permissions,
+          },
+    );
+  };
+  const setMatrixModuleLevel = (
+    module: (typeof ROLE_MODULES)[number],
+    level: RoleLevel,
+  ) =>
+    setMatrixDraft((value) => {
+      if (!value) return value;
+      const modulePermissions = [...module.read, ...module.manage];
+      const retained = value.permissions.filter(
+        (item) => !modulePermissions.includes(item),
+      );
+      const added =
+        level === "none"
+          ? []
+          : level === "read"
+            ? module.read
+            : [...module.read, ...module.manage];
+      return {
+        ...value,
+        permissions: [...new Set([...retained, ...added])],
+      };
+    });
+  const saveMatrixRole = async () => {
+    if (!matrixDraft) return;
+    setBusy(true);
+    setMessage("");
+    try {
+      const next = await saveManagedRole(matrixDraft);
+      setRoles(next);
+      const saved = next.find((role) => role.id === matrixDraft.id);
+      setMatrixDraft(
+        saved
+          ? {
+              id: saved.id,
+              name: saved.name,
+              description: saved.description,
+              permissions: saved.permissions,
+            }
+          : null,
+      );
+      setMessage("角色权限已保存。");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "角色保存失败");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const submitReset = async () => {
     if (!resetTarget || resetPassword.length < 8) {
       setResetError("新密码至少需要 8 位");
@@ -624,6 +693,96 @@ export default function UserManagementPanel({
         : removableUsers,
     [batchDeleteGradeId, removableUsers],
   );
+  const BUILTIN_GROUP_ORDER = [
+    "super_admin",
+    "grade_admin",
+    "class_admin",
+    "viewer",
+  ];
+  const groupUsersByRole = (userList: ManagedUser[]) => {
+    const groups = new Map<
+      string,
+      { key: string; name: string; builtIn: boolean; users: ManagedUser[] }
+    >();
+    for (const user of userList) {
+      const builtIn = BUILTIN_GROUP_ORDER.includes(user.roleId);
+      const existing = groups.get(user.roleId);
+      if (existing) existing.users.push(user);
+      else
+        groups.set(user.roleId, {
+          key: user.roleId,
+          name: user.roleName || user.roleId,
+          builtIn,
+          users: [user],
+        });
+    }
+    return [...groups.values()].sort((a, b) => {
+      const aIndex = BUILTIN_GROUP_ORDER.indexOf(a.key);
+      const bIndex = BUILTIN_GROUP_ORDER.indexOf(b.key);
+      const aOrder = aIndex >= 0 ? aIndex : BUILTIN_GROUP_ORDER.length;
+      const bOrder = bIndex >= 0 ? bIndex : BUILTIN_GROUP_ORDER.length;
+      return aOrder - bOrder || a.name.localeCompare(b.name, "zh-CN");
+    });
+  };
+  const groupsInitialized = useRef(false);
+  useEffect(() => {
+    if (groupsInitialized.current || !users.length) return;
+    groupsInitialized.current = true;
+    const currentRoleName =
+      users.find((user) => user.id === current?.id)?.roleName ?? "";
+    setCollapsedGroups((prev) => {
+      const next = { ...prev };
+      for (const group of groupUsersByRole(users)) {
+        if (!(group.key in next))
+          next[group.key] = group.name !== currentRoleName;
+      }
+      return next;
+    });
+  }, [users, current?.id]);
+  const filteredUsers = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return users.filter((user) => {
+      if (
+        query &&
+        !user.displayName.toLowerCase().includes(query) &&
+        !user.username.toLowerCase().includes(query)
+      )
+        return false;
+      if (roleFilter && user.roleId !== roleFilter) return false;
+      if (statusFilter && user.status !== statusFilter) return false;
+      return true;
+    });
+  }, [users, searchQuery, roleFilter, statusFilter]);
+  const userGroups = useMemo(
+    () => groupUsersByRole(batchDeleteMode ? batchDeleteUsers : filteredUsers),
+    [batchDeleteMode, batchDeleteUsers, filteredUsers],
+  );
+  const selectedRole = useMemo(
+    () => roles.find((role) => role.id === selectedRoleId) ?? null,
+    [roles, selectedRoleId],
+  );
+  useEffect(() => {
+    if (!roles.length) return;
+    setSelectedRoleId((id) =>
+      id && roles.some((role) => role.id === id) ? id : roles[0].id,
+    );
+  }, [roles]);
+  const rolePermissionGroups = (
+    role: ManagedRole,
+    draft: RoleDraft | null,
+  ) => {
+    const permissions =
+      draft && draft.id === role.id ? draft.permissions : role.permissions;
+    return groupedPermissions
+      .map((group) => ({
+        ...group,
+        items: permissions.includes("*")
+          ? group.items
+          : group.items.filter((item) => permissions.includes(item)),
+      }))
+      .filter((group) => group.items.length);
+  };
+
   const removeSelectedUsers = async () => {
     const targets = removableUsers.filter((user) => selectedUserIds.includes(user.id));
     if (!targets.length) return;
@@ -859,29 +1018,8 @@ export default function UserManagementPanel({
               </button>
             </>
           )}
-          {section === "users" && canDeleteUser && (
-            <button
-              className={`admin-btn${batchDeleteMode ? " admin-btn--danger" : ""}`}
-              onClick={() => {
-                setBatchDeleteMode((value) => !value);
-                setSelectedUserIds([]);
-                setBatchDeleteGradeId("");
-              }}
-            >
-              {batchDeleteMode ? "退出批量删除" : "批量删除账户"}
-            </button>
-          )}
-          {section === "roles" && canManageRoles && (
-            <button
-              className="admin-btn admin-btn--primary"
-              onClick={() => {
-                setRoleError("");
-                setRoleDraft({ name: "", description: "", permissions: [] });
-              }}
-            >
-              新建角色
-            </button>
-          )}
+
+
         </div>
       </div>
       {current?.mustChangePassword && (
@@ -953,202 +1091,486 @@ export default function UserManagementPanel({
               </strong>
             </div>
           </div>
-          {batchDeleteMode && (
-            <div className="user-management__batch-delete">
-              <InlineSelect
-                className="admin-input user-management__batch-grade-filter"
-                value={batchDeleteGradeId}
-                onChange={(value) => {
-                  setBatchDeleteGradeId(value);
-                  setSelectedUserIds([]);
-                }}
-                options={[
-                  { value: "", label: "全部年级" },
-                  ...visibleGrades.map((grade) => ({
-                    value: grade.id,
-                    label: grade.name,
-                  })),
-                ]}
-              />
-              <label>
-                <input
-                  type="checkbox"
-                  checked={batchDeleteUsers.length > 0 && batchDeleteUsers.every((user) => selectedUserIds.includes(user.id))}
-                  onChange={(event) => setSelectedUserIds(event.target.checked ? batchDeleteUsers.map((user) => user.id) : [])}
+                    {canDeleteUser && (
+            <div className="user-management__batch-entry">
+              {batchDeleteMode && (
+                <InlineSelect
+                  className="admin-input user-management__batch-grade-filter"
+                  value={batchDeleteGradeId}
+                  onChange={(value) => {
+                    setBatchDeleteGradeId(value);
+                    setSelectedUserIds([]);
+                  }}
+                  options={[
+                    { value: "", label: "全部年级" },
+                    ...visibleGrades.map((grade) => ({
+                      value: grade.id,
+                      label: grade.name,
+                    })),
+                  ]}
                 />
-                选择当前可删除账号
-              </label>
-              <span>已选择 {selectedUserIds.length} 个账号</span>
-              <button className="admin-btn admin-btn--danger" disabled={busy || !selectedUserIds.length} onClick={() => void removeSelectedUsers()}>
-                删除所选账号
+              )}
+              <button
+                className={`admin-btn${batchDeleteMode ? " admin-btn--danger" : ""}`}
+                onClick={() => {
+                  setBatchDeleteMode((value) => !value);
+                  setSelectedUserIds([]);
+                  setBatchDeleteGradeId("");
+                }}
+              >
+                {batchDeleteMode ? "退出批量删除" : "批量删除账户"}
               </button>
+              {batchDeleteMode && (
+                <span className="user-management__batch-entry-count">
+                  已选择 {selectedUserIds.length} 个账号
+                </span>
+              )}
+              {batchDeleteMode && (
+                <button
+                  className="admin-btn admin-btn--danger"
+                  disabled={busy || !selectedUserIds.length}
+                  onClick={() => void removeSelectedUsers()}
+                >
+                  删除所选账号
+                </button>
+              )}
             </div>
           )}
-          <div className="user-management__list">
-            {batchDeleteMode && batchDeleteUsers.length === 0 ? (
-              <div className="admin-empty"><Mascot className="mascot-empty" size={64} alt="" /><p>当前年级没有可批量删除的账号。</p></div>
-            ) : (batchDeleteMode ? batchDeleteUsers : users).map((user) => (
-              <article
-                className={`user-management__row${user.status === "disabled" ? " is-disabled" : ""}${batchDeleteMode ? " is-batch" : ""}`}
-                key={user.id}
-              >
-                {batchDeleteMode && user.id !== current?.id && (
-                  <input
-                    className="user-management__batch-check"
-                    type="checkbox"
-                    checked={selectedUserIds.includes(user.id)}
-                    onChange={(event) => setSelectedUserIds((ids) => event.target.checked ? [...ids, user.id] : ids.filter((id) => id !== user.id))}
-                    aria-label={`选择 ${user.displayName}`}
-                  />
-                )}
-                <div className="user-management__identity">
-                  <strong>
-                    {user.displayName}
-                    {user.id === current?.id && (
-                      <span className="user-management__self">当前账号</span>
-                    )}
-                  </strong>
-                  <code>@{user.username}</code>
-                </div>
-                <div className="user-management__scope-cell">
-                  <span className="user-management__role">{user.roleName}</span>
-                  <small>{scopeText(user, grades, classes)}</small>
-                </div>
-                <div className="user-management__status-cell">
-                  <small>
-                    {user.status === "active" ? "已启用" : "已停用"} ·{" "}
-                    {fmt(user.lastLoginAt)}
-                  </small>
-                  {user.mustChangePassword && <em>首次登录需改密码</em>}
-                </div>
-                {(canEditUser || canResetPassword || canDeleteUser) && (
-                  <div className="user-management__actions">
-                    {canEditUser && (
-                      <button
-                        className="admin-btn"
-                        onClick={() => beginEditUser(user)}
-                      >
-                        编辑
-                      </button>
-                    )}
-                    {canResetPassword && user.id !== current?.id && (
-                      <button
-                        className="admin-btn"
-                        onClick={() => {
-                          setResetTarget(user);
-                          setResetMode("generated");
-                          setResetPassword(generateTemporaryPassword());
-                          setResetError("");
-                        }}
-                      >
-                        重置密码
-                      </button>
-                    )}
-                    {canDeleteUser && user.id !== current?.id && (
-                      <button
-                        className="admin-btn admin-btn--danger"
-                        onClick={() => void removeUser(user)}
-                      >
-                        删除
-                      </button>
-                    )}
-                    {user.id === current?.id && (
-                      <button
-                        className="admin-btn"
-                        onClick={() => {
-                          setPasswordErrors({});
-                          setPasswordOpen(true);
-                        }}
-                      >
-                        修改密码
-                      </button>
+          {!batchDeleteMode && (
+            <div className="user-management__toolbar">
+              <input
+                className="admin-input"
+                placeholder="搜索姓名或用户名…"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+              />
+              <InlineSelect
+                className="admin-input"
+                value={roleFilter}
+                onChange={setRoleFilter}
+                options={[
+                  { value: "", label: "全部角色" },
+                  ...roles.map((role) => ({ value: role.id, label: role.name })),
+                ]}
+              />
+              <InlineSelect
+                className="admin-input"
+                value={statusFilter}
+                onChange={setStatusFilter}
+                options={[
+                  { value: "", label: "全部状态" },
+                  { value: "active", label: "已启用" },
+                  { value: "disabled", label: "已停用" },
+                ]}
+              />
+              <span className="user-management__toolbar-count">
+                共 {filteredUsers.length} 个账号
+              </span>
+            </div>
+          )}
+          <div className="user-management__groups">
+            {userGroups.map((group) => {
+              const expanded = !collapsedGroups[group.key];
+              const allSelected =
+                group.users.length > 0 &&
+                group.users.every((user) => selectedUserIds.includes(user.id));
+              return (
+                <section className="user-management__group" key={group.key}>
+                  <div className="user-management__group-head">
+                    <button
+                      type="button"
+                      className="user-management__group-toggle"
+                      aria-expanded={expanded}
+                      onClick={() =>
+                        setCollapsedGroups((prev) => ({
+                          ...prev,
+                          [group.key]: !prev[group.key],
+                        }))
+                      }
+                    >
+                      <span
+                        className="user-management__group-caret"
+                        aria-hidden="true"
+                      />
+                      <strong>{group.name}</strong>
+                      {group.builtIn && (
+                        <span className="user-management__group-badge">内置</span>
+                      )}
+                      <span className="user-management__group-count">
+                        {group.users.length} 人
+                      </span>
+                    </button>
+                    {batchDeleteMode && group.users.length > 0 && (
+                      <label className="user-management__group-select">
+                        <input
+                          type="checkbox"
+                          checked={allSelected}
+                          onChange={(event) =>
+                            setSelectedUserIds((ids) =>
+                              event.target.checked
+                                ? [
+                                    ...new Set([
+                                      ...ids,
+                                      ...group.users.map((user) => user.id),
+                                    ]),
+                                  ]
+                                : ids.filter(
+                                    (id) =>
+                                      !group.users.some((user) => user.id === id),
+                                  ),
+                            )
+                          }
+                        />
+                        全选本组
+                      </label>
                     )}
                   </div>
-                )}
-              </article>
-            ))}
+                  {expanded && (
+                    <div className="user-management__group-body">
+                      {group.users.length === 0 ? (
+                        <div className="user-management__group-empty">
+                          该角色暂无账号
+                        </div>
+                      ) : (
+                        group.users.map((user) => (
+                          <article
+                            className={`user-management__row${user.status === "disabled" ? " is-disabled" : ""}${batchDeleteMode ? " is-batch" : ""}`}
+                            key={user.id}
+                          >
+                            {batchDeleteMode && user.id !== current?.id && (
+                              <input
+                                className="user-management__batch-check"
+                                type="checkbox"
+                                checked={selectedUserIds.includes(user.id)}
+                                onChange={(event) =>
+                                  setSelectedUserIds((ids) =>
+                                    event.target.checked
+                                      ? [...ids, user.id]
+                                      : ids.filter((id) => id !== user.id),
+                                  )
+                                }
+                                aria-label={"选择 " + user.displayName}
+                              />
+                            )}
+                            <div className="user-management__identity">
+                              <strong>
+                                {user.displayName}
+                                {user.id === current?.id && (
+                                  <span className="user-management__self">
+                                    当前账号
+                                  </span>
+                                )}
+                                {user.mustChangePassword && (
+                                  <span className="user-management__password-badge">
+                                    首次登录需改密码
+                                  </span>
+                                )}
+                              </strong>
+                              <code>@{user.username}</code>
+                            </div>
+                            <div
+                              className="user-management__scope-cell"
+                              title={scopeText(user, grades, classes)}
+                            >
+                              <span className="user-management__role">
+                                {user.roleName}
+                              </span>
+                              <small>{scopeText(user, grades, classes)}</small>
+                            </div>
+                            <div
+                              className="user-management__status-cell"
+                              title={"最近登录：" + fmt(user.lastLoginAt)}
+                            >
+                              <small>
+                                <i
+                                  className={
+                                    "user-management__status-dot" +
+                                    (user.status === "active"
+                                      ? " is-active"
+                                      : " is-disabled")
+                                  }
+                                  aria-hidden="true"
+                                />
+                                {user.status === "active" ? "已启用" : "已停用"}
+                              </small>
+                            </div>
+                            {(canEditUser ||
+                              canResetPassword ||
+                              canDeleteUser) && (
+                              <div className="user-management__actions">
+                                {canEditUser && (
+                                  <button
+                                    className="admin-btn"
+                                    onClick={() => beginEditUser(user)}
+                                  >
+                                    编辑
+                                  </button>
+                                )}
+                                {(canResetPassword ||
+                                  canDeleteUser ||
+                                  user.id === current?.id) && (
+                                  <div className="user-management__menu-wrap">
+                                    <button
+                                      type="button"
+                                      className="admin-btn user-management__menu-btn"
+                                      aria-haspopup="menu"
+                                      aria-expanded={menuUser === String(user.id)}
+                                      onClick={() =>
+                                        setMenuUser(
+                                          menuUser === String(user.id)
+                                            ? null
+                                            : String(user.id),
+                                        )
+                                      }
+                                    >
+                                      ⋯
+                                    </button>
+                                    {menuUser === String(user.id) && (
+                                      <>
+                                        <span
+                                          className="user-management__menu-backdrop"
+                                          onClick={() => setMenuUser(null)}
+                                        />
+                                        <div
+                                          className="user-management__menu"
+                                          role="menu"
+                                        >
+                                          {canResetPassword &&
+                                            user.id !== current?.id && (
+                                              <button
+                                                type="button"
+                                                role="menuitem"
+                                                onClick={() => {
+                                                  setMenuUser(null);
+                                                  setResetTarget(user);
+                                                  setResetMode("generated");
+                                                  setResetPassword(
+                                                    generateTemporaryPassword(),
+                                                  );
+                                                  setResetError("");
+                                                }}
+                                              >
+                                                重置密码
+                                              </button>
+                                            )}
+                                          {canDeleteUser &&
+                                            user.id !== current?.id && (
+                                              <button
+                                                type="button"
+                                                role="menuitem"
+                                                onClick={() => {
+                                                  setMenuUser(null);
+                                                  void removeUser(user);
+                                                }}
+                                              >
+                                                删除
+                                              </button>
+                                            )}
+                                          {user.id === current?.id && (
+                                            <button
+                                              type="button"
+                                              role="menuitem"
+                                              onClick={() => {
+                                                setMenuUser(null);
+                                                setPasswordOpen(true);
+                                              }}
+                                            >
+                                              修改密码
+                                            </button>
+                                          )}
+                                        </div>
+                                      </>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </article>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </section>
+              );
+            })}
           </div>
         </>
       ) : section === "roles" ? (
-        <div className="user-management__role-list">
-          {roles.map((role) => {
-            const roleGroups = groupedPermissions
-              .map((group) => ({
-                ...group,
-                items: role.permissions.includes("*")
-                  ? group.items
-                  : group.items.filter((item) =>
-                      role.permissions.includes(item),
-                    ),
-              }))
-              .filter((group) => group.items.length);
-            return (
-              <article className="user-management__role-row" key={role.id}>
-                <div className="user-management__role-main">
-                  <div>
-                    <strong>{role.name}</strong>
-                    {role.builtIn && <span>内置</span>}
-                  </div>
-                  <p>{role.description || "尚未填写角色职责说明。"}</p>
-                  <details className="user-management__role-detail">
-                    <summary>
-                      {role.permissions.includes("*")
-                        ? "查看全部系统权限说明"
-                        : `查看 ${role.permissions.length} 项权限说明`}
-                    </summary>
-                    <div className="user-management__role-groups">
-                      {roleGroups.map((group) => (
-                        <section key={group.prefix}>
-                          <b>{group.label}</b>
-                          <ul>
-                            {group.items.map((permission) => (
-                              <li key={permission}>
-                                <strong>
-                                  {permissionMeta(permission).label}
-                                </strong>
-                                <span>
-                                  {permissionMeta(permission).description}
-                                </span>
-                              </li>
-                            ))}
-                          </ul>
-                        </section>
-                      ))}
-                    </div>
-                  </details>
-                </div>
-                <div className="user-management__permission-summary">
+        <div className="user-management__role-layout">
+          <aside className="user-management__role-list">
+            {canManageRoles && (
+              <button
+                className="admin-btn admin-btn--primary user-management__new-role"
+                onClick={() => {
+                  setRoleError("");
+                  setRoleDraft({ name: "", description: "", permissions: [] });
+                }}
+              >
+                新建角色
+              </button>
+            )}
+            {roles.map((role) => (
+              <button
+                type="button"
+                key={role.id}
+                className={
+                  "user-management__role-item" +
+                  (selectedRoleId === role.id ? " is-active" : "")
+                }
+                aria-pressed={selectedRoleId === role.id}
+                onClick={() => selectRole(role)}
+              >
+                <span className="user-management__role-item-main">
+                  <strong>{role.name}</strong>
+                  {role.builtIn && <em>内置</em>}
+                </span>
+                <small>
                   {role.permissions.includes("*")
                     ? "全部权限"
-                    : `${role.permissions.length} 项权限`}
-                </div>
-                {!role.builtIn && (
-                  <div className="user-management__actions">
-                    <button
-                      className="admin-btn"
-                      onClick={() => {
-                        setRoleError("");
-                        setRoleDraft({
-                          id: role.id,
-                          name: role.name,
-                          description: role.description,
-                          permissions: role.permissions,
-                        });
-                      }}
-                    >
-                      编辑
-                    </button>
-                    <button
-                      className="admin-btn admin-btn--danger"
-                      onClick={() => void removeRole(role)}
-                    >
-                      删除
-                    </button>
-                  </div>
-                )}
-              </article>
-            );
-          })}
+                    : role.permissions.length + " 项权限"}
+                </small>
+              </button>
+            ))}
+          </aside>
+          <section className="user-management__role-panel">
+            {selectedRole ?
+              (() => {
+                const permissionGroups = rolePermissionGroups(
+                  selectedRole,
+                  matrixDraft,
+                );
+                const draft =
+                  matrixDraft && matrixDraft.id === selectedRole.id
+                    ? matrixDraft
+                    : null;
+                const shownPermissions = draft
+                  ? draft.permissions
+                  : selectedRole.permissions;
+                return (
+                  <>
+                    <div className="user-management__role-panel-head">
+                      <div>
+                        <strong>{selectedRole.name}</strong>
+                        {selectedRole.builtIn && <span>内置</span>}
+                      </div>
+                      <small>
+                        {shownPermissions.includes("*")
+                          ? "全部权限"
+                          : shownPermissions.length + " 项权限"}
+                      </small>
+                    </div>
+                    <p className="user-management__role-panel-desc">
+                      {selectedRole.description || "尚未填写角色职责说明。"}
+                    </p>
+                    <div className="user-management__matrix">
+                      <div className="user-management__matrix-row user-management__matrix-head">
+                        <span>模块</span>
+                        <span>不可访问</span>
+                        <span>仅查看</span>
+                        <span>可管理</span>
+                      </div>
+                      {ROLE_MODULES.map((module) => {
+                        const level = moduleLevel(shownPermissions, module);
+                        const canManage = module.manage.length > 0;
+                        const readonly = selectedRole.builtIn || !draft;
+                        return (
+                          <div className="user-management__matrix-row" key={module.id}>
+                            <span className="user-management__matrix-module">
+                              <strong>{module.label}</strong>
+                              <small>
+                                {canManage ? "查看或管理整个模块" : "仅控制显示"}
+                              </small>
+                            </span>
+                            {(["none", "read", "manage"] as const).map(
+                              (levelKey) => {
+                                const disabled =
+                                  readonly ||
+                                  (!canManage && levelKey === "manage");
+                                return (
+                                  <button
+                                    type="button"
+                                    key={levelKey}
+                                    className={
+                                      "user-management__matrix-cell" +
+                                      (level === levelKey ? " is-active" : "") +
+                                      (disabled ? " is-disabled" : "")
+                                    }
+                                    disabled={disabled}
+                                    onClick={() => {
+                                      if (draft) {
+                                        setMatrixModuleLevel(module, levelKey);
+                                      }
+                                    }}
+                                  >
+                                    {levelKey === "none"
+                                      ? "—"
+                                      : levelKey === "read"
+                                        ? "查看"
+                                        : "管理"}
+                                  </button>
+                                );
+                              },
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {!selectedRole.builtIn && (
+                      <div className="user-management__matrix-actions">
+                        <button
+                          className="admin-btn admin-btn--primary"
+                          disabled={busy || !draft}
+                          onClick={() => void saveMatrixRole()}
+                        >
+                          {busy ? "保存中…" : "保存角色"}
+                        </button>
+                        <button
+                          className="admin-btn"
+                          disabled={busy}
+                          onClick={() => setMatrixDraft(null)}
+                        >
+                          放弃修改
+                        </button>
+                      </div>
+                    )}
+                    {permissionGroups.length > 0 && (
+                      <details className="user-management__role-detail">
+                        <summary>
+                          {shownPermissions.includes("*")
+                            ? "查看全部系统权限说明"
+                            : "查看 " + shownPermissions.length + " 项权限明细"}
+                        </summary>
+                        <div className="user-management__role-groups">
+                          {permissionGroups.map((group) => (
+                            <section key={group.prefix}>
+                              <b>{group.label}</b>
+                              <ul>
+                                {group.items.map((permission) => (
+                                  <li key={permission}>
+                                    <strong>
+                                      {permissionMeta(permission).label}
+                                    </strong>
+                                    <span>
+                                      {permissionMeta(permission).description}
+                                    </span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </section>
+                          ))}
+                        </div>
+                      </details>
+                    )}
+                  </>
+                );
+              })()
+            : (
+              <div className="admin-empty">
+                <Mascot className="mascot-empty" size={64} alt="" />
+                <p>请选择一个角色查看权限</p>
+              </div>
+            )}
+          </section>
         </div>
       ) : (
         <div className="user-management__audit">

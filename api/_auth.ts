@@ -143,7 +143,6 @@ export async function ensureAuthTables(): Promise<void> {
         updated_at BIGINT NOT NULL,
         CHECK (id = 1)
       )`,
-      transaction`ALTER TABLE email_config ADD COLUMN IF NOT EXISTS init_bind_policy TEXT NOT NULL DEFAULT 'optional'`,
       transaction`ALTER TABLE app_auth ADD COLUMN IF NOT EXISTS recovery_key_hash TEXT`,
       transaction`ALTER TABLE app_auth ADD COLUMN IF NOT EXISTS recovery_key_salt TEXT`,
       transaction`CREATE TABLE IF NOT EXISTS app_telemetry_config (
@@ -225,6 +224,7 @@ export async function ensureAuthTables(): Promise<void> {
         updated_at BIGINT NOT NULL DEFAULT 0,
         CHECK (id = 1)
       )`,
+      transaction`ALTER TABLE email_config ADD COLUMN IF NOT EXISTS init_bind_policy TEXT NOT NULL DEFAULT 'optional'`,
     ]);
     const now = Date.now();
     await Promise.all(BUILTIN_ROLES.map(role => sql`INSERT INTO app_roles (id, name, description, permissions, built_in, created_at, updated_at)

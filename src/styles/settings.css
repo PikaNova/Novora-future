@@ -228,13 +228,15 @@ select.set-input { cursor: pointer; }
 .set-collapse__body .set-card__lead{margin-top:0}
 @media(max-width:620px){.set-group-nav{top:52px}.set-group{scroll-margin-top:116px}.set-collapse__toggle{padding:14px 14px}.set-collapse__body{padding:12px 14px 16px}}
 
-/* ―― 手机端：滚动时隐藏顶部标题栏，分组导航保持钉顶；消除横向溢出 ―― */
+/* ―― 分组导航：桌面双栏常驻；手机端滚动时隐藏标题栏、导航钉顶；消除横向溢出 ―― */
 .set-body{min-width:0}
 .set-header{transition:transform .22s ease,opacity .22s ease,border-color .22s ease}
-.set-page.is-scrolled .set-header{transform:translateY(-100%);opacity:0;pointer-events:none;border-bottom-color:transparent}
 .set-group-nav{min-width:0;max-width:100%;box-sizing:border-box;top:60px;transition:top .22s ease}
-.set-page.is-scrolled .set-group-nav{top:0}
-@media(max-width:620px){.set-group-nav{top:52px}.set-page.is-scrolled .set-group-nav{top:0}}
+@media(max-width:620px){
+  .set-page.is-scrolled .set-header{transform:translateY(-100%);opacity:0;pointer-events:none;border-bottom-color:transparent}
+  .set-group-nav{top:52px}
+  .set-page.is-scrolled .set-group-nav{top:0}
+}
 
 /* ―― 系统状态面板（仅超管，系统设置-基础信息） ―― */
 .system-status__summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:4px 0 14px}

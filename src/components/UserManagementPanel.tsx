@@ -1198,7 +1198,10 @@ export default function UserManagementPanel({
               </span>
             </div>
           )}
-          <div className="user-management__groups">
+          <div
+            className="user-management__groups"
+            key={`${roleFilter}|${statusFilter}|${batchDeleteMode}`}
+          >
             {userGroups.map((group) => {
               const expanded = !collapsedGroups[group.key];
               const allSelected =
@@ -1398,7 +1401,10 @@ export default function UserManagementPanel({
               </button>
             ))}
           </aside>
-          <section className="user-management__role-panel">
+          <section
+            className="user-management__role-panel"
+            key={selectedRole ? selectedRole.id : "none"}
+          >
             {selectedRole ?
               (() => {
                 const permissionGroups = rolePermissionGroups(

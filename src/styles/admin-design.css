@@ -940,3 +940,72 @@
 .user-management__menu-wrap {
   position: static;
 }
+
+
+/* ---- New content animations (2026-08-10) ---- */
+/* A1 分组展开 / 空状态 */
+.user-management__group-body {
+  animation: app-panel-in 180ms var(--adm-ease) both;
+}
+.user-management__group-empty {
+  animation: app-fade-in 160ms ease-out both;
+}
+/* A2/A3 菜单与遮罩 */
+.user-management__menu {
+  transform-origin: top right;
+  animation: app-menu-in 120ms ease-out both;
+}
+.user-management__menu-backdrop {
+  animation: app-fade-in 120ms ease-out both;
+}
+/* A4 批量模式 / 工具栏 / 复选框 */
+.user-management__batch-entry,
+.user-management__toolbar {
+  animation: app-fade-in 160ms ease-out both;
+}
+.user-management__group-select,
+.user-management__batch-check {
+  animation: app-fade-in 120ms ease-out both;
+}
+/* A5 角色列表选中态过渡 */
+.user-management__role-item {
+  transition:
+    background-color var(--adm-dur-fast) var(--adm-ease),
+    border-color var(--adm-dur-fast) var(--adm-ease),
+    color var(--adm-dur-fast) var(--adm-ease);
+}
+/* A6 权限矩阵单元格过渡 */
+.user-management__matrix-cell {
+  transition:
+    background-color var(--adm-dur-fast) var(--adm-ease),
+    color var(--adm-dur-fast) var(--adm-ease);
+}
+/* A7 角色面板切换 */
+.user-management__role-panel {
+  animation: app-panel-in 180ms var(--adm-ease) both;
+}
+/* B1 状态点脉冲 */
+.system-status__dot.is-ok {
+  animation: systemStatusPulse 2.6s ease-in-out infinite;
+}
+.system-status__dot.is-warn {
+  animation: systemStatusPulse 1.4s ease-in-out infinite;
+}
+.system-status__dot.is-err {
+  animation: systemStatusPulse 1.1s ease-in-out infinite;
+}
+@keyframes systemStatusPulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+/* B3 状态区块入场 */
+.system-status {
+  animation: sw-rise var(--adm-dur-base) var(--adm-ease) both;
+}
+/* C1/C2 部署设置面板与更新说明 */
+.set-update-guide {
+  animation: app-panel-in 180ms var(--adm-ease) both;
+}
+.set-readme {
+  animation: app-fade-in 180ms ease-out both;
+}

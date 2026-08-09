@@ -929,6 +929,7 @@
   border: 0;
   background: transparent;
   cursor: default;
+  z-index: 0;
 }
 .user-management__menu {
   right: auto;

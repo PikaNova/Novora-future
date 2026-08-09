@@ -30,7 +30,7 @@ export default function LoginPage() {
   const [passwordUpgrade, setPasswordUpgrade] = useState<{ current: string; username: string; next: string; confirm: string; token: string } | null>(null);
   const [emailEnabled, setEmailEnabled] = useState<boolean | null>(null);
   const [emailPolicy, setEmailPolicy] = useState<EmailBindPolicy>('optional');
-  const [emailView, setEmailView] = useState(false);
+  const [emailView, setEmailView] = useState(true);
   const [emailAddr, setEmailAddr] = useState('');
   const [emailCode, setEmailCode] = useState('');
   const [emailLoading, setEmailLoading] = useState(false);
@@ -67,7 +67,8 @@ export default function LoginPage() {
       if (!alive) return;
       setEmailEnabled(config.enabled);
       setEmailPolicy(config.initBindPolicy);
-    }).catch(() => { if (alive) setEmailEnabled(false); });
+      setEmailView(config.enabled);
+    }).catch(() => { if (alive) { setEmailEnabled(false); setEmailView(false); } });
     return () => { alive = false; };
   }, []);
 
@@ -254,11 +255,11 @@ export default function LoginPage() {
         </form> : <>
         {!initializing && emailEnabled === true && (
           <div className="login-form__tabs" role="tablist" aria-label="登录方式">
-            <button type="button" className={emailView ? '' : 'is-active'} onClick={() => { setEmailView(false); setError(''); setEmailError(''); }}>密码登录</button>
             <button type="button" className={emailView ? 'is-active' : ''} onClick={() => { setEmailView(true); setError(''); setEmailError(''); }}>验证码登录</button>
+            <button type="button" className={emailView ? '' : 'is-active'} onClick={() => { setEmailView(false); setError(''); setEmailError(''); }}>密码登录</button>
           </div>
         )}
-        {emailView ? (
+        {emailEnabled === true && emailView ? (
         <form className="login-form" onSubmit={submitEmailLogin}>
           <p className="login-form__notice">输入已绑定邮箱，我们会发送 6 位验证码到您的邮箱，5 分钟内有效。</p>
           <label className="login-form__label" htmlFor="email-address">邮箱</label>

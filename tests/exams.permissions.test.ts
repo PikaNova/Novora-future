@@ -634,3 +634,92 @@ test('validateMutation: changing other initialization fields requires initializa
   );
   assert.equal(allowed.ok, true);
 });
+
+test('sanitizeStaleSnapshot: grade admin can add an in-scope major while stale majors and global fields are restored', () => {
+  const actor = makeActor({
+    permissions: ['major.create', 'major.edit'],
+    scopes: [scope({ type: 'grade', gradeId: 'g1' })],
+  });
+  const ownMajor = { id: 'm1', name: '已有考试', items: [], targetGradeIds: ['g1'], targetClassIds: [] };
+  const staleMajor = { id: 'm2', name: '越权陈旧考试', items: [], targetGradeIds: ['g2'], targetClassIds: [] };
+  const newMajor = {
+    id: 'm3', name: '新建考试', items: [{ id: 'i1', enabled: true }],
+    targetGradeIds: ['g1'], targetClassIds: [],
+  };
+  const current = makeCurrent({
+    majors: [ownMajor, staleMajor],
+    activeMajorId: 'm1',
+    title: '已有考试',
+    items: [],
+    scheduleMode: 'major-only',
+    weeklyConflictPolicy: null,
+    initialization: { schoolName: '服务器校名' },
+    alerts: { enabled: true },
+    grades: [{ id: 'g1' }, { id: 'g2' }],
+    classes: [],
+  });
+  const sanitized = sanitizeStaleSnapshot(actor, current, {
+    majors: [{ ...ownMajor, name: '已有考试(客户端改名)' }, staleMajor, newMajor],
+    activeMajorId: 'm3',
+    title: '陈旧标题',
+    items: [{ id: 'stale', enabled: true }],
+    scheduleMode: 'automatic',
+    weeklyConflictPolicy: { scope: 'whole-day' },
+    initialization: { schoolName: '陈旧校名' },
+    alerts: { enabled: false },
+    grades: current.grades,
+    classes: current.classes,
+  });
+
+  // 范围内已有考试保留客户端改名；越权陈旧考试回退；新建范围内考试保留
+  assert.deepEqual(sanitized.majors, [
+    { ...ownMajor, name: '已有考试(客户端改名)' },
+    staleMajor,
+    newMajor,
+  ]);
+  // title / activeMajorId / items 从“清洗后接受的 activeMajor”派生
+  assert.equal(sanitized.activeMajorId, 'm3');
+  assert.equal(sanitized.title, '新建考试');
+  assert.deepEqual(sanitized.items, newMajor.items);
+  // 全局字段全部回退服务器当前值
+  assert.equal(sanitized.scheduleMode, 'major-only');
+  assert.deepEqual(sanitized.weeklyConflictPolicy, null);
+  assert.deepEqual(sanitized.initialization, current.initialization);
+  assert.deepEqual(sanitized.alerts, current.alerts);
+  // 清洗后校验通过（不会因越权/陈旧数据 403）
+  assert.equal(validateMutation(actor, current, sanitized).ok, true);
+});
+
+test('sanitizeStaleSnapshot: class admin is not blocked by stale title/activeMajorId/global fields', () => {
+  const actor = makeActor({
+    permissions: ['weekly.edit', 'major.quick_create'],
+    scopes: [scope({ type: 'class', gradeId: 'g1', classId: 'c1' })],
+  });
+  const formal = { id: 'm1', name: '正式考试', items: [], targetGradeIds: ['g1'], targetClassIds: ['c1'] };
+  const current = makeCurrent({
+    majors: [formal],
+    activeMajorId: 'm1',
+    title: '正式考试',
+    items: [],
+    scheduleMode: 'major-only',
+    weeklyConflictPolicy: null,
+    grades: [{ id: 'g1' }],
+    classes: [{ id: 'c1', gradeId: 'g1' }],
+  });
+  const sanitized = sanitizeStaleSnapshot(actor, current, {
+    majors: [formal],
+    activeMajorId: 'm_stale',
+    title: '陈旧标题',
+    items: [{ id: 'stale', enabled: true }],
+    scheduleMode: 'automatic',
+    weeklyConflictPolicy: { scope: 'whole-day' },
+  });
+
+  assert.deepEqual(sanitized.majors, [formal]);
+  assert.equal(sanitized.activeMajorId, 'm1');
+  assert.equal(sanitized.title, '正式考试');
+  assert.deepEqual(sanitized.items, []);
+  assert.equal(sanitized.scheduleMode, 'major-only');
+  assert.deepEqual(sanitized.weeklyConflictPolicy, null);
+  assert.equal(validateMutation(actor, current, sanitized).ok, true);
+});

@@ -9,6 +9,7 @@ import InlineSelect from './InlineSelect';
 import { DateTimeField } from './touch-datetime-picker';
 import AdminWizardSteps from './AdminWizardSteps';
 import '../styles/initialization-wizard.css';
+import '../styles/settings.css';
 import EmailServicePanel from './EmailServicePanel';
 
 export type InitializationPasswordChange = { currentPassword: string; newPassword: string };

@@ -241,3 +241,13 @@
   background: rgba(224, 96, 96, 0.35);
   color: #fff;
 }
+/* ―― 自包含控件样式：设置页未加载 admin.css，避免输入框/按钮回退为浏览器默认白底 ―― */
+.batch-preset-panel .admin-input{padding:7px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);color:#eef4f9;font-size:13px;outline:none;transition:border-color .2s}
+.batch-preset-panel .admin-input:focus{border-color:#3498db}
+.batch-preset-panel .admin-input::placeholder{color:rgba(235,244,250,.45)}
+.batch-preset-panel .admin-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:6px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.06);color:#eef4f9;font-size:13px;cursor:pointer;white-space:nowrap;transition:background .2s,border-color .2s}
+.batch-preset-panel .admin-btn:hover{background:rgba(255,255,255,.12)}
+.batch-preset-panel .admin-btn:disabled{opacity:.5;cursor:not-allowed}
+.batch-preset-panel .admin-btn--primary{background:#3498db;border-color:#3498db;color:#fff;font-weight:600}
+.batch-preset-panel .admin-btn--primary:hover{background:#2980b9}
+@media(max-width:640px){.batch-preset-panel .admin-input{min-height:44px;font-size:16px}.batch-preset-panel .admin-btn{min-height:44px}}

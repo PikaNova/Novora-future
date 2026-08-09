@@ -37,6 +37,7 @@ export default function SettingsPage() {
     getAdminUser(),
   );
   const [denied, setDenied] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
     if (hasValidLocalToken()) {
       refreshAdminUser().then((user) => {
@@ -64,6 +65,12 @@ export default function SettingsPage() {
       else navigate("/login?next=/settings", { replace: true });
     });
   }, [navigate]);
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 12);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
   const canEditSettings = adminUser
     ? adminCan("settings.edit", adminUser)
     : !hasValidLocalToken();
@@ -99,7 +106,7 @@ export default function SettingsPage() {
 
 
   return (
-    <div className="set-page">
+    <div className={"set-page" + (scrolled ? " is-scrolled" : "")}>
       <header className="set-header">
         <div className="set-header__left">
           <button className="set-back" onClick={() => navigate("/admin")}>

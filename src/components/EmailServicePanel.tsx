@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import InlineSelect from './InlineSelect';
 import { Switch } from './settings/Switch';
+import { confirmDialog } from '../services/appDialog';
 import {
   clearEmailConfig,
   fetchEmailConfigFull,
@@ -131,7 +132,8 @@ export default function EmailServicePanel({
   };
 
   const clear = async () => {
-    if (!window.confirm('确定清空邮件服务配置并停用邮箱登录与绑定吗？')) return;
+    const ok = await confirmDialog({ title: '停用邮件服务', message: '确定清空邮件服务配置并停用邮箱登录与绑定吗？', tone: 'danger', confirmLabel: '停用并清空' });
+    if (!ok) return;
     setSaving(true); setErr(''); setMsg('');
     try {
       await clearEmailConfig();

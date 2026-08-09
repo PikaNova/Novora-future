@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { bindEmailConfirm, bindEmailRequest, fetchEmailConfig, unbindEmail } from '../services/emailAuth';
+import { confirmDialog } from '../services/appDialog';
 
 export default function AccountEmailBinding() {
   const [enabled, setEnabled] = useState<boolean | null>(null);
@@ -50,7 +51,8 @@ export default function AccountEmailBinding() {
   };
 
   const unbind = async () => {
-    if (!window.confirm('确定解绑当前邮箱吗？解绑后将无法使用邮箱验证码登录。')) return;
+    const ok = await confirmDialog({ title: '解绑邮箱', message: '确定解绑当前邮箱吗？解绑后将无法使用邮箱验证码登录。', tone: 'danger', confirmLabel: '解绑' });
+    if (!ok) return;
     setBusy(true); setErr(''); setMsg('');
     try {
       await unbindEmail();

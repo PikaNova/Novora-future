@@ -18,7 +18,6 @@ export type SystemStatusPayload = {
     version: string | null; sizeBytes: number | null; tables: number | null; indexes: number | null;
     activeConnections: number | null; maxConnections: number | null;
     cacheHitRate: number | null; xactCommit: number | null; xactRollback: number | null;
-    largestTables: Array<{ name: string; sizeBytes: number }>;
     error?: string;
   };
   infra: {

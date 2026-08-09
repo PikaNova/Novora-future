@@ -108,7 +108,6 @@ async function collectDatabase(): Promise<{
   version: string | null; sizeBytes: number | null; tables: number | null; indexes: number | null;
   activeConnections: number | null; maxConnections: number | null;
   cacheHitRate: number | null; xactCommit: number | null; xactRollback: number | null;
-  largestTables: Array<{ name: string; sizeBytes: number }>;
   error?: string;
 }> {
   try {
@@ -128,14 +127,13 @@ async function collectDatabase(): Promise<{
       rowShape<{ next_allowed_at: number | string }>({ next_allowed_at: (v): v is number | string => typeof v === 'number' || typeof v === 'string' }),
       'write_throttle',
     );
-    const [versionRows, sizeRows, countRows, connRows, statRows, xactRows, topRows] = await Promise.all([
+    const [versionRows, sizeRows, countRows, connRows, statRows, xactRows] = await Promise.all([
       authSql()`SHOW server_version`,
       authSql()`SELECT pg_database_size(current_database())::bigint AS size`,
       authSql()`SELECT (SELECT COUNT(*)::int FROM information_schema.tables WHERE table_schema='public') AS tables, (SELECT COUNT(*)::int FROM pg_indexes WHERE schemaname='public') AS indexes`,
       authSql()`SELECT (SELECT COUNT(*)::int FROM pg_stat_activity) AS active, (SELECT current_setting('max_connections')::int) AS maxconn`,
       authSql()`SELECT blks_hit::bigint AS hit, blks_read::bigint AS read FROM pg_stat_database WHERE datname=current_database()`,
       authSql()`SELECT xact_commit::bigint AS commit, xact_rollback::bigint AS rollback FROM pg_stat_database WHERE datname=current_database()`,
-      authSql()`SELECT c.relname AS name, pg_total_relation_size(c.oid)::bigint AS size FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind IN ('r','p','m') ORDER BY size DESC LIMIT 3`,
     ]);
     const isNum = (v: unknown): v is number => typeof v === 'number';
     const versionRow = assertRows(versionRows, rowShape<{ server_version: string }>({ server_version: isString }), 'pg_version')[0];
@@ -144,7 +142,6 @@ async function collectDatabase(): Promise<{
     const connRow = assertRows(connRows, rowShape<{ active: number; maxconn: number }>({ active: isNum, maxconn: isNum }), 'pg_conns')[0];
     const statRow = assertRows(statRows, rowShape<{ hit: DatabaseInt8; read: DatabaseInt8 }>({ hit: isDatabaseInt8, read: isDatabaseInt8 }), 'pg_stat')[0];
     const xactRow = assertRows(xactRows, rowShape<{ commit: DatabaseInt8; rollback: DatabaseInt8 }>({ commit: isDatabaseInt8, rollback: isDatabaseInt8 }), 'pg_xact')[0];
-    const topRowsValid = assertRows(topRows, rowShape<{ name: string; size: DatabaseInt8 }>({ name: isString, size: isDatabaseInt8 }), 'pg_top');
     const hit = Number(statRow?.hit ?? 0);
     const read = Number(statRow?.read ?? 0);
     const cacheHitRate = hit + read > 0 ? (hit / (hit + read)) * 100 : null;
@@ -163,13 +160,12 @@ async function collectDatabase(): Promise<{
       cacheHitRate,
       xactCommit: xactRow ? Number(xactRow.commit) : null,
       xactRollback: xactRow ? Number(xactRow.rollback) : null,
-      largestTables: topRowsValid.map((row) => ({ name: row.name, sizeBytes: Number(row.size) })),
     };
   } catch (error) {
     return {
       reachable: false, latencyMs: null, schemaOk: false, missingTables: [], writeThrottleNextAllowedAt: null,
       version: null, sizeBytes: null, tables: null, indexes: null, activeConnections: null, maxConnections: null,
-      cacheHitRate: null, xactCommit: null, xactRollback: null, largestTables: [],
+      cacheHitRate: null, xactCommit: null, xactRollback: null,
       error: String(error instanceof Error ? error.message : error).slice(0, 200),
     };
   }

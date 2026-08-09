@@ -103,9 +103,6 @@ export default function SystemStatusSection() {
     isWindows && data.server.cpu.load1 === 0
       ? '—'
       : data.server.cpu.load1.toFixed(2) + ' / ' + data.server.cpu.load5.toFixed(2) + ' / ' + data.server.cpu.load15.toFixed(2);
-  const largestTables = data.database.largestTables.length
-    ? data.database.largestTables.map((item) => item.name + ' ' + formatBytes(item.sizeBytes)).join('、')
-    : '—';
   const reqStats = data.requestStats;
   const failedRate =
     reqStats && reqStats.total > 0 ? (reqStats.failed / reqStats.total) * 100 : null;
@@ -204,7 +201,6 @@ export default function SystemStatusSection() {
             <li><span>连接（活跃/上限）</span><b>{data.database.activeConnections != null ? data.database.activeConnections + ' / ' + (data.database.maxConnections ?? '—') : '—'}</b></li>
             <li><span>缓存命中率</span><b>{formatPercent(data.database.cacheHitRate)}</b></li>
             <li><span>事务提交 / 回滚</span><b>{data.database.xactCommit != null ? data.database.xactCommit.toLocaleString() + ' / ' + (data.database.xactRollback ?? 0).toLocaleString() : '—'}</b></li>
-            <li><span>最大表</span><b>{largestTables}</b></li>
             <li><span>Schema</span><b>{data.database.schemaOk ? '完整' : '不匹配'}</b></li>
             <li><span>缺失表</span><b>{data.database.missingTables.length ? data.database.missingTables.join(', ') : '无'}</b></li>
             <li><span>写入闸门</span><b>{data.database.writeThrottleNextAllowedAt ? formatClock(data.database.writeThrottleNextAllowedAt) : '空闲'}</b></li>

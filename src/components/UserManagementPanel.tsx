@@ -234,6 +234,7 @@ export default function UserManagementPanel({
   const [roleFilter, setRoleFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [menuUser, setMenuUser] = useState<string | null>(null);
+  const [menuRect, setMenuRect] = useState<{ left: number; top: number } | null>(null);
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
   const [matrixDraft, setMatrixDraft] = useState<RoleDraft | null>(null);
 
@@ -491,6 +492,33 @@ export default function UserManagementPanel({
       setBusy(false);
     }
   };
+  const toggleMenu = (
+    event: React.MouseEvent<HTMLButtonElement>,
+    user: ManagedUser,
+  ) => {
+    if (menuUser === String(user.id)) {
+      setMenuUser(null);
+      setMenuRect(null);
+      return;
+    }
+    const rect = event.currentTarget.getBoundingClientRect();
+    setMenuRect({ left: rect.right, top: rect.bottom });
+    setMenuUser(String(user.id));
+  };
+  useEffect(() => {
+    if (!menuUser) return;
+    const close = () => {
+      setMenuUser(null);
+      setMenuRect(null);
+    };
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    return () => {
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+    };
+  }, [menuUser]);
+
   const selectRole = (role: ManagedRole) => {
     setSelectedRoleId(role.id);
     setMatrixDraft(
@@ -1309,79 +1337,15 @@ export default function UserManagementPanel({
                                 {(canResetPassword ||
                                   canDeleteUser ||
                                   user.id === current?.id) && (
-                                  <div className="user-management__menu-wrap">
-                                    <button
-                                      type="button"
-                                      className="admin-btn user-management__menu-btn"
-                                      aria-haspopup="menu"
-                                      aria-expanded={menuUser === String(user.id)}
-                                      onClick={() =>
-                                        setMenuUser(
-                                          menuUser === String(user.id)
-                                            ? null
-                                            : String(user.id),
-                                        )
-                                      }
-                                    >
-                                      ⋯
-                                    </button>
-                                    {menuUser === String(user.id) && (
-                                      <>
-                                        <span
-                                          className="user-management__menu-backdrop"
-                                          onClick={() => setMenuUser(null)}
-                                        />
-                                        <div
-                                          className="user-management__menu"
-                                          role="menu"
-                                        >
-                                          {canResetPassword &&
-                                            user.id !== current?.id && (
-                                              <button
-                                                type="button"
-                                                role="menuitem"
-                                                onClick={() => {
-                                                  setMenuUser(null);
-                                                  setResetTarget(user);
-                                                  setResetMode("generated");
-                                                  setResetPassword(
-                                                    generateTemporaryPassword(),
-                                                  );
-                                                  setResetError("");
-                                                }}
-                                              >
-                                                重置密码
-                                              </button>
-                                            )}
-                                          {canDeleteUser &&
-                                            user.id !== current?.id && (
-                                              <button
-                                                type="button"
-                                                role="menuitem"
-                                                onClick={() => {
-                                                  setMenuUser(null);
-                                                  void removeUser(user);
-                                                }}
-                                              >
-                                                删除
-                                              </button>
-                                            )}
-                                          {user.id === current?.id && (
-                                            <button
-                                              type="button"
-                                              role="menuitem"
-                                              onClick={() => {
-                                                setMenuUser(null);
-                                                setPasswordOpen(true);
-                                              }}
-                                            >
-                                              修改密码
-                                            </button>
-                                          )}
-                                        </div>
-                                      </>
-                                    )}
-                                  </div>
+                                  <button
+                                    type="button"
+                                    className="admin-btn user-management__menu-btn"
+                                    aria-haspopup="menu"
+                                    aria-expanded={menuUser === String(user.id)}
+                                    onClick={(event) => toggleMenu(event, user)}
+                                  >
+                                    ⋯
+                                  </button>
                                 )}
                               </div>
                             )}
@@ -1592,6 +1556,87 @@ export default function UserManagementPanel({
         </div>
       )}
 
+      {menuUser && menuRect && (() => {
+        const target =
+          users.find((user) => String(user.id) === menuUser) ?? null;
+        if (!target) return null;
+        const itemCount =
+          (canResetPassword && target.id !== current?.id ? 1 : 0) +
+          (canDeleteUser && target.id !== current?.id ? 1 : 0) +
+          (target.id === current?.id ? 1 : 0);
+        const menuWidth = 148;
+        const menuHeight = itemCount * 34 + 14;
+        const left = Math.min(
+          Math.max(menuRect.left - menuWidth, 8),
+          window.innerWidth - menuWidth - 8,
+        );
+        const openUp =
+          menuRect.top + 8 + menuHeight > window.innerHeight;
+        const top = openUp
+          ? Math.max(menuRect.top - menuHeight - 6, 8)
+          : menuRect.top + 6;
+        return (
+          <AdminModalPortal className="user-management__menu-layer">
+            <button
+              type="button"
+              className="user-management__menu-backdrop"
+              aria-label="关闭菜单"
+              onClick={() => {
+                setMenuUser(null);
+                setMenuRect(null);
+              }}
+            />
+            <div
+              className="user-management__menu"
+              role="menu"
+              style={{ left, top }}
+            >
+              {canResetPassword && target.id !== current?.id && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setMenuUser(null);
+                    setMenuRect(null);
+                    setResetTarget(target);
+                    setResetMode("generated");
+                    setResetPassword(generateTemporaryPassword());
+                    setResetError("");
+                  }}
+                >
+                  重置密码
+                </button>
+              )}
+              {canDeleteUser && target.id !== current?.id && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setMenuUser(null);
+                    setMenuRect(null);
+                    void removeUser(target);
+                  }}
+                >
+                  删除
+                </button>
+              )}
+              {target.id === current?.id && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setMenuUser(null);
+                    setMenuRect(null);
+                    setPasswordOpen(true);
+                  }}
+                >
+                  修改密码
+                </button>
+              )}
+            </div>
+          </AdminModalPortal>
+        );
+      })()}
       {userDraft && (
         <AdminModalPortal className="admin-modal-overlay">
           <div

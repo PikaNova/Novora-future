@@ -1,4 +1,4 @@
-# Novora v2.7.1
+# Novora v2.7.2
 
 Novora 是面向学校教室大屏的考试与周测安排系统，包含客户端大屏、管理后台、设备管理、网页预览和 A4 PDF 下载。技术栈为 React、TypeScript、Vite、Vercel Functions 与 Neon Postgres。
 
@@ -183,6 +183,15 @@ npm run build
 
 ## 更新日志
 
+### V2.7.2
+
+- 支持纯本地/内网部署：新增 server 适配器复用全部 API，Docker Compose 一键启动（内嵌 PostgreSQL 16），不依赖 Vercel 与 Neon，与云端双部署共存。
+- 系统状态界面增强：新增内存总量/可用/使用率、CPU 型号/核心数/使用率、系统负载、启动时间，以及数据库版本、大小、表/索引数、连接数、缓存命中率、事务统计、最大表等数据；本地部署额外展示最近 5 分钟请求统计。
+- 内置角色“只读用户”更名为“巡考员”并扩展查看类权限（大型考试/周测/设备/提醒/设置只读）。
+- 用户与权限页改版：按角色分组折叠、搜索筛选、角色权限矩阵、批量删除入口调整。
+- 修复用户行“⋯”菜单层级与点击被遮罩拦截的问题。
+- 本地部署新增一键更新（npm run update:local / 双击 update-local.bat）。
+
 ### V2.7.1
 
 - 大型考试分考试支持按班级选科策略分发：语文、数学、外语默认对适用范围内全部班级可见，物理、化学、生物、思想政治、历史、地理等选择性科目会按班级选科组合自动限定到命中的班级。
@@ -257,3 +266,11 @@ npm run build
 完整发布记录以 [GitHub Releases](https://github.com/PikaNova/Novora/releases) 为准。
 
 官方问题反馈与部署交流群：`1067566386`。
+
+## 本地 / 内网部署（不依赖 Vercel 与 Neon）
+
+如需纯本地部署（教室局域网、无外网数据库），参见 [DEPLOY_LOCAL.md](./DEPLOY_LOCAL.md)：
+
+- Docker Compose 一键启动：应用 + 内嵌 PostgreSQL 16
+- 无 Docker：Node 22 + 本机 PostgreSQL，npm run serve
+- 与云端部署共存于同一仓库，互不冲突；server/ 适配器复用全部 api/* handler

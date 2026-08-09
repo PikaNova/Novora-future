@@ -1,6 +1,6 @@
 {
   "name": "novora",
-  "version": "2.7.1",
+  "version": "2.7.2",
   "private": true,
   "type": "module",
   "engines": {
@@ -17,7 +17,13 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+        "serve:build": "tsc -p tsconfig.server.json",
+        "start": "node server-build/server/serve.js",
+        "serve": "npm run build && npm run serve:build && node server-build/server/serve.js",
+        "docker:up": "docker compose up -d --build",
+        "docker:down": "docker compose down",
+    "update:local": "node scripts/update-local.cjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.9.5",

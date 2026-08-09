@@ -1,18 +1,19 @@
-FROM node:24-alpine AS build
+FROM node:22-alpine AS build
 WORKDIR /app
-COPY package*.json ./
-RUN npm install
+COPY package.json package-lock.json ./
+RUN npm ci --ignore-scripts
 COPY . .
+ARG VITE_SPEED_INSIGHTS=false
+ENV VITE_SPEED_INSIGHTS=$VITE_SPEED_INSIGHTS
 RUN npm run build
-RUN npx tsc -p tsconfig.server.json
+RUN npm run serve:build
 
-FROM node:24-alpine AS runtime
+FROM node:22-alpine AS runtime
 WORKDIR /app
-ENV NODE_ENV=production
-COPY package*.json ./
-RUN npm install --omit=dev
+ENV NODE_ENV=production PORT=3000
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev --ignore-scripts
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/server-build ./server-build
-COPY server.js ./server.js
 EXPOSE 3000
-CMD ["node", "server.js"]
+CMD ["node", "server-build/server/serve.js"]

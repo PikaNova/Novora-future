@@ -5,4 +5,12 @@ server-build
 .test-check
 .git
 .env
+data
 *.log
+.npm-cache
+.vercel
+.tmp
+.tmp-weekly-shots
+.browser-acceptance-profile
+.browser-acceptance-profile-9334
+deliveries

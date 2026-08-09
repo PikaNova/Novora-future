@@ -48,7 +48,7 @@ type EmailConfigRow = {
   smtp_from_name: string;
   admin_emails: string;
   init_bind_policy: string;
-  updated_at: number;
+  updated_at: DatabaseInt8;
 };
 const isEmailConfigRow = rowShape<EmailConfigRow>({
   id: isNumberLike,
@@ -62,7 +62,7 @@ const isEmailConfigRow = rowShape<EmailConfigRow>({
   smtp_from_name: isString,
   admin_emails: isString,
   init_bind_policy: isString,
-  updated_at: isNumberLike,
+  updated_at: isDatabaseInt8,
 });
 
 type EmailCodeRow = { id: DatabaseInt8; code: string; expires_at: DatabaseInt8; used: boolean };

@@ -191,6 +191,36 @@ select.set-input { cursor: pointer; }
 .set-policy-option{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid rgba(255,255,255,.1);border-radius:10px;background:rgba(255,255,255,.03);cursor:pointer}
 .set-policy-option.is-active{border-color:rgba(52,152,219,.55);background:rgba(52,152,219,.1)}
 .set-policy-option input{margin-top:3px}
+.set-policy-option input[type="radio"]{
+  appearance:none;
+  display:inline-grid;
+  place-content:center;
+  flex:none;
+  width:18px;
+  height:18px;
+  margin-top:2px;
+  border:1px solid rgba(174,197,213,.55);
+  border-radius:50%;
+  background:rgba(255,255,255,.035);
+  cursor:pointer;
+  transition:background .14s,border-color .14s,transform .14s;
+}
+.set-policy-option input[type="radio"]::after{
+  content:"";
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  background:#2586d7;
+  transform:scale(0);
+  transition:transform .14s;
+}
+.set-policy-option input[type="radio"]:checked{
+  border-color:#3498db;
+  background:rgba(52,152,219,.18);
+}
+.set-policy-option input[type="radio"]:checked::after{transform:scale(1)}
+.set-policy-option input[type="radio"]:focus-visible{outline:2px solid rgba(52,152,219,.55);outline-offset:1px}
+.set-policy-option input[type="radio"]:disabled{cursor:not-allowed;opacity:.55}
 .set-policy-option span{display:grid;gap:3px}
 .set-policy-option strong{font-size:.82rem;font-weight:700}
 .set-policy-option small{color:rgba(235,240,255,.55);font-size:.74rem;line-height:1.5}

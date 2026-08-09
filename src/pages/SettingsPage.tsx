@@ -26,6 +26,7 @@ import AlertsAdvancedSection from "../components/settings/AlertsAdvancedSection"
 import DataMaintenanceSection from "../components/settings/DataMaintenanceSection";
 import SettingsGroupNav from "../components/settings/SettingsGroupNav";
 import SettingsCollapsibleCard from "../components/settings/SettingsCollapsibleCard";
+import SystemStatusSection from "../components/settings/SystemStatusSection";
 import { ArrowLeft, DatabaseZap, ListChecks, RadioTower, Rocket } from "lucide-react";
 
 export default function SettingsPage() {
@@ -135,6 +136,7 @@ export default function SettingsPage() {
           <h2 className="set-group__title">基础信息</h2>
           <div className="set-group__body">
             <SchoolInfoSection canEditSchool={canEditSchool} />
+            {canResetDatabase && <SystemStatusSection />}
             <SettingsCollapsibleCard
               storageKey="novora_set_collapse_deploy"
               title="版本与更新"

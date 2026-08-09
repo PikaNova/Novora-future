@@ -235,3 +235,27 @@ select.set-input { cursor: pointer; }
 .set-group-nav{min-width:0;max-width:100%;box-sizing:border-box;top:60px;transition:top .22s ease}
 .set-page.is-scrolled .set-group-nav{top:0}
 @media(max-width:620px){.set-group-nav{top:52px}.set-page.is-scrolled .set-group-nav{top:0}}
+
+/* ―― 系统状态面板（仅超管，系统设置-基础信息） ―― */
+.system-status__summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:4px 0 14px}
+.system-status__summary-item{display:grid;grid-template-columns:auto 1fr;gap:2px 8px;align-items:center;padding:10px 12px;border:1px solid rgba(255,255,255,.08);border-radius:10px;background:rgba(255,255,255,.03)}
+.system-status__summary-item span{grid-column:2;font-size:11px;color:#8b95a1}
+.system-status__summary-item b{grid-column:2;font-size:13px;color:#e9edf2}
+.system-status__dot{width:9px;height:9px;grid-row:1/3;border-radius:50%;display:inline-block}
+.system-status__dot.is-ok{background:#2ecc71;box-shadow:0 0 8px rgba(46,204,113,.6)}
+.system-status__dot.is-warn{background:#f1c40f}
+.system-status__dot.is-err{background:#e74c3c;box-shadow:0 0 8px rgba(231,76,60,.6)}
+.system-status__dot.is-idle{background:#8b95a1}
+.system-status__grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:4px}
+.system-status__section{border-top:1px solid rgba(255,255,255,.07);padding-top:12px}
+.system-status__section h3{margin:0 0 10px;font-size:12.5px;font-weight:700;color:#c4ccd4;letter-spacing:.05em}
+.system-status__section--wide{grid-column:1/-1}
+.system-status__latency{font-variant-numeric:tabular-nums}
+.system-status__latency.is-warn{color:#f1c40f}
+.system-status__latency.is-err{color:#ff8a7d}
+.system-status__events{list-style:none;margin:0;padding:0;display:grid;gap:6px;max-height:260px;overflow:auto}
+.system-status__events li{display:flex;align-items:center;gap:10px;padding:7px 10px;border:1px solid rgba(255,255,255,.06);border-radius:8px;background:rgba(255,255,255,.025);font-size:12px}
+.system-status__event-time{flex:0 0 auto;color:#8b95a1;font-variant-numeric:tabular-nums}
+.system-status__events code{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#dce7f2}
+.system-status__event-user{flex:0 0 auto;color:#93a0ad}
+@media(max-width:620px){.system-status__summary{grid-template-columns:repeat(2,1fr)}.system-status__grid{grid-template-columns:1fr}.system-status__summary-item{padding:9px 10px}}

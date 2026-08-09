@@ -21,13 +21,7 @@ export default function DeploymentSection({
   } = useDeploymentSettings();
 
   return (
-        <section className="set-card">
-          <div className="set-card__head">
-            <h2 className="set-card__title">
-              <Rocket size={20} />
-              版本与更新
-            </h2>
-          </div>
+    <>
           <p className="set-card__lead">
             检查 Novora 官方仓库的最新发布版本；Deploy Hook
             会重新拉取当前项目已连接的 main 分支并部署。
@@ -188,6 +182,6 @@ export default function DeploymentSection({
               </a>
             </div>
           )}
-        </section>
+    </>
   );
 }

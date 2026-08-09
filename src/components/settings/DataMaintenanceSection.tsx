@@ -19,13 +19,7 @@ export default function DataMaintenanceSection({
 
   return (
     <>
-          <section className="set-card set-danger-zone">
-            <div className="set-card__head">
-              <h2 className="set-card__title">
-                <DatabaseZap size={20} /> 数据库重置
-              </h2>
-            </div>
-            <p className="set-card__lead">
+          <p className="set-card__lead">
               仅重置选择的业务数据，不删除超级管理员和其他登录账号。重置学校结构时会同时清除周测与设备绑定。
             </p>
             <div className="set-reset-grid">
@@ -81,7 +75,6 @@ export default function DataMaintenanceSection({
             >
               {resettingCloud ? "正在重置…" : "重置所选云端数据"}
             </button>
-          </section>
         {canResetDatabase && (
           <details className="set-card set-dev-tools">
             <summary>开发与测试</summary>

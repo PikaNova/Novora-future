@@ -200,3 +200,30 @@ select.set-input { cursor: pointer; }
 .set-actions .set-btn{flex:0 0 auto}
 .set-note--success{color:#7fd7a6}
 .set-note--error{color:#ff8a7d}
+
+/* ―― 设置页分组（v1.33） ―― */
+.set-group{display:flex;flex-direction:column;gap:14px;scroll-margin-top:128px}
+.set-group__title{display:flex;align-items:center;gap:8px;margin:12px 0 2px;font-size:12.5px;font-weight:800;letter-spacing:.1em;color:#8b95a1}
+.set-group__body{display:flex;flex-direction:column;gap:14px}
+.set-group-nav{position:sticky;top:60px;z-index:4;display:flex;gap:6px;margin:0 0 4px;padding:7px;border:1px solid rgba(255,255,255,.08);border-radius:12px;background:rgba(13,13,13,.94);backdrop-filter:blur(8px);overflow-x:auto;scrollbar-width:thin}
+.set-group-nav button{flex:0 0 auto;padding:7px 14px;border:0;border-radius:8px;background:transparent;color:#93a0ad;font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap;transition:background .15s,color .15s}
+.set-group-nav button:hover{color:#e9edf2;background:rgba(255,255,255,.06)}
+.set-group-nav button.is-active{color:#fff;background:#3498db}
+.set-note--local-hint{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:0;padding:10px 12px;border:1px solid rgba(96,146,255,.28);border-radius:10px;background:rgba(96,146,255,.08);color:#c9d9ff;font-size:12px;line-height:1.55}
+.set-note--local-hint a{color:#9dbdff;font-weight:700;text-decoration:underline}
+.set-note--local-hint a:hover{color:#d3e2ff}
+/* ―― 可折叠卡片 ―― */
+.set-collapse{padding:0;overflow:hidden}
+.set-collapse--danger{border-color:rgba(224,82,72,.35)}
+.set-collapse__toggle{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:15px 18px;border:0;background:transparent;color:#f2f5f8;font:inherit;cursor:pointer;text-align:left}
+.set-collapse__toggle:hover{background:rgba(255,255,255,.03)}
+.set-collapse__label{display:flex;align-items:center;gap:9px;min-width:0}
+.set-collapse__label svg{width:18px;height:18px;flex:none;color:#8b95a1}
+.set-collapse--danger .set-collapse__label{color:#ffaaa3}
+.set-collapse__title{font-size:15px;font-weight:700}
+.set-collapse__badge{margin-left:8px;padding:2px 8px;border-radius:999px;background:rgba(224,82,72,.14);color:#ffaaa3;font-size:11px;font-style:normal;font-weight:600}
+.set-collapse__chevron{flex:none;transition:transform .18s ease;color:#8b95a1}
+.set-collapse__chevron.is-open{transform:rotate(180deg)}
+.set-collapse__body{display:flex;flex-direction:column;gap:12px;padding:14px 18px 18px;border-top:1px solid rgba(255,255,255,.07)}
+.set-collapse__body .set-card__lead{margin-top:0}
+@media(max-width:620px){.set-group-nav{top:52px}.set-group{scroll-margin-top:116px}.set-collapse__toggle{padding:14px 14px}.set-collapse__body{padding:12px 14px 16px}}

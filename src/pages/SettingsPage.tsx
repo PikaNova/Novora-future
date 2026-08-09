@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   adminCan,
   getAdminUser,
@@ -22,10 +22,11 @@ import EmailServiceSection from "../components/settings/EmailServiceSection";
 import WeeklyCalendarSection from "../components/settings/WeeklyCalendarSection";
 import SubjectTrackModeSection from "../components/settings/SubjectTrackModeSection";
 import TimeSyncSection from "../components/settings/TimeSyncSection";
-import AppearanceSection from "../components/settings/AppearanceSection";
 import AlertsAdvancedSection from "../components/settings/AlertsAdvancedSection";
 import DataMaintenanceSection from "../components/settings/DataMaintenanceSection";
-import { ArrowLeft, ListChecks } from "lucide-react";
+import SettingsGroupNav from "../components/settings/SettingsGroupNav";
+import SettingsCollapsibleCard from "../components/settings/SettingsCollapsibleCard";
+import { ArrowLeft, DatabaseZap, ListChecks, RadioTower, Rocket } from "lucide-react";
 
 export default function SettingsPage() {
   const navigate = useNavigate();
@@ -82,7 +83,13 @@ export default function SettingsPage() {
     ? adminUser.permissions.includes("*")
     : !hasValidLocalToken();
 
-
+  const groups = [
+    { id: "basic", label: "基础信息" },
+    { id: "account", label: "登录与账号" },
+    { id: "exam", label: "考试与排课" },
+    { id: "runtime", label: "系统运行" },
+    ...(canResetDatabase ? [{ id: "maintenance", label: "数据与维护" }] : []),
+  ];
 
   if (!authed) return <LoadingState kind="auth" title="正在获取权限" message="正在确认系统设置权限…" />;
   if (denied)
@@ -110,40 +117,93 @@ export default function SettingsPage() {
             当前账号只能修改已授权的系统设置项，其余全局设置保持只读。如需修改登录密码，请前往“用户与权限”。
           </div>
         )}
-        <SchoolInfoSection canEditSchool={canEditSchool} />
-        <EmailServiceSection canEditSettings={canEditSettings} canEditPolicy={canResetDatabase} />
-        <WeeklyCalendarSection canEditWeekly={canEditWeekly} adminUser={adminUser} />
+        <div className="set-note set-note--local-hint">
+          显示风格、动效与字体属于本机偏好，请前往
+          <Link to="/local-settings">本地设置</Link>
+          调整。
+        </div>
+        <SettingsGroupNav groups={groups} />
 
-        <SubjectTrackModeSection canEditSettings={canEditSettings} />
-
-        {/* ―― 批量添加分考试预设 ―― */}
-        <section className="set-card">
-          <h2 className="set-card__title">
-            <ListChecks size={18} />
-            批量添加分考试预设
-          </h2>
-          <p className="set-note">
-            管理批量添加分考试时可复用的常用科目组和常用时间组，与批量添加弹窗中的设置共享，可在此新建、排序或删除。
-          </p>
-          <BatchPresetSettingsPanel canEdit={canEditSettings} />
+        <section id="set-group-basic" className="set-group" data-group="basic">
+          <h2 className="set-group__title">基础信息</h2>
+          <div className="set-group__body">
+            <SchoolInfoSection canEditSchool={canEditSchool} />
+            <SettingsCollapsibleCard
+              storageKey="novora_set_collapse_deploy"
+              title="版本与更新"
+              icon={<Rocket size={18} />}
+            >
+              <DeploymentSection adminUser={adminUser} />
+            </SettingsCollapsibleCard>
+            <AnnouncementsSection />
+          </div>
         </section>
 
-        <TimeSyncSection canEditSettings={canEditSettings} />
+        <section id="set-group-account" className="set-group" data-group="account">
+          <h2 className="set-group__title">登录与账号</h2>
+          <div className="set-group__body">
+            <EmailServiceSection
+              canEditSettings={canEditSettings}
+              canEditPolicy={canResetDatabase}
+            />
+          </div>
+        </section>
 
-        <AppearanceSection canEditSettings={canEditSettings} />
+        <section id="set-group-exam" className="set-group" data-group="exam">
+          <h2 className="set-group__title">考试与排课</h2>
+          <div className="set-group__body">
+            <WeeklyCalendarSection canEditWeekly={canEditWeekly} adminUser={adminUser} />
+            <SubjectTrackModeSection canEditSettings={canEditSettings} />
 
-        <AlertsAdvancedSection canReadAlerts={canReadAlerts} canEditAlerts={canEditAlerts} canEditSettings={canEditSettings} />
+            {/* ―― 批量添加分考试预设 ―― */}
+            <section className="set-card">
+              <h2 className="set-card__title">
+                <ListChecks size={18} />
+                批量添加分考试预设
+              </h2>
+              <p className="set-note">
+                管理批量添加分考试时可复用的常用科目组和常用时间组，与批量添加弹窗中的设置共享，可在此新建、排序或删除。
+              </p>
+              <BatchPresetSettingsPanel canEdit={canEditSettings} />
+            </section>
+          </div>
+        </section>
+
+        <section id="set-group-runtime" className="set-group" data-group="runtime">
+          <h2 className="set-group__title">系统运行</h2>
+          <div className="set-group__body">
+            <TimeSyncSection canEditSettings={canEditSettings} />
+            <AlertsAdvancedSection
+              canReadAlerts={canReadAlerts}
+              canEditAlerts={canEditAlerts}
+              canEditSettings={canEditSettings}
+            />
+            <SettingsCollapsibleCard
+              storageKey="novora_set_collapse_telemetry"
+              title="使用遥测"
+              icon={<RadioTower size={18} />}
+            >
+              <TelemetrySection canEditSettings={canEditSettings} />
+            </SettingsCollapsibleCard>
+          </div>
+        </section>
 
         {canResetDatabase && (
-          <DataMaintenanceSection canResetDatabase={canResetDatabase} />
+          <section id="set-group-maintenance" className="set-group" data-group="maintenance">
+            <h2 className="set-group__title">数据与维护</h2>
+            <div className="set-group__body">
+              <SettingsCollapsibleCard
+                storageKey="novora_set_collapse_maintenance"
+                title="数据维护"
+                icon={<DatabaseZap size={18} />}
+                badge="危险操作"
+                danger
+              >
+                <DataMaintenanceSection canResetDatabase={canResetDatabase} />
+              </SettingsCollapsibleCard>
+            </div>
+          </section>
         )}
-
-
-        <TelemetrySection canEditSettings={canEditSettings} />
-
-        <DeploymentSection adminUser={adminUser} />
-
-        <AnnouncementsSection />
 
         {/* ―― 关于（置于页面最底部） ―― */}
         <AboutSection />

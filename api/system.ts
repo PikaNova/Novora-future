@@ -1,6 +1,7 @@
-// 系统状态接口：仅超级管理员可访问，用于查看服务器/数据库/配置/邮件队列等系统级状态。
-// 兼容纯本地化部署：服务器信息全部来自 Node 运行时（process/os），不依赖 Vercel 专属能力；
-// Vercel 字段（region/runtime）仅在存在时返回。
+// 系统相关 Serverless 函数合并：/api/health、/api/status、/api/email-worker 三个 URL
+// 通过 vercel.json rewrites 指向本文件（?sys=...），合并为一个函数以符合 Vercel Hobby
+// “单次部署最多 12 个 Serverless Functions”的上限。
+// 兼容纯本地化部署：服务器信息全部来自 Node 运行时，不依赖 Vercel 专属能力。
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { readFileSync } from 'node:fs';
 import { hostname } from 'node:os';
@@ -8,6 +9,7 @@ import { authSql, ensureAuthTables, isAdminRecoveryConfigured, requireActor } fr
 import { assertRows, rowShape, isString, isNumberLike, isDatabaseInt8, type DatabaseInt8 } from './_validation.js';
 import { requestId, sendDatabaseError } from './_apiError.js';
 import { loadSmtpConfig } from './emailAuth.js';
+import { drainOutbox } from './_emailQueue.js';
 
 let cachedVersion: string | null = null;
 function readVersionFrom(url: URL): string | null {
@@ -28,6 +30,15 @@ function appVersion(): string {
   return cachedVersion;
 }
 
+function sysRoute(req: VercelRequest): string {
+  const fromQuery = String(req.query?.sys ?? '');
+  if (fromQuery === 'health' || fromQuery === 'status' || fromQuery === 'email-worker') return fromQuery;
+  const pathname = String(req.url ?? '').split('?')[0].replace(/\/+$/, '');
+  const segment = pathname.split('/').pop() ?? '';
+  if (segment === 'health' || segment === 'status' || segment === 'email-worker') return segment;
+  return '';
+}
+
 const isCountRow = rowShape<{ count: number }>({ count: (v): v is number => typeof v === 'number' });
 const isTableRow = rowShape<{ table_name: string }>({ table_name: isString });
 const isStatusRow = rowShape<{ status: string; n: number }>({ status: isString, n: (v): v is number => typeof v === 'number' });
@@ -41,6 +52,7 @@ const isEventRow = rowShape<{ username: string; action: string; resource_type: s
   created_at: isDatabaseInt8,
 });
 
+const CORE_TABLES = ['app_auth', 'app_users', 'app_roles', 'email_config', 'email_outbox', 'write_throttle'];
 const REQUIRED_TABLES = [
   'app_auth', 'app_roles', 'app_users', 'app_user_scopes', 'app_audit_logs',
   'email_config', 'email_verification_codes', 'email_outbox', 'mail_throttle',
@@ -54,6 +66,42 @@ function smtpPresetOf(host: string): 'qq' | '163' | 'custom' {
   return 'custom';
 }
 
+// ── /api/health（公开） ─────────────────────────────────────────────
+async function handleHealth(req: VercelRequest, res: VercelResponse): Promise<void> {
+  if (req.method !== 'GET') { res.status(405).json({ ok: false, code: 'METHOD_NOT_ALLOWED', error: 'Method not allowed' }); return; }
+  try {
+    const started = Date.now();
+    await ensureAuthTables();
+    await authSql()`SELECT 1`;
+    const latencyMs = Date.now() - started;
+    const tables = assertRows(
+      await authSql()`SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_name = ANY(${CORE_TABLES})`,
+      isTableRow,
+      'information_schema',
+    );
+    const present = new Set(tables.map((row) => row.table_name));
+    const missingTables = CORE_TABLES.filter((name) => !present.has(name));
+    const pendingRows = assertRows(
+      await authSql()`SELECT COUNT(*)::int AS count FROM email_outbox WHERE status='pending' AND next_attempt_at <= ${Date.now()}`,
+      isCountRow,
+      'email_outbox',
+    );
+    const schemaOk = missingTables.length === 0;
+    const backedUp = Number(pendingRows[0]?.count ?? 0) > 20;
+    res.status(schemaOk ? 200 : 503).json({
+      ok: schemaOk,
+      status: schemaOk ? 'ok' : 'degraded',
+      version: appVersion(),
+      serverTime: new Date().toISOString(),
+      latencyMs,
+      checks: { db: 'ok', schema: schemaOk ? 'ok' : 'mismatch', mailQueue: backedUp ? 'backed_up' : 'ok' },
+    });
+  } catch (error) {
+    sendDatabaseError(req, res, error, 'read');
+  }
+}
+
+// ── /api/status（仅超管） ───────────────────────────────────────────
 async function collectDatabase(): Promise<{ reachable: boolean; latencyMs: number | null; schemaOk: boolean; missingTables: string[]; writeThrottleNextAllowedAt: number | null; error?: string }> {
   try {
     const started = Date.now();
@@ -72,13 +120,7 @@ async function collectDatabase(): Promise<{ reachable: boolean; latencyMs: numbe
       rowShape<{ next_allowed_at: number | string }>({ next_allowed_at: (v): v is number | string => typeof v === 'number' || typeof v === 'string' }),
       'write_throttle',
     );
-    return {
-      reachable: true,
-      latencyMs,
-      schemaOk: missingTables.length === 0,
-      missingTables,
-      writeThrottleNextAllowedAt: throttle[0] ? Number(throttle[0].next_allowed_at) : null,
-    };
+    return { reachable: true, latencyMs, schemaOk: missingTables.length === 0, missingTables, writeThrottleNextAllowedAt: throttle[0] ? Number(throttle[0].next_allowed_at) : null };
   } catch (error) {
     return { reachable: false, latencyMs: null, schemaOk: false, missingTables: [], writeThrottleNextAllowedAt: null, error: String(error instanceof Error ? error.message : error).slice(0, 200) };
   }
@@ -105,23 +147,11 @@ async function collectInfra(): Promise<{ users: { total: number; active: number;
 }
 
 async function collectMailQueue(): Promise<{ pending: number; sending: number; sent: number; failed: number; lastError: string | null; lastSentAt: number | null }> {
-  const statusRows = assertRows(
-    await authSql()`SELECT status, COUNT(*)::int AS n FROM email_outbox GROUP BY status`,
-    isStatusRow,
-    'email_outbox',
-  );
+  const statusRows = assertRows(await authSql()`SELECT status, COUNT(*)::int AS n FROM email_outbox GROUP BY status`, isStatusRow, 'email_outbox');
   const counts: Record<string, number> = {};
   for (const row of statusRows) counts[row.status] = row.n;
-  const errorRows = assertRows(
-    await authSql()`SELECT last_error FROM email_outbox WHERE status IN ('pending','failed') AND last_error <> '' ORDER BY updated_at DESC LIMIT 1`,
-    isErrorRow,
-    'email_outbox',
-  );
-  const throttleRows = assertRows(
-    await authSql()`SELECT last_sent_at FROM mail_throttle WHERE id=1`,
-    isThrottleRow,
-    'mail_throttle',
-  );
+  const errorRows = assertRows(await authSql()`SELECT last_error FROM email_outbox WHERE status IN ('pending','failed') AND last_error <> '' ORDER BY updated_at DESC LIMIT 1`, isErrorRow, 'email_outbox');
+  const throttleRows = assertRows(await authSql()`SELECT last_sent_at FROM mail_throttle WHERE id=1`, isThrottleRow, 'mail_throttle');
   return {
     pending: counts.pending ?? 0,
     sending: counts.sending ?? 0,
@@ -143,9 +173,7 @@ async function collectEvents(): Promise<Array<{ username: string; action: string
   return rows.map((row) => ({ username: row.username, action: row.action, resourceType: row.resource_type, detail: row.detail, createdAt: Number(row.created_at) }));
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
-  requestId(req, res);
-  res.setHeader('Cache-Control', 'no-store');
+async function handleStatus(req: VercelRequest, res: VercelResponse): Promise<void> {
   if (req.method !== 'GET') { res.status(405).json({ ok: false, code: 'METHOD_NOT_ALLOWED', error: 'Method not allowed' }); return; }
   try {
     const actor = await requireActor(req, res);
@@ -166,11 +194,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     res.json({
       ok: true,
       fetchedAt: now,
-      service: {
-        version: appVersion(),
-        runtime: process.env.VERCEL ? 'vercel' : 'local',
-        region: process.env.VERCEL_REGION ?? null,
-      },
+      service: { version: appVersion(), runtime: process.env.VERCEL ? 'vercel' : 'local', region: process.env.VERCEL_REGION ?? null },
       server: {
         hostname: hostname(),
         node: process.version,
@@ -196,5 +220,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     });
   } catch (error) {
     sendDatabaseError(req, res, error, 'read');
+  }
+}
+
+// ── /api/email-worker（Cron 消费） ──────────────────────────────────
+async function handleWorker(req: VercelRequest, res: VercelResponse): Promise<void> {
+  if (req.method !== 'GET') { res.status(405).json({ ok: false, code: 'METHOD_NOT_ALLOWED', error: 'Method not allowed' }); return; }
+  try {
+    const smtp = await loadSmtpConfig();
+    if (!smtp) { res.json({ ok: true, sent: 0, failed: 0, remaining: 0, skipped: 'not_configured' }); return; }
+    const result = await drainOutbox(smtp, { max: 5, hardTimeoutMs: 8_000, acquireSlot: false });
+    res.json({ ok: true, ...result });
+  } catch (error) {
+    sendDatabaseError(req, res, error, 'write');
+  }
+}
+
+export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
+  requestId(req, res);
+  res.setHeader('Cache-Control', 'no-store');
+  switch (sysRoute(req)) {
+    case 'health': return handleHealth(req, res);
+    case 'status': return handleStatus(req, res);
+    case 'email-worker': return handleWorker(req, res);
+    default: res.status(404).json({ ok: false, code: 'NOT_FOUND', error: 'Not found' });
   }
 }

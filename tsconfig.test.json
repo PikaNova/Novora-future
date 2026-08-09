@@ -29,6 +29,7 @@
     "api/_auth.ts",
     "api/login.ts",
     "api/emailAuth.ts",
+    "api/_emailQueue.ts",
     "src/utils/renderMarkdown.ts",
     "api/globals.d.ts",
     "api/_exams/types.ts",

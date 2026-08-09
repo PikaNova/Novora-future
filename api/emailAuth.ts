@@ -26,6 +26,7 @@ import {
 import type { AdminActor } from './_auth.js';
 import { consumeRateLimit } from './_rateLimiter.js';
 import { sendVerificationCode, type SmtpConfig } from '../src/services/emailSender.js';
+import { drainOutbox, enqueueEmailOutbox } from './_emailQueue.js';
 import { requestId, sendDatabaseError } from './_apiError.js';
 
 const AUTH_FAILURE_DELAY_MS = 400;
@@ -162,6 +163,11 @@ async function smtpConfigFromRow(row: EmailConfigRow): Promise<SmtpConfig | null
   };
 }
 
+export async function loadSmtpConfig(): Promise<SmtpConfig | null> {
+  const row = await loadEmailConfigRow();
+  return row ? smtpConfigFromRow(row) : null;
+}
+
 async function emailLockout(email: string): Promise<{ locked: boolean; retryAfterMs: number }> {
   const rows = assertRows(
     await authSql()`SELECT action, created_at FROM app_audit_logs WHERE LOWER(username)=LOWER(${email}) AND action='auth.email.failed' ORDER BY created_at DESC LIMIT ${LOCKOUT_MAX_FAILURES}`,
@@ -176,12 +182,12 @@ async function recordEmailFailure(email: string): Promise<void> {
     VALUES (NULL, ${email}, 'auth.email.failed', 'user', '', '', '', NULL, ${Date.now()})`;
 }
 
-async function issueAndSendCode(
+async function issueAndEnqueueCode(
   smtp: SmtpConfig,
   email: string,
   purpose: 'login' | 'bind',
   ip: string,
-): Promise<{ ok: boolean; status?: number; code?: string; error?: string; retryAfterMs?: number }> {
+): Promise<{ ok: boolean; status?: number; code?: string; error?: string; retryAfterMs?: number; outboxId?: DatabaseInt8 }> {
   const emailLimit = consumeRateLimit(`email-${purpose}-code:${email.toLowerCase()}`, { windowMs: EMAIL_COOLDOWN_MS, maxRequests: 1 });
   if (!emailLimit.allowed) return { ok: false, status: 429, code: 'EMAIL_SEND_FREQUENT', error: '请等待60秒后再试', retryAfterMs: emailLimit.retryAfterMs };
   const ipLimit = consumeRateLimit(`email-code-ip:${ip}`, { windowMs: IP_HOURLY_WINDOW_MS, maxRequests: IP_HOURLY_MAX });
@@ -189,16 +195,14 @@ async function issueAndSendCode(
   const code = String(randomInt(100000, 1000000)).padStart(6, '0');
   const now = Date.now();
   await authSql()`DELETE FROM email_verification_codes WHERE email=${email} AND purpose=${purpose} AND (used OR expires_at < ${now})`;
-  await authSql()`INSERT INTO email_verification_codes (email, purpose, code, expires_at, used, created_at, ip)
-    VALUES (${email}, ${purpose}, ${code}, ${now + CODE_TTL_MS}, FALSE, ${now}, ${ip})`;
-  try {
-    await sendVerificationCode(smtp, { to: email, code, purpose });
-  } catch (error) {
-    await authSql()`DELETE FROM email_verification_codes WHERE email=${email} AND purpose=${purpose} AND code=${code}`;
-    console.error('[email-send]', error);
-    return { ok: false, status: 500, code: 'EMAIL_SEND_FAILED', error: '验证码发送失败，请稍后重试' };
-  }
-  return { ok: true };
+  const inserted = assertRows(
+    await authSql()`INSERT INTO email_verification_codes (email, purpose, code, expires_at, used, created_at, ip)
+      VALUES (${email}, ${purpose}, ${code}, ${now + CODE_TTL_MS}, FALSE, ${now}, ${ip}) RETURNING id`,
+    isUserIdRow,
+    'email_verification_codes',
+  );
+  const outboxId = await enqueueEmailOutbox(email, purpose, inserted[0].id);
+  return { ok: true, outboxId };
 }
 
 async function verifyCode(email: string, purpose: 'login' | 'bind', code: string): Promise<{ ok: boolean; code?: string; error?: string }> {
@@ -238,10 +242,18 @@ async function handleSendCode(req: VercelRequest, res: VercelResponse): Promise<
   if (!users[0]) { await recordEmailFailure(email); await new Promise(r => setTimeout(r, AUTH_FAILURE_DELAY_MS)); fail(res, 403, 'EMAIL_NOT_BOUND', '该邮箱未绑定账号'); return; }
   const whitelist = (row.admin_emails || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
   if (whitelist.length && !whitelist.includes(email)) { fail(res, 403, 'EMAIL_NOT_ALLOWED', '该邮箱无权登录'); return; }
-  const sent = await issueAndSendCode(smtp, email, 'login', clientIp(req));
-  if (!sent.ok) { fail(res, sent.status ?? 500, sent.code ?? 'EMAIL_SEND_FAILED', sent.error ?? '发送失败', sent.retryAfterMs != null ? { retryAfterMs: sent.retryAfterMs } : {}); return; }
-  await writeAudit(null, 'auth.email.code', 'user', String(users[0].id), { email });
-  res.json({ ok: true, message: '验证码已发送到您的邮箱，有效期5分钟' });
+  const queued = await issueAndEnqueueCode(smtp, email, 'login', clientIp(req));
+  if (!queued.ok) { fail(res, queued.status ?? 500, queued.code ?? 'EMAIL_SEND_FAILED', queued.error ?? '发送失败', queued.retryAfterMs != null ? { retryAfterMs: queued.retryAfterMs } : {}); return; }
+  if (queued.outboxId != null) {
+    const first = await drainOutbox(smtp, { jobId: queued.outboxId, hardTimeoutMs: 8_000, slotWaitMs: 2_000, acquireSlot: true, deadlineMs: Date.now() + 9_000 });
+    if (first.sent > 0) {
+      await writeAudit(null, 'auth.email.code', 'user', String(users[0].id), { email });
+      res.json({ ok: true, message: '验证码已发送到您的邮箱，5 分钟内有效' });
+      return;
+    }
+  }
+  await writeAudit(null, 'auth.email.code.queued', 'user', String(users[0].id), { email });
+  res.json({ ok: true, queued: true, message: '验证码已加入发送队列，系统将自动重试，请留意查收（5 分钟内有效）' });
 }
 
 async function handleEmailLogin(req: VercelRequest, res: VercelResponse): Promise<void> {
@@ -306,10 +318,18 @@ async function handleBindRequest(req: VercelRequest, res: VercelResponse): Promi
     'app_users',
   );
   if (taken[0]) { fail(res, 409, 'EMAIL_TAKEN', '该邮箱已被其他账号绑定'); return; }
-  const sent = await issueAndSendCode(smtp, email, 'bind', clientIp(req));
-  if (!sent.ok) { fail(res, sent.status ?? 500, sent.code ?? 'EMAIL_SEND_FAILED', sent.error ?? '发送失败', sent.retryAfterMs != null ? { retryAfterMs: sent.retryAfterMs } : {}); return; }
-  await writeAudit(actor, 'auth.email.bind.request', 'user', String(actor.id), { email });
-  res.json({ ok: true, message: '验证码已发送到您的邮箱，有效期5分钟' });
+  const queued = await issueAndEnqueueCode(smtp, email, 'bind', clientIp(req));
+  if (!queued.ok) { fail(res, queued.status ?? 500, queued.code ?? 'EMAIL_SEND_FAILED', queued.error ?? '发送失败', queued.retryAfterMs != null ? { retryAfterMs: queued.retryAfterMs } : {}); return; }
+  if (queued.outboxId != null) {
+    const first = await drainOutbox(smtp, { jobId: queued.outboxId, hardTimeoutMs: 8_000, slotWaitMs: 2_000, acquireSlot: true, deadlineMs: Date.now() + 9_000 });
+    if (first.sent > 0) {
+      await writeAudit(actor, 'auth.email.bind.request', 'user', String(actor.id), { email });
+      res.json({ ok: true, message: '验证码已发送到您的邮箱，5 分钟内有效' });
+      return;
+    }
+  }
+  await writeAudit(actor, 'auth.email.bind.request.queued', 'user', String(actor.id), { email });
+  res.json({ ok: true, queued: true, message: '验证码已加入发送队列，系统将自动重试，请留意查收（5 分钟内有效）' });
 }
 
 async function handleBindConfirm(req: VercelRequest, res: VercelResponse): Promise<void> {

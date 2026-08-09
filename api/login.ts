@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { authenticateUser, checkLoginLockout, extractBearer, getActor, isAdminRecoveryConfigured, isPasswordRequired, recoverSuperAdmin, repairSuperAdmin, writeAudit } from './_auth.js';
-import { handleEmailAuth } from './emailAuth.js';
+import { handleEmailAuth, loadSmtpConfig } from './emailAuth.js';
+import { opportunisticDrain } from './_emailQueue.js';
 import { requestId, sendDatabaseError } from './_apiError.js';
 import { applyCors } from './_cors.js';
 
@@ -23,6 +24,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         res.json({ ok: true, user: actor }); return;
       }
       if (action === 'recovery-status') { res.json({ ok: true, configured: await isAdminRecoveryConfigured() }); return; }
+      await opportunisticDrain({ smtpLoader: loadSmtpConfig });
       res.json({ ok: true, required: await isPasswordRequired(), multiUser: true, defaultUsername: 'admin' }); return;
     }
     if (req.method !== 'POST') { res.status(405).json({ ok: false, error: 'Method not allowed' }); return; }

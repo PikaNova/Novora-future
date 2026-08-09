@@ -225,8 +225,29 @@ export async function ensureAuthTables(): Promise<void> {
         CHECK (id = 1)
       )`,
       transaction`ALTER TABLE email_config ADD COLUMN IF NOT EXISTS init_bind_policy TEXT NOT NULL DEFAULT 'optional'`,
+      transaction`CREATE TABLE IF NOT EXISTS email_outbox (
+        id BIGSERIAL PRIMARY KEY,
+        email TEXT NOT NULL,
+        purpose TEXT NOT NULL DEFAULT 'login',
+        code_id BIGINT,
+        status TEXT NOT NULL DEFAULT 'pending',
+        attempts INTEGER NOT NULL DEFAULT 0,
+        max_attempts INTEGER NOT NULL DEFAULT 3,
+        next_attempt_at BIGINT NOT NULL,
+        last_error TEXT NOT NULL DEFAULT '',
+        created_at BIGINT NOT NULL,
+        sent_at BIGINT,
+        updated_at BIGINT NOT NULL
+      )`,
+      transaction`CREATE INDEX IF NOT EXISTS idx_email_outbox_due ON email_outbox (status, next_attempt_at)`,
+      transaction`CREATE TABLE IF NOT EXISTS mail_throttle (
+        id INTEGER PRIMARY KEY DEFAULT 1,
+        last_sent_at BIGINT NOT NULL DEFAULT 0,
+        CHECK (id = 1)
+      )`,
     ]);
     const now = Date.now();
+    await authSql()`INSERT INTO mail_throttle (id, last_sent_at) VALUES (1, 0) ON CONFLICT (id) DO NOTHING`;
     await Promise.all(BUILTIN_ROLES.map(role => sql`INSERT INTO app_roles (id, name, description, permissions, built_in, created_at, updated_at)
       VALUES (${role.id}, ${role.name}, ${role.description}, ${JSON.stringify(role.permissions)}::jsonb, TRUE, ${now}, ${now})
       ON CONFLICT (id) DO UPDATE SET name=EXCLUDED.name, description=EXCLUDED.description, permissions=EXCLUDED.permissions, built_in=TRUE, updated_at=EXCLUDED.updated_at`));

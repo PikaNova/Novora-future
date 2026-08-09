@@ -447,6 +447,31 @@ async function handleClearConfig(req: VercelRequest, res: VercelResponse): Promi
   res.json({ ok: true, enabled: false });
 }
 
+async function handleSendStatus(req: VercelRequest, res: VercelResponse): Promise<void> {
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  const email = String(body.email ?? '').trim().toLowerCase();
+  if (!validateEmailFormat(email)) { fail(res, 400, 'EMAIL_FORMAT_INVALID', '邮箱格式无效'); return; }
+  const codeRows = assertRows(
+    await authSql()`SELECT id, used FROM email_verification_codes WHERE email=${email} AND purpose='login' ORDER BY id DESC LIMIT 1`,
+    rowShape<{ id: DatabaseInt8; used: boolean }>({ id: isDatabaseInt8, used: (v): v is boolean => typeof v === 'boolean' }),
+    'email_verification_codes',
+  );
+  const code = codeRows[0];
+  if (!code) { res.json({ ok: true, status: 'none' }); return; }
+  const outboxRows = assertRows(
+    await authSql()`SELECT status, last_error FROM email_outbox WHERE code_id=${code.id} ORDER BY id DESC LIMIT 1`,
+    rowShape<{ status: string; last_error: string }>({ status: isString, last_error: isString }),
+    'email_outbox',
+  );
+  const outbox = outboxRows[0];
+  let status: 'sent' | 'failed' | 'pending';
+  if (code.used) status = 'sent';
+  else if (outbox && outbox.status === 'sent') status = 'sent';
+  else if (outbox && outbox.status === 'failed') status = 'failed';
+  else status = 'pending';
+  res.json({ ok: true, status, lastError: outbox?.last_error || null });
+}
+
 export function normalizeInitBindPolicy(value: unknown): 'optional' | 'force' | 'skip' {
   return value === 'force' || value === 'skip' ? value : 'optional';
 }
@@ -477,6 +502,7 @@ export async function handleEmailAuth(req: VercelRequest, res: VercelResponse, a
     if (req.method !== 'POST') { fail(res, 405, 'METHOD_NOT_ALLOWED', 'Method not allowed'); return; }
     switch (action) {
       case 'email-send-code': return handleSendCode(req, res);
+      case 'email-send-status': return handleSendStatus(req, res);
       case 'email-login': return handleEmailLogin(req, res);
       case 'email-bind-request': return handleBindRequest(req, res);
       case 'email-bind-confirm': return handleBindConfirm(req, res);

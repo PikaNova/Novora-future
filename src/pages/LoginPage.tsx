@@ -1,9 +1,9 @@
 import React, { FormEvent, useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { getAdminRecoveryStatus, getAdminUser, getLastAuthApiError, hasValidLocalToken, isLoginRequired, loginAdmin, logoutAdmin, recoverSuperAdminAccount, storeAdminSession, type AdminUserContext } from '../services/examService';
-import { bindEmailConfirm, bindEmailRequest, fetchEmailConfig, loginWithEmail, sendEmailCode, type EmailBindPolicy } from '../services/emailAuth';
+import { bindEmailConfirm, bindEmailRequest, fetchEmailConfig, fetchEmailSendStatus, loginWithEmail, sendEmailCode, type EmailBindPolicy } from '../services/emailAuth';
 import { formatApiError } from '../services/apiError';
-import { changeOwnCredentials } from '../services/adminUsers';
+import { changeOwnCredentials, AdminApiError } from '../services/adminUsers';
 import { useRetryCountdown } from '../hooks/useRetryCountdown';
 import { computeLockedUntil, formatRetryMessage, loginLockoutRetryAfterMs } from '../utils/retryCountdown';
 import Watermark from '../components/Watermark';
@@ -37,6 +37,8 @@ export default function LoginPage() {
   const [emailError, setEmailError] = useState('');
   const [emailSendUntil, setEmailSendUntil] = useState<number | null>(null);
   const emailSendRemaining = useRetryCountdown(emailSendUntil);
+  const [emailLockUntil, setEmailLockUntil] = useState<number | null>(null);
+  const emailLockRemaining = useRetryCountdown(emailLockUntil);
   const [bindEmail, setBindEmail] = useState('');
   const [bindCode, setBindCode] = useState('');
   const [bindStatus, setBindStatus] = useState<'idle' | 'requested' | 'bound'>('idle');
@@ -62,6 +64,10 @@ export default function LoginPage() {
   }, [lockedUntil, remainingLockSeconds]);
 
   useEffect(() => {
+    if (emailLockUntil && emailLockRemaining <= 0) setEmailLockUntil(null);
+  }, [emailLockUntil, emailLockRemaining]);
+
+  useEffect(() => {
     let alive = true;
     fetchEmailConfig().then(config => {
       if (!alive) return;
@@ -72,20 +78,50 @@ export default function LoginPage() {
     return () => { alive = false; };
   }, []);
 
+  const pollEmailSendStatus = async (email: string) => {
+    const delays = [4000, 8000, 12000];
+    for (const delay of delays) {
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      try {
+        const status = await fetchEmailSendStatus(email);
+        if (status.status === 'sent') { setNotice('验证码已发送到您的邮箱，5 分钟内有效'); return; }
+        if (status.status === 'failed') {
+          setEmailSendUntil(null);
+          setEmailError(`验证码发送失败：${status.lastError || '邮件服务错误'}，请重新发送`);
+          return;
+        }
+      } catch { /* 继续等待下一次轮询 */ }
+    }
+  };
+
   const sendEmailLoginCode = async () => {
     const email = emailAddr.trim();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setEmailError('请输入有效的邮箱地址'); return; }
     setEmailLoading(true); setEmailError('');
     try {
-      await sendEmailCode(email, 'login');
+      const result = await sendEmailCode(email, 'login');
       setEmailSendUntil(Date.now() + 60_000);
-      setNotice('验证码已发送到您的邮箱，5 分钟内有效');
-    } catch (cause) { setEmailError(cause instanceof Error ? cause.message : '验证码发送失败，请稍后重试'); }
+      if (result?.queued) {
+        setNotice('验证码已加入发送队列，请留意查收（5 分钟内有效）');
+        void pollEmailSendStatus(email);
+      } else {
+        setNotice('验证码已发送到您的邮箱，5 分钟内有效');
+      }
+    } catch (cause) {
+      const retryAfterMs = cause instanceof AdminApiError ? cause.retryAfterMs : undefined;
+      if (retryAfterMs != null) {
+        setEmailSendUntil(Date.now() + retryAfterMs);
+        setEmailError(`发送过于频繁，请 ${Math.ceil(retryAfterMs / 1000)} 秒后再试`);
+      } else {
+        setEmailError(cause instanceof Error ? cause.message : '验证码发送失败，请稍后重试');
+      }
+    }
     finally { setEmailLoading(false); }
   };
 
   const submitEmailLogin = async (event: FormEvent) => {
     event.preventDefault();
+    if (emailLockUntil && emailLockRemaining > 0) return;
     if (!emailAddr.trim() || !emailCode.trim()) { setEmailError('请输入邮箱和验证码'); return; }
     setEmailLoading(true); setEmailError('');
     try {
@@ -98,7 +134,15 @@ export default function LoginPage() {
         return;
       }
       navigate(next, { replace: true });
-    } catch (cause) { setEmailError(cause instanceof Error ? cause.message : '验证码登录失败，请重试'); }
+    } catch (cause) {
+      const retryAfterMs = cause instanceof AdminApiError ? cause.retryAfterMs : undefined;
+      if (cause instanceof AdminApiError && cause.code === 'EMAIL_CODE_LOCKED' && retryAfterMs != null) {
+        setEmailLockUntil(Date.now() + retryAfterMs);
+        setEmailError(`验证失败次数过多，请 ${Math.ceil(retryAfterMs / 1000)} 秒后再试`);
+      } else {
+        setEmailError(cause instanceof Error ? cause.message : '验证码登录失败，请重试');
+      }
+    }
     finally { setEmailLoading(false); }
   };
 
@@ -111,7 +155,15 @@ export default function LoginPage() {
       await bindEmailRequest(email, passwordUpgrade.token);
       setBindSendUntil(Date.now() + 60_000);
       setBindStatus('requested');
-    } catch (cause) { setBindError(cause instanceof Error ? cause.message : '验证码发送失败，请稍后重试'); }
+    } catch (cause) {
+      const retryAfterMs = cause instanceof AdminApiError ? cause.retryAfterMs : undefined;
+      if (retryAfterMs != null) {
+        setBindSendUntil(Date.now() + retryAfterMs);
+        setBindError(`发送过于频繁，请 ${Math.ceil(retryAfterMs / 1000)} 秒后再试`);
+      } else {
+        setBindError(cause instanceof Error ? cause.message : '验证码发送失败，请稍后重试');
+      }
+    }
     finally { setBindLoading(false); }
   };
 
@@ -277,9 +329,18 @@ export default function LoginPage() {
               {emailLoading ? '发送中…' : emailSendRemaining > 0 ? emailSendRemaining + 's' : '发送验证码'}
             </button>
           </div>
-          {emailError && <p className="login-form__error">{emailError}</p>}
-          <button className="login-form__submit" disabled={emailLoading || !emailAddr.trim() || !emailCode.trim()} type="submit">
-            {emailLoading ? '正在登录…' : '验证并登录'} {!emailLoading && <ArrowRight aria-hidden="true" />}
+          {emailLockUntil && emailLockRemaining > 0 ? (
+            <p className="login-form__error">{formatRetryMessage(emailLockRemaining, '验证失败次数过多')}</p>
+          ) : emailError ? (
+            <p className="login-form__error">{emailError}</p>
+          ) : null}
+          <button
+            className="login-form__submit"
+            disabled={emailLoading || !emailAddr.trim() || !emailCode.trim() || (!!emailLockUntil && emailLockRemaining > 0)}
+            type="submit"
+          >
+            {emailLoading ? '正在登录…' : emailLockUntil && emailLockRemaining > 0 ? `请 ${emailLockRemaining} 秒后再试` : '验证并登录'}
+            {!emailLoading && <ArrowRight aria-hidden="true" />}
           </button>
         </form>
         ) : (

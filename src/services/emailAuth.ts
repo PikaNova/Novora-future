@@ -59,7 +59,7 @@ async function request<T = Record<string, unknown>>(path: string, init: RequestI
   }, 20_000);
   const data = await response.json().catch(() => null);
   if (!response.ok || !data?.ok) {
-    throw new AdminApiError(data?.error || `HTTP ${response.status}`, data?.field, data?.code, data?.requestId || response.headers.get('X-Request-Id') || undefined);
+    throw new AdminApiError(data?.error || `HTTP ${response.status}`, data?.field, data?.code, data?.requestId || response.headers.get('X-Request-Id') || undefined, data?.retryAfterMs);
   }
   return data as T;
 }
@@ -91,8 +91,14 @@ export async function fetchEmailConfigFull(bearerToken?: string): Promise<EmailC
   };
 }
 
-export async function sendEmailCode(email: string, purpose: 'login' | 'bind'): Promise<void> {
-  await request(`${LOGIN_URL}`, { method: 'POST', body: JSON.stringify({ action: 'email-send-code', email, purpose }) });
+export async function sendEmailCode(email: string, purpose: 'login' | 'bind'): Promise<{ queued?: boolean; message?: string }> {
+  return request<{ queued?: boolean; message?: string }>(`${LOGIN_URL}`, { method: 'POST', body: JSON.stringify({ action: 'email-send-code', email, purpose }) });
+}
+
+export type EmailSendStatus = { status: 'none' | 'pending' | 'sent' | 'failed'; lastError?: string | null };
+
+export async function fetchEmailSendStatus(email: string): Promise<EmailSendStatus> {
+  return request<EmailSendStatus>(`${LOGIN_URL}`, { method: 'POST', body: JSON.stringify({ action: 'email-send-status', email }) });
 }
 
 export async function loginWithEmail(

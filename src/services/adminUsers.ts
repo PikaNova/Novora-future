@@ -49,9 +49,10 @@ export class AdminApiError extends Error {
   field?: string;
   code?: string;
   requestId?: string;
-  constructor(message: string, field?: string, code?: string, requestId?: string) {
+  retryAfterMs?: number;
+  constructor(message: string, field?: string, code?: string, requestId?: string, retryAfterMs?: number) {
     super(`${message}${requestId ? `（请求 ID：${requestId}）` : ''}`);
-    this.name = 'AdminApiError'; this.field = field; this.code = code; this.requestId = requestId;
+    this.name = 'AdminApiError'; this.field = field; this.code = code; this.requestId = requestId; this.retryAfterMs = retryAfterMs;
   }
 }
 
@@ -62,7 +63,7 @@ async function request(path: string, init: RequestInit = {}, bearerToken?: strin
     headers: { 'Content-Type': 'application/json', ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}), ...(init.headers || {}) },
   });
   const data = await response.json().catch(() => null);
-  if (!response.ok || !data?.ok) throw new AdminApiError(data?.error || `HTTP ${response.status}`, data?.field, data?.code, data?.requestId || response.headers.get('X-Request-Id') || undefined);
+  if (!response.ok || !data?.ok) throw new AdminApiError(data?.error || `HTTP ${response.status}`, data?.field, data?.code, data?.requestId || response.headers.get('X-Request-Id') || undefined, data?.retryAfterMs);
   return data;
 }
 

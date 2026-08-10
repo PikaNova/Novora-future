@@ -18,6 +18,7 @@ PROJECT_HANDOVER.md
 task_plan.md
 findings.md
 progress.md
+CHANGELIST.md
 
 # Local standalone server build and runtime data.
 .env

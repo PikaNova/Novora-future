@@ -14,7 +14,7 @@ export const ALL_PERMISSIONS = [
 	'school.read', 'school.grade_manage', 'school.class_manage',
 	'device.read', 'device.bind', 'device.revoke',
 	'schedule.mode_edit', 'schedule.conflict_edit',
-	'alerts.read', 'alerts.edit', 'settings.read', 'settings.edit', 'initialization.run', 'demo_data.delete',
+	'alerts.read', 'alerts.edit', 'settings.read', 'settings.edit', 'majorBatch.preset_edit', 'initialization.run', 'demo_data.delete',
 	'user.read', 'user.create', 'user.edit', 'user.disable', 'user.delete', 'user.reset_password', 'role.manage', 'audit.read', 'deployment.trigger',
 ] as const;
 

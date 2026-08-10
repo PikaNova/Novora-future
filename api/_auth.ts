@@ -1,4 +1,4 @@
-import { neon } from '@neondatabase/serverless';
+﻿import { neon } from '@neondatabase/serverless';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createHmac, randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
@@ -63,6 +63,7 @@ type UserRow = {
   must_change_password: boolean;
   token_version: number;
   last_login_at?: DatabaseInt8 | null;
+  email?: string | null;
 };
 
 const isPasswordSaltRow = rowShape<{ password_hash: string; password_salt: string }>({
@@ -101,6 +102,7 @@ const isUserRow = rowShape<UserRow>({
   must_change_password: isBoolean,
   token_version: isNumberLike,
   last_login_at: (value): value is DatabaseInt8 | null | undefined => value == null || isDatabaseInt8(value),
+  email: (value): value is string | null | undefined => value == null || isString(value),
 });
 const isScopeRow = rowShape<{ scope_type: string; grade_id: string; class_id: string }>({
   scope_type: isString,
@@ -123,7 +125,7 @@ export const BUILTIN_ROLES: Array<{ id: string; name: string; description: strin
   { id: 'super_admin', name: '超级管理员', description: '拥有全校数据与全部系统权限，可管理用户、角色、部署及所有业务设置。', permissions: ['*'] },
   { id: 'grade_admin', name: '年级管理员', description: '管理授权年级的考试、周测、班级、设备和下级用户，可批量创建该年级的班级管理员，并查看该年级完整运行总览。', permissions: ['overview.read', 'major.read', 'major.create', 'major.quick_create', 'major.edit', 'major.delete', 'major.import', 'major.export', 'weekly.read', 'weekly.create', 'weekly.edit', 'weekly.delete', 'weekly.copy', 'weekly.override', 'weekly.import', 'weekly.export', 'school.read', 'school.class_manage', 'device.read', 'device.bind', 'device.revoke', 'alerts.read', 'settings.read', 'user.read', 'user.create', 'user.edit', 'user.disable', 'user.delete', 'user.reset_password'] },
   { id: 'class_admin', name: '班级管理员', description: '管理授权班级的周测、考试安排和绑定设备，可快速发布本班临时考试并修改自己的用户名与密码，不显示项目运行总览。', permissions: ['major.read', 'major.quick_create', 'weekly.read', 'weekly.create', 'weekly.edit', 'weekly.delete', 'weekly.copy', 'weekly.override', 'weekly.import', 'weekly.export', 'school.read', 'device.read', 'device.bind', 'device.revoke', 'alerts.read'] },
-  { id: 'viewer', name: '只读用户', description: '仅按授权范围预览和导出考试与周测安排，不进入运行总览。', permissions: ['major.read', 'weekly.read', 'weekly.export', 'school.read'] },
+  { id: 'viewer', name: '巡考员', description: '巡考期间查看考试安排、周测与教室大屏显示，可导出安排用于核对，不修改任何数据。', permissions: ['major.read', 'major.export', 'weekly.read', 'weekly.export', 'school.read', 'device.read', 'alerts.read', 'settings.read'] },
 ];
 
 export async function ensureAuthTables(): Promise<void> {
@@ -193,12 +195,63 @@ export async function ensureAuthTables(): Promise<void> {
         detail JSONB,
         created_at BIGINT NOT NULL
       )`,
+      transaction`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS email TEXT`,
+      transaction`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS email_bound_at BIGINT`,
+      transaction`CREATE UNIQUE INDEX IF NOT EXISTS idx_app_users_email ON app_users (email) WHERE email IS NOT NULL`,
+      transaction`CREATE TABLE IF NOT EXISTS email_verification_codes (
+        id BIGSERIAL PRIMARY KEY,
+        email TEXT NOT NULL,
+        purpose TEXT NOT NULL DEFAULT 'login',
+        code TEXT NOT NULL,
+        expires_at BIGINT NOT NULL,
+        used BOOLEAN NOT NULL DEFAULT FALSE,
+        created_at BIGINT NOT NULL,
+        ip TEXT NOT NULL DEFAULT ''
+      )`,
+      transaction`CREATE INDEX IF NOT EXISTS idx_email_codes_email ON email_verification_codes (email)`,
+      transaction`CREATE INDEX IF NOT EXISTS idx_email_codes_expires ON email_verification_codes (expires_at)`,
+      transaction`CREATE TABLE IF NOT EXISTS email_config (
+        id INTEGER PRIMARY KEY DEFAULT 1,
+        smtp_host TEXT NOT NULL DEFAULT '',
+        smtp_port INTEGER NOT NULL DEFAULT 465,
+        smtp_secure BOOLEAN NOT NULL DEFAULT TRUE,
+        smtp_require_tls BOOLEAN NOT NULL DEFAULT FALSE,
+        smtp_user TEXT NOT NULL DEFAULT '',
+        smtp_pass_enc TEXT NOT NULL DEFAULT '',
+        smtp_from TEXT NOT NULL DEFAULT '',
+        smtp_from_name TEXT NOT NULL DEFAULT '',
+        admin_emails TEXT NOT NULL DEFAULT '',
+        updated_at BIGINT NOT NULL DEFAULT 0,
+        CHECK (id = 1)
+      )`,
+      transaction`ALTER TABLE email_config ADD COLUMN IF NOT EXISTS init_bind_policy TEXT NOT NULL DEFAULT 'optional'`,
+      transaction`CREATE TABLE IF NOT EXISTS email_outbox (
+        id BIGSERIAL PRIMARY KEY,
+        email TEXT NOT NULL,
+        purpose TEXT NOT NULL DEFAULT 'login',
+        code_id BIGINT,
+        status TEXT NOT NULL DEFAULT 'pending',
+        attempts INTEGER NOT NULL DEFAULT 0,
+        max_attempts INTEGER NOT NULL DEFAULT 3,
+        next_attempt_at BIGINT NOT NULL,
+        last_error TEXT NOT NULL DEFAULT '',
+        created_at BIGINT NOT NULL,
+        sent_at BIGINT,
+        updated_at BIGINT NOT NULL
+      )`,
+      transaction`CREATE INDEX IF NOT EXISTS idx_email_outbox_due ON email_outbox (status, next_attempt_at)`,
+      transaction`CREATE TABLE IF NOT EXISTS mail_throttle (
+        id INTEGER PRIMARY KEY DEFAULT 1,
+        last_sent_at BIGINT NOT NULL DEFAULT 0,
+        CHECK (id = 1)
+      )`,
     ]);
     const now = Date.now();
+    await authSql()`INSERT INTO mail_throttle (id, last_sent_at) VALUES (1, 0) ON CONFLICT (id) DO NOTHING`;
     await Promise.all(BUILTIN_ROLES.map(role => sql`INSERT INTO app_roles (id, name, description, permissions, built_in, created_at, updated_at)
       VALUES (${role.id}, ${role.name}, ${role.description}, ${JSON.stringify(role.permissions)}::jsonb, TRUE, ${now}, ${now})
       ON CONFLICT (id) DO UPDATE SET name=EXCLUDED.name, description=EXCLUDED.description, permissions=EXCLUDED.permissions, built_in=TRUE, updated_at=EXCLUDED.updated_at`));
-    // v1.32：精简旧内置角色。教务管理员降为全范围年级管理员，设备管理员迁移为只读用户。
+    // v1.32：精简旧内置角色。教务管理员降为全范围年级管理员，设备管理员迁移为巡考员（viewer）。
     await sql`UPDATE app_users SET role_id='grade_admin', token_version=token_version+1, updated_at=${now} WHERE role_id='academic_admin'`;
     await sql`UPDATE app_users SET role_id='viewer', token_version=token_version+1, updated_at=${now} WHERE role_id='device_admin'`;
     await sql`DELETE FROM app_roles WHERE id IN ('academic_admin','device_admin') AND NOT EXISTS (SELECT 1 FROM app_users WHERE app_users.role_id=app_roles.id)`;
@@ -410,7 +463,7 @@ async function actorFromUserRow(row: UserRow): Promise<AdminActor> {
 
 async function userById(id: number): Promise<UserRow | null> {
   const rows = assertRows(await authSql()`SELECT u.id, u.username, u.display_name, u.password_hash, u.password_salt, u.role_id,
-      r.name AS role_name, r.permissions, u.status, u.must_change_password, u.token_version
+      r.name AS role_name, r.permissions, u.status, u.must_change_password, u.token_version, u.email
     FROM app_users u JOIN app_roles r ON r.id=u.role_id WHERE u.id=${id} LIMIT 1`, isUserRow, 'app_users/app_roles');
   return rows[0] ?? null;
 }
@@ -426,6 +479,20 @@ export async function invalidateLegacySharedToken(): Promise<void> {
 
 function signature(userId: number, expiresAt: number, version: number, secret: string): string {
   return createHmac('sha256', secret).update(`${userId}.${expiresAt}.${version}`).digest('base64url');
+}
+
+export function validateEmailFormat(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email ?? '').trim());
+}
+
+export async function issueTokenForUser(row: { id: number | bigint | string; token_version: number }): Promise<{ token: string; expiresAt: number } | null> {
+  await ensureAuthTables();
+  const auth = await config();
+  if (!auth) return null;
+  const userId = Number(row.id);
+  const expiresAt = Date.now() + TOKEN_TTL;
+  const token = Buffer.from(`${userId}.${expiresAt}.${row.token_version}.${signature(userId, expiresAt, row.token_version, auth.token_secret)}`).toString('base64url');
+  return { token, expiresAt };
 }
 
 export type LoginAttemptRow = { action: string; created_at: DatabaseInt8 };
@@ -515,7 +582,7 @@ export async function authenticateUser(username: string, password: string): Prom
   await ensureDefaultSuperAdmin(password);
   const name = (username.trim() || 'admin').slice(0, 80);
   const rows = assertRows(await authSql()`SELECT u.id, u.username, u.display_name, u.password_hash, u.password_salt, u.role_id,
-      r.name AS role_name, r.permissions, u.status, u.must_change_password, u.token_version, u.last_login_at
+      r.name AS role_name, r.permissions, u.status, u.must_change_password, u.token_version, u.email, u.last_login_at
     FROM app_users u JOIN app_roles r ON r.id=u.role_id WHERE LOWER(u.username)=LOWER(${name}) LIMIT 1`, isUserRow, 'app_users/app_roles');
   const row = rows[0];
   if (!row || row.status !== 'active' || !await matches(password, row.password_hash, row.password_salt)) {
@@ -607,7 +674,8 @@ export async function requireActor(req: VercelRequest, res: VercelResponse, perm
 export async function changeOwnPassword(actorId: number, currentPassword: string, nextPassword: string): Promise<{ ok: boolean; error?: string }> {
   if (nextPassword.length < 8) return { ok: false, error: '新密码至少需要 8 位' };
   const row = await userById(actorId);
-  if (!row || !await matches(currentPassword, row.password_hash, row.password_salt)) return { ok: false, error: '当前密码不正确' };
+  if (!row) return { ok: false, error: '账号不存在' };
+  if (!row.must_change_password && !await matches(currentPassword, row.password_hash, row.password_salt)) return { ok: false, error: '当前密码不正确' };
   if (row.must_change_password && row.role_id === 'class_admin') return { ok: false, error: '班级管理员首次登录必须同时设置新的用户名和密码' };
   const { hash, salt } = await makePasswordHash(nextPassword);
   await invalidateLegacySharedToken();
@@ -630,6 +698,18 @@ export async function changeOwnUsername(actorId: number, currentPassword: string
   }
 }
 
+async function initBindPolicyForced(): Promise<boolean> {
+  try {
+    await ensureAuthTables();
+    const rows = assertRows(
+      await authSql()`SELECT init_bind_policy FROM email_config WHERE id=1`,
+      rowShape<{ init_bind_policy: string }>({ init_bind_policy: isString }),
+      'email_config',
+    );
+    return rows[0]?.init_bind_policy === 'force';
+  } catch { return false; }
+}
+
 export async function changeOwnCredentials(actorId: number, currentPassword: string, nextUsername: string, nextPassword: string): Promise<{ ok: boolean; error?: string; oldUsername?: string; username?: string }> {
   const username = nextUsername.trim();
   if (!/^[A-Za-z0-9._-]{3,40}$/.test(username)) return { ok: false, error: '用户名需为 3-40 位字母、数字、点、横线或下划线' };
@@ -637,6 +717,7 @@ export async function changeOwnCredentials(actorId: number, currentPassword: str
   if (!row || !await matches(currentPassword, row.password_hash, row.password_salt)) return { ok: false, error: '当前密码不正确' };
   if (row.must_change_password && row.role_id === 'class_admin' && username.toLowerCase() === row.username.toLowerCase()) return { ok: false, error: '班级管理员首次登录必须设置新的用户名' };
   if (row.must_change_password && nextPassword.length < 8) return { ok: false, error: '首次登录必须设置至少 8 位的新密码' };
+  if (row.must_change_password && !row.email && await initBindPolicyForced()) return { ok: false, error: '当前系统要求初始化时必须先绑定邮箱，请返回登录页完成绑定' };
   if (nextPassword && nextPassword.length < 8) return { ok: false, error: '新密码至少需要 8 位' };
   if (!nextPassword && username.toLowerCase() === row.username.toLowerCase()) return { ok: false, error: '用户名和密码均未修改' };
   const password = nextPassword ? await makePasswordHash(nextPassword) : { hash: row.password_hash, salt: row.password_salt };

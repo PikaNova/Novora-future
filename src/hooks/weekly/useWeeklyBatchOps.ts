@@ -8,11 +8,13 @@ import {
 import { confirmDialog } from "../../services/appDialog";
 import { notify } from "../../services/notify";
 import type { LastDeleted } from "./useWeeklyPlanModal";
+import { buildCopiedPlanTitle } from "../../components/weekly/weeklyShared";
 
 export interface WeeklyCopyModal {
   sourcePlanId: string;
   targetClassIds: string[];
   name: string;
+  suffix: string;
 }
 
 type ClassOption = { id: string; gradeId: string; label: string };
@@ -92,10 +94,12 @@ export function useWeeklyBatchOps({
         ? lastLabelSegment(sourceClass.label)
         : "";
       const targetClassName = lastLabelSegment(target.label);
-      const targetName =
-        sourceClassName && copyName.includes(sourceClassName)
-          ? copyName.replace(sourceClassName, targetClassName)
-          : `${targetClassName} \u00b7 ${copyName}`;
+      const targetName = buildCopiedPlanTitle(
+        copyName,
+        sourceClassName,
+        targetClassName,
+        copyModal.suffix,
+      );
       return {
         ...source,
         id: genWeeklyPlanId(),

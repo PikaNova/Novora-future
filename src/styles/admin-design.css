@@ -534,3 +534,478 @@
   .admin-tabbar__mode-label.with-help-tip { justify-content: flex-start; }
   .admin-tabbar__mode .help-tip { align-self: center; }
 }
+
+/* User & permission page: grouped layout (2026-08-10) */
+.user-management__batch-entry {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+.user-management__batch-entry-count {
+  color: var(--adm-text-2);
+  font-size: 12px;
+}
+.user-management__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.user-management__toolbar .admin-input {
+  flex: 1 1 180px;
+  min-width: 140px;
+}
+.user-management__toolbar-count {
+  margin-left: auto;
+  color: var(--adm-text-2);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.user-management__groups {
+  display: grid;
+  gap: 12px;
+}
+.user-management__group {
+  border: 1px solid var(--adm-line);
+  border-radius: 12px;
+  background: var(--adm-card);
+  box-shadow: var(--adm-shadow-1);
+  overflow: hidden;
+}
+.user-management__group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+}
+.user-management__group-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  color: var(--adm-text);
+  font: inherit;
+  cursor: pointer;
+}
+.user-management__group-toggle strong {
+  font-size: 14px;
+}
+.user-management__group-caret {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  border-left: 5px solid var(--adm-accent);
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  transition: transform var(--adm-dur-base) var(--adm-ease);
+}
+.user-management__group-toggle[aria-expanded="true"] .user-management__group-caret {
+  transform: rotate(90deg);
+}
+.user-management__group-badge {
+  padding: 1px 8px;
+  border: 1px solid rgba(59, 143, 208, 0.35);
+  border-radius: 999px;
+  background: var(--adm-accent-soft);
+  color: var(--adm-accent);
+  font-size: 11px;
+}
+.user-management__group-count {
+  margin-left: auto;
+  color: var(--adm-text-2);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.user-management__group-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--adm-text-2);
+  font-size: 12px;
+  cursor: pointer;
+}
+.user-management__group-body {
+  display: grid;
+  gap: 8px;
+  padding: 0 12px 12px;
+}
+.user-management__group-empty {
+  padding: 14px;
+  border: 1px dashed var(--adm-line);
+  border-radius: 10px;
+  color: var(--adm-text-3);
+  font-size: 12px;
+  text-align: center;
+}
+.user-management__group .user-management__row {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) minmax(150px, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+}
+.user-management__group .user-management__row.is-batch {
+  grid-template-columns: 22px minmax(130px, 1fr) minmax(140px, 1fr) auto auto;
+}
+.user-management__password-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(230, 162, 60, 0.14);
+  color: var(--adm-warn);
+  font-size: 10px;
+  font-weight: 700;
+}
+.user-management__status-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 6px;
+  border-radius: 999px;
+  vertical-align: 1px;
+}
+.user-management__status-dot.is-active {
+  background: #57d995;
+  box-shadow: 0 0 6px rgba(87, 217, 149, 0.55);
+}
+.user-management__status-dot.is-disabled {
+  background: rgba(218, 231, 245, 0.35);
+}
+.user-management__group .user-management__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.user-management__menu-wrap {
+  position: relative;
+}
+.user-management__menu-btn {
+  min-width: 34px;
+  padding: 5px 8px;
+  line-height: 1;
+}
+.user-management__menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+}
+.user-management__menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 41;
+  display: grid;
+  gap: 2px;
+  min-width: 132px;
+  padding: 6px;
+  border: 1px solid var(--adm-line-strong);
+  border-radius: 10px;
+  background: var(--adm-bg2);
+  box-shadow: var(--adm-shadow-2);
+}
+.user-management__menu button {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--adm-text);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.user-management__menu button:hover {
+  background: var(--adm-bg3);
+}
+.user-management__menu button:last-child {
+  color: var(--adm-danger);
+}
+.user-management__role-layout {
+  display: grid;
+  grid-template-columns: minmax(210px, 270px) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+.user-management__role-list {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--adm-line);
+  border-radius: 12px;
+  background: var(--adm-card);
+  box-shadow: var(--adm-shadow-1);
+}
+.user-management__new-role {
+  width: 100%;
+}
+.user-management__role-item {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--adm-text);
+  text-align: left;
+  cursor: pointer;
+}
+.user-management__role-item:hover {
+  background: var(--adm-bg3);
+}
+.user-management__role-item.is-active {
+  border-color: rgba(59, 143, 208, 0.45);
+  background: var(--adm-accent-soft);
+}
+.user-management__role-item-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.user-management__role-item-main strong {
+  font-size: 14px;
+}
+.user-management__role-item-main em {
+  padding: 1px 7px;
+  border: 1px solid rgba(59, 143, 208, 0.35);
+  border-radius: 999px;
+  background: var(--adm-accent-soft);
+  color: var(--adm-accent);
+  font-size: 10px;
+  font-style: normal;
+}
+.user-management__role-item small {
+  color: var(--adm-text-2);
+  font-size: 12px;
+}
+.user-management__role-panel {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--adm-line);
+  border-radius: 12px;
+  background: var(--adm-card);
+  box-shadow: var(--adm-shadow-1);
+}
+.user-management__role-panel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.user-management__role-panel-head strong {
+  color: var(--adm-text);
+  font-size: 18px;
+}
+.user-management__role-panel-head span {
+  margin-left: 8px;
+  padding: 1px 8px;
+  border: 1px solid rgba(59, 143, 208, 0.35);
+  border-radius: 999px;
+  background: var(--adm-accent-soft);
+  color: var(--adm-accent);
+  font-size: 11px;
+}
+.user-management__role-panel-head small {
+  color: var(--adm-accent);
+  font-size: 12px;
+  font-weight: 700;
+}
+.user-management__role-panel-desc {
+  margin: 0;
+  color: var(--adm-text-2);
+  font-size: 12px;
+  line-height: 1.55;
+}
+.user-management__matrix {
+  display: grid;
+  border: 1px solid var(--adm-line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.user-management__matrix-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 1.3fr) repeat(3, minmax(74px, 1fr));
+}
+.user-management__matrix-row + .user-management__matrix-row {
+  border-top: 1px solid var(--adm-line);
+}
+.user-management__matrix-head {
+  background: var(--adm-bg2);
+}
+.user-management__matrix-head span {
+  padding: 8px 10px;
+  color: var(--adm-text-3);
+  font-size: 11px;
+  font-weight: 700;
+}
+.user-management__matrix-module {
+  display: grid;
+  gap: 2px;
+  align-content: center;
+  min-width: 0;
+  padding: 8px 12px;
+}
+.user-management__matrix-module strong {
+  color: var(--adm-text);
+  font-size: 13px;
+}
+.user-management__matrix-module small {
+  color: var(--adm-text-3);
+  font-size: 11px;
+}
+.user-management__matrix-cell {
+  padding: 8px 6px;
+  border: 0;
+  border-left: 1px solid var(--adm-line);
+  background: transparent;
+  color: var(--adm-text-3);
+  font-size: 12px;
+  cursor: pointer;
+}
+.user-management__matrix-cell:hover:not(:disabled) {
+  background: var(--adm-bg3);
+  color: var(--adm-text);
+}
+.user-management__matrix-cell.is-active {
+  background: var(--adm-accent-soft);
+  color: var(--adm-accent);
+  font-weight: 700;
+}
+.user-management__matrix-cell.is-disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.user-management__matrix-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+@media (max-width: 760px) {
+  .user-management__group .user-management__row,
+  .user-management__group .user-management__row.is-batch {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .user-management__group .user-management__row .user-management__actions {
+    justify-content: flex-start;
+  }
+  .user-management__role-layout {
+    grid-template-columns: 1fr;
+  }
+  .user-management__matrix-row {
+    grid-template-columns: minmax(110px, 1.2fr) repeat(3, minmax(58px, 1fr));
+  }
+  .user-management__toolbar-count {
+    margin-left: 0;
+  }
+}
+
+
+/* ⋯ menu: portal-based overlay (2026-08-10) */
+.user-management__menu-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+}
+.user-management__menu-backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  cursor: default;
+  z-index: 0;
+}
+.user-management__menu {
+  right: auto;
+  top: auto;
+  z-index: 1;
+  min-width: 148px;
+}
+.user-management__menu-wrap {
+  position: static;
+}
+
+
+/* ---- New content animations (2026-08-10) ---- */
+/* A1 分组展开 / 空状态 */
+.user-management__group-body {
+  animation: app-panel-in 180ms var(--adm-ease) both;
+}
+.user-management__group-empty {
+  animation: app-fade-in 160ms ease-out both;
+}
+/* A2/A3 菜单与遮罩 */
+.user-management__menu {
+  transform-origin: top right;
+  animation: app-menu-in 120ms ease-out both;
+}
+.user-management__menu-backdrop {
+  animation: app-fade-in 120ms ease-out both;
+}
+/* A4 批量模式 / 工具栏 / 复选框 */
+.user-management__batch-entry,
+.user-management__toolbar {
+  animation: app-fade-in 160ms ease-out both;
+}
+.user-management__group-select,
+.user-management__batch-check {
+  animation: app-fade-in 120ms ease-out both;
+}
+/* A5 角色列表选中态过渡 */
+.user-management__role-item {
+  transition:
+    background-color var(--adm-dur-fast) var(--adm-ease),
+    border-color var(--adm-dur-fast) var(--adm-ease),
+    color var(--adm-dur-fast) var(--adm-ease);
+}
+/* A6 权限矩阵单元格过渡 */
+.user-management__matrix-cell {
+  transition:
+    background-color var(--adm-dur-fast) var(--adm-ease),
+    color var(--adm-dur-fast) var(--adm-ease);
+}
+/* A7 角色面板切换 */
+.user-management__role-panel {
+  animation: app-panel-in 180ms var(--adm-ease) both;
+}
+/* B1 状态点脉冲 */
+.system-status__dot.is-ok {
+  animation: systemStatusPulse 2.6s ease-in-out infinite;
+}
+.system-status__dot.is-warn {
+  animation: systemStatusPulse 1.4s ease-in-out infinite;
+}
+.system-status__dot.is-err {
+  animation: systemStatusPulse 1.1s ease-in-out infinite;
+}
+@keyframes systemStatusPulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+/* B3 状态区块入场 */
+.system-status {
+  animation: sw-rise var(--adm-dur-base) var(--adm-ease) both;
+}
+/* C1/C2 部署设置面板与更新说明 */
+.set-update-guide {
+  animation: app-panel-in 180ms var(--adm-ease) both;
+}
+.set-readme {
+  animation: app-fade-in 180ms ease-out both;
+}

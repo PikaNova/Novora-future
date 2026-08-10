@@ -8,3 +8,6 @@
 .dsw-card__lock{position:absolute;left:6px;bottom:6px;padding:2px 8px;border-radius:99px;background:#0b1220cc;color:#ffd98a;font-size:10.5px;font-style:normal;font-weight:700;letter-spacing:.02em}
 .dsw-card__ok{margin-left:7px;padding:1px 7px;border:1px solid #27ae6080;border-radius:99px;color:#8fe6ac;font-size:10px;font-style:normal}
 .dsw-overlay{z-index:3000}
+
+.dsw-managed-note{display:flex;align-items:flex-start;gap:8px;margin-bottom:12px;padding:10px 12px;border:1px solid rgba(223,167,47,.45);border-radius:9px;background:rgba(223,167,47,.1);color:#f0ce7c;font-size:12px;line-height:1.55}
+.dsw-managed-note svg{flex:none;margin-top:1px}

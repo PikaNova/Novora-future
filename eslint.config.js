@@ -10,6 +10,8 @@ export default tseslint.config(
       'dist/**',
       'node_modules/**',
       '.api-check/**',
+      '.integration-check/**',
+      'server-build/**',
       '.test-check/**',
       '.tmp/**',
       'coverage/**',
@@ -32,7 +34,7 @@ export default tseslint.config(
     rules: {
       ...reactHooks.configs.recommended.rules,
       '@typescript-eslint/no-explicit-any': 'warn',
-      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
     },
   },
   {

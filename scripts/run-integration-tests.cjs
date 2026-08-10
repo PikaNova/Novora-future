@@ -16,6 +16,8 @@ const testEnvironment = {
   ...process.env,
   DATABASE_URL: integrationUrl,
   ADMIN_PASSWORD: randomBytes(24).toString('base64url'),
+  // 入口限流测试确定性：300s 窗口保证用例在一次窗口内完成，第 N+1 个请求必然 429。
+  ENTRY_RATE_LIMIT_WINDOW_MS: '300000',
 };
 
 function run(command, args) {

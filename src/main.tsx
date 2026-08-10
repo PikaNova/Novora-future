@@ -53,6 +53,6 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <ErrorBoundary>
       <App />
     </ErrorBoundary>
-    <SpeedInsights />
+    {import.meta.env.VITE_SPEED_INSIGHTS !== "false" && <SpeedInsights />}
   </React.StrictMode>
 );

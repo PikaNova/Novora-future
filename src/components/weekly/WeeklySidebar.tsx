@@ -128,6 +128,7 @@ export default function WeeklySidebar({
                     sourcePlanId: activePlan.id,
                     targetClassIds: [],
                     name: activePlan.name.replace(/（复制）$/u, ""),
+                    suffix: "",
                   })
                 }
               >

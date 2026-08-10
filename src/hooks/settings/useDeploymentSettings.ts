@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { APP_VERSION } from "../../services/telemetry";
 import {
   checkForUpdate,
-  getRedeployConfigured,
+  getDeployStatus,
   triggerRedeploy,
 } from "../../services/update";
 import type { UpdateInfo } from "../../services/update";
@@ -22,10 +22,14 @@ export function useDeploymentSettings() {
   }>({ status: "idle" });
   const [notesOpen, setNotesOpen] = useState(false);
   const [updateGuideOpen, setUpdateGuideOpen] = useState(false);
+  const [deployTarget, setDeployTarget] = useState<"vercel" | "local" | null>(null);
 
   useEffect(() => {
-    getRedeployConfigured()
-      .then(setRedeployOk)
+    getDeployStatus()
+      .then((status) => {
+        setRedeployOk(status.configured);
+        setDeployTarget(status.deployTarget);
+      })
       .catch(() => {});
   }, []);
 
@@ -78,6 +82,7 @@ export function useDeploymentSettings() {
 
   return {
     upd,
+    deployTarget,
     redeployOk,
     redeploy,
     notesOpen,

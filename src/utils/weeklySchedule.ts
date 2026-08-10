@@ -35,6 +35,12 @@ function dateKeyToAnchorMs(dateKey: string): number {
 }
 
 /** 在上海日历日上加减天数，返回新的 'YYYY-MM-DD'。 */
+/** 返回从 weekStart（周一）开始连续 count 周的每周起始日期（共 count 个）。 */
+export function weekRangeStarts(weekStart: string, count: number): string[] {
+  const safeCount = Number.isFinite(count) ? Math.max(1, Math.min(4, Math.floor(count))) : 1;
+  return Array.from({ length: safeCount }, (_, index) => addDaysToDateKey(weekStart, index * 7));
+}
+
 export function addDaysToDateKey(dateKey: string, days: number): string {
   const dt = new Date(dateKeyToAnchorMs(dateKey) + days * DAY_MS);
   return `${dt.getUTCFullYear()}-${pad2(dt.getUTCMonth() + 1)}-${pad2(dt.getUTCDate())}`;

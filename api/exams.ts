@@ -40,6 +40,7 @@ import {
 } from "./_exams/routes/deviceSelfRoutes.js";
 import {
   handleDesignPolicy,
+  handleMajorBatchPresets,
   handleResetData,
 } from "./_exams/routes/settingsRoutes.js";
 import { handleDashboard } from "./_exams/routes/dashboardRoutes.js";
@@ -78,6 +79,7 @@ const POST_ONLY_ROUTES: Record<string, RouteHandler> = {
   "device-command": (req, res) => handleDeviceCommand(req, res),
   "device-revoke": (req, res) => handleDeviceRevoke(req, res),
   "design-policy": (req, res) => handleDesignPolicy(req, res),
+  "major-batch-presets": (req, res) => handleMajorBatchPresets(req, res),
   "reset-data": (req, res) => handleResetData(req, res),
 };
 

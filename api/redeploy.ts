@@ -17,7 +17,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const hookUrl = process.env.VERCEL_DEPLOY_HOOK_URL || '';
 
   if (req.method === 'GET') {
-    res.status(200).json({ ok: true, configured: !!hookUrl });
+    res.status(200).json({ ok: true, configured: !!hookUrl, deployTarget: process.env.VERCEL ? 'vercel' : 'local' });
     return;
   }
 

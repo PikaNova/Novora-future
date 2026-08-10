@@ -113,7 +113,24 @@ export default function CopyPlanModal({
             }
             placeholder="请输入计划标题"
           />
-        </label></div>}
+        </label>
+        <label className="admin-label">
+          统一后缀（可选）
+          <input
+            className="admin-input"
+            value={copyModal.suffix}
+            onChange={(event) =>
+              setCopyModal(
+                (current) =>
+                  current && { ...current, suffix: event.target.value },
+              )
+            }
+            placeholder="如：期中复习"
+          />
+        </label>
+        <p className="admin-major-card__hint">
+          最终标题 = 班级名 · 标题{copyModal.suffix.trim() ? ' · ' + copyModal.suffix.trim() : ''}；不填后缀则与现在一致。
+        </p></div>}
         {copyWizardStep === 1 && <div className="admin-workflow-pane"><div className="admin-label">
           应用到班级
           <ClassMultiPicker

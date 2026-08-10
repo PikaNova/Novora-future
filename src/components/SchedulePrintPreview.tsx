@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { ChevronLeft, ChevronRight, Download, X } from 'lucide-react';
 import { getClassBindingInstanceId } from '../services/classBinding';
 import { getAppSettings } from '../utils/appSettings';
-import { addDaysToDateKey, getShanghaiDateKey, isoWeekdayOfDateKey } from '../utils/weeklySchedule';
+import { addDaysToDateKey, getShanghaiDateKey, isoWeekdayOfDateKey, weekRangeStarts } from '../utils/weeklySchedule';
 import InlineSelect from './InlineSelect';
 import SubjectIcon from './SubjectIcon';
 
@@ -54,6 +54,7 @@ type Props = {
 
 export default function SchedulePrintPreview({ entries, gradeName, className, onClose, mode = 'weekly', title = '', schedules }: Props) {
   const [weekStart, setWeekStart] = useState(() => mondayOf(getShanghaiDateKey(Date.now())));
+  const [weekCount, setWeekCount] = useState(1);
   const [titleFont, setTitleFont] = useState<FontKey>('smiley');
   const [bodyFont, setBodyFont] = useState<FontKey>('wenkai');
   const [numericFont, setNumericFont] = useState<FontKey>('source');
@@ -65,7 +66,7 @@ export default function SchedulePrintPreview({ entries, gradeName, className, on
   const schoolLogo = settings.initialization.schoolLogo ?? '';
   const instanceId = getClassBindingInstanceId();
   const exportedAt = useMemo(() => new Date().toLocaleString('zh-CN', { hour12: false }), []);
-  const weekEnd = addDaysToDateKey(weekStart, 6);
+  const weekEnd = addDaysToDateKey(weekStart, 6 + 7 * (weekCount - 1));
   const documents = useMemo<PrintScheduleDocument[]>(() => schedules?.length ? schedules : [{ entries, gradeName, className }], [className, entries, gradeName, schedules]);
   const visible = useMemo(() => documents[0].entries.filter(item => !item.suppressed && (mode === 'major' || (item.date >= weekStart && item.date <= weekEnd))).sort(comparePrintEntries), [documents, mode, weekEnd, weekStart]);
   const dateRange = useMemo(() => [...new Set(visible.map(item => item.date))].sort(), [visible]);
@@ -76,11 +77,14 @@ export default function SchedulePrintPreview({ entries, gradeName, className, on
         const dates = [...new Set(documentVisible.map(item => item.date))].sort();
         return [{ key: `major-${document.className}`, visible: documentVisible, groups: [...new Set(documentVisible.map(item => item.date))].map(date => ({ date, entries: documentVisible.filter(item => item.date === date) })), periodText: dates.length ? `${dates[0]} 至 ${dates[dates.length - 1]}` : '尚未添加科目', gradeName: document.gradeName, className: document.className }];
       }
-      const pageVisible = documentVisible.filter(item => item.date >= weekStart && item.date <= weekEnd);
-      const pageGroups = [...new Set(pageVisible.map(item => item.date))].map(date => ({ date, entries: pageVisible.filter(item => item.date === date) }));
-      return [{ key: `${document.className}-${weekStart}`, visible: pageVisible, groups: pageGroups, periodText: `${weekStart} 至 ${weekEnd}`, gradeName: document.gradeName, className: document.className }];
+      return weekRangeStarts(weekStart, weekCount).map(start => {
+        const end = addDaysToDateKey(start, 6);
+        const pageVisible = documentVisible.filter(item => item.date >= start && item.date <= end);
+        const pageGroups = [...new Set(pageVisible.map(item => item.date))].map(date => ({ date, entries: pageVisible.filter(item => item.date === date) }));
+        return { key: `${document.className}-${start}`, visible: pageVisible, groups: pageGroups, periodText: `${start} 至 ${end}`, gradeName: document.gradeName, className: document.className };
+      });
     });
-  }, [documents, mode, weekEnd, weekStart]);
+  }, [documents, mode, weekCount, weekStart]);
   useEffect(() => {
     const timer = window.setTimeout(() => {
       const fonts = (document as Document & { fonts?: FontFaceSet }).fonts;
@@ -128,7 +132,8 @@ export default function SchedulePrintPreview({ entries, gradeName, className, on
       }
       const firstDocument = documents[0];
       const fileTitle = mode === 'major' ? (title || '大型考试') : mode === 'combined' ? `${firstDocument.gradeName}-${firstDocument.className}` : documents.length > 1 ? `${firstDocument.gradeName}-${documents.length}个班级-周测` : `${firstDocument.gradeName}-${firstDocument.className}-周测`;
-      pdf.save(`${safeFileName(fileTitle)}-考试安排-${getShanghaiDateKey(Date.now())}.pdf`);
+      const rangeSuffix = mode !== 'major' && weekCount > 1 ? `-${weekStart}-${weekEnd}` : '';
+      pdf.save(`${safeFileName(fileTitle)}-考试安排${rangeSuffix}-${getShanghaiDateKey(Date.now())}.pdf`);
     } catch (error) {
       setExportError(error instanceof Error ? error.message : 'PDF 生成失败，请重试');
     } finally {
@@ -139,6 +144,7 @@ export default function SchedulePrintPreview({ entries, gradeName, className, on
   return createPortal(<div className="schedule-preview" role="dialog" aria-modal="true" aria-label="A4 考试安排预览">
     <header className="schedule-preview__toolbar">
       <div className="schedule-preview__period">{mode !== 'major' && <button title="上一周" aria-label="上一周" onClick={() => setWeekStart(value => addDaysToDateKey(value, -7))}><ChevronLeft /></button>}<strong>{periodText}</strong>{mode !== 'major' && <button title="下一周" aria-label="下一周" onClick={() => setWeekStart(value => addDaysToDateKey(value, 7))}><ChevronRight /></button>}</div>
+      {mode !== 'major' && <label className="schedule-preview__weeks">导出周数<InlineSelect value={String(weekCount)} onChange={value => setWeekCount(Number(value) as 1 | 2 | 3)} options={[{ value: '1', label: '1 周' }, { value: '2', label: '2 周' }, { value: '3', label: '3 周' }]} /></label>}
       <div className="schedule-preview__fonts"><label>标题<InlineSelect value={titleFont} onChange={value => setTitleFont(value as FontKey)} options={FONT_OPTIONS.map(font => ({ value: font.id, label: font.label }))} /></label><label>正文<InlineSelect value={bodyFont} onChange={value => setBodyFont(value as FontKey)} options={FONT_OPTIONS.map(font => ({ value: font.id, label: font.label }))} /></label><label>时间数字<InlineSelect value={numericFont} onChange={value => setNumericFont(value as FontKey)} options={FONT_OPTIONS.map(font => ({ value: font.id, label: font.label }))} /></label></div>
       <div className="schedule-preview__actions">{exportError && <span className="schedule-preview__error" role="alert">{exportError}</span>}<button disabled={exporting} onClick={() => void downloadPdf()}><Download />{exporting ? '正在生成 PDF' : '下载 PDF'}</button><button title="关闭预览" aria-label="关闭预览" onClick={onClose}><X /></button></div>
     </header>

@@ -2,13 +2,16 @@ import { useEffect, useRef, useState } from "react";
 import { Clock3 } from "lucide-react";
 import Mascot from "./Mascot";
 import TimeRangePickerModal from "./TimeRangePickerModal";
-import { COMMON_EXAM_SUBJECTS, normalizeSubjectList } from "../data/subjects";
+import { COMMON_EXAM_SUBJECTS, normalizeSubjectList, normalizeSubjectName } from "../data/subjects";
 import type { MajorBatchSubjectGroup, MajorBatchTimeGroup, MajorBatchTimeSlot } from "../utils/appSettings";
 import {
   APP_SETTINGS_CHANGED_EVENT,
   getAppSettings,
+  updateExamSettings,
   updateMajorBatchSettings,
 } from "../utils/appSettings";
+import { fetchExamsFromServer, saveMajorBatchPresets } from "../services/examService";
+import { notify } from "../services/notify";
 import "../styles/batch-preset-settings-panel.css";
 
 function makeSubjectGroupId() {
@@ -31,11 +34,12 @@ type DraftSlot = MajorBatchTimeSlot & { key: string };
  * reorder, and delete presets outside of the batch-add modal itself.
  */
 export default function BatchPresetSettingsPanel({ canEdit }: { canEdit: boolean }) {
+  const [source, setSource] = useState<'school' | 'local'>('school');
   const [subjectGroups, setSubjectGroups] = useState<MajorBatchSubjectGroup[]>(
-    () => getAppSettings().majorBatch.subjectGroups,
+    () => getAppSettings().exam.majorBatchPresets.subjectGroups,
   );
   const [timeGroups, setTimeGroups] = useState<MajorBatchTimeGroup[]>(
-    () => getAppSettings().majorBatch.timeGroups,
+    () => getAppSettings().exam.majorBatchPresets.timeGroups,
   );
 
   const [newSubjectName, setNewSubjectName] = useState("");
@@ -51,7 +55,7 @@ export default function BatchPresetSettingsPanel({ canEdit }: { canEdit: boolean
 
   useEffect(() => {
     const sync = () => {
-      const settings = getAppSettings().majorBatch;
+      const settings = source === 'school' ? getAppSettings().exam.majorBatchPresets : getAppSettings().majorBatch;
       setSubjectGroups(settings.subjectGroups);
       setTimeGroups(settings.timeGroups);
     };
@@ -61,7 +65,31 @@ export default function BatchPresetSettingsPanel({ canEdit }: { canEdit: boolean
       window.removeEventListener(APP_SETTINGS_CHANGED_EVENT, sync);
       window.removeEventListener("storage", sync);
     };
+  }, [source]);
+
+  useEffect(() => {
+    void fetchExamsFromServer().then((payload) => {
+      if (payload?.majorBatchPresets) {
+        updateExamSettings({ majorBatchPresets: { subjectGroups: (payload.majorBatchPresets.subjectGroups ?? []) as MajorBatchSubjectGroup[], timeGroups: (payload.majorBatchPresets.timeGroups ?? []) as MajorBatchTimeGroup[], updatedAt: Number(payload.majorBatchPresets.updatedAt ?? 0) }, updatedAt: payload.updatedAt });
+      }
+    }).catch(() => {});
   }, []);
+
+  const commit = (patch: { subjectGroups?: MajorBatchSubjectGroup[]; timeGroups?: MajorBatchTimeGroup[] }) => {
+    if (patch.subjectGroups) setSubjectGroups(patch.subjectGroups);
+    if (patch.timeGroups) setTimeGroups(patch.timeGroups);
+    if (source === 'school') {
+      const next = {
+        subjectGroups: patch.subjectGroups ?? subjectGroups,
+        timeGroups: patch.timeGroups ?? timeGroups,
+      };
+      void saveMajorBatchPresets(next)
+        .then((saved) => updateExamSettings({ majorBatchPresets: { subjectGroups: saved.subjectGroups as MajorBatchSubjectGroup[], timeGroups: saved.timeGroups as MajorBatchTimeGroup[], updatedAt: saved.updatedAt }, updatedAt: saved.updatedAt }))
+        .catch((error) => notify('error', error instanceof Error ? error.message : '学校预设保存失败'));
+    } else {
+      updateMajorBatchSettings({ ...patch });
+    }
+  };
 
   const moveSubjectGroup = (id: string, direction: -1 | 1) => {
     const index = subjectGroups.findIndex((item) => item.id === id);
@@ -71,8 +99,7 @@ export default function BatchPresetSettingsPanel({ canEdit }: { canEdit: boolean
     const next = [...subjectGroups];
     [next[index], next[targetIndex]] = [next[targetIndex], next[index]];
     const reordered = next.map((item, i) => ({ ...item, order: i }));
-    updateMajorBatchSettings({ subjectGroups: reordered });
-    setSubjectGroups(reordered);
+    commit({ subjectGroups: reordered });
   };
 
   const moveTimeGroup = (id: string, direction: -1 | 1) => {
@@ -83,20 +110,17 @@ export default function BatchPresetSettingsPanel({ canEdit }: { canEdit: boolean
     const next = [...timeGroups];
     [next[index], next[targetIndex]] = [next[targetIndex], next[index]];
     const reordered = next.map((item, i) => ({ ...item, order: i }));
-    updateMajorBatchSettings({ timeGroups: reordered });
-    setTimeGroups(reordered);
+    commit({ timeGroups: reordered });
   };
 
   const deleteSubjectGroup = (id: string) => {
     const next = subjectGroups.filter((item) => item.id !== id).map((item, i) => ({ ...item, order: i }));
-    updateMajorBatchSettings({ subjectGroups: next });
-    setSubjectGroups(next);
+    commit({ subjectGroups: next });
   };
 
   const deleteTimeGroup = (id: string) => {
     const next = timeGroups.filter((item) => item.id !== id).map((item, i) => ({ ...item, order: i }));
-    updateMajorBatchSettings({ timeGroups: next });
-    setTimeGroups(next);
+    commit({ timeGroups: next });
   };
 
   const addSubjectGroup = () => {
@@ -111,8 +135,7 @@ export default function BatchPresetSettingsPanel({ canEdit }: { canEdit: boolean
       order: subjectGroups.length,
     };
     const nextGroups = [...subjectGroups, next];
-    updateMajorBatchSettings({ subjectGroups: nextGroups });
-    setSubjectGroups(nextGroups);
+    commit({ subjectGroups: nextGroups });
     setNewSubjectName("");
     setSelectedSubjects([]);
   };
@@ -163,14 +186,17 @@ export default function BatchPresetSettingsPanel({ canEdit }: { canEdit: boolean
       order: timeGroups.length,
     };
     const nextGroups = [...timeGroups, next];
-    updateMajorBatchSettings({ timeGroups: nextGroups });
-    setTimeGroups(nextGroups);
+    commit({ timeGroups: nextGroups });
     setNewTimeName("");
     setDraftSlots([{ key: makeSlotKey(), start: "08:30", end: "09:30", dayOffset: 0 }]);
   };
 
   return (
     <div className="batch-preset-panel">
+      <div className="batch-preset-source" role="tablist" aria-label="预设来源">
+        <button type="button" className={source === 'school' ? 'is-active' : ''} onClick={() => setSource('school')} role="tab" aria-selected={source === 'school'}>学校预设<span>全校共享</span></button>
+        <button type="button" className={source === 'local' ? 'is-active' : ''} onClick={() => setSource('local')} role="tab" aria-selected={source === 'local'}>本机预设<span>仅当前设备</span></button>
+      </div>
       <section className="batch-preset-section">
         <div className="batch-preset-section__head">
           <strong>常用科目组</strong>

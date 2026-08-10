@@ -1,8 +1,9 @@
 import React, { FormEvent, useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { getAdminRecoveryStatus, getAdminUser, getLastAuthApiError, hasValidLocalToken, isLoginRequired, loginAdmin, logoutAdmin, recoverSuperAdminAccount } from '../services/examService';
+import { getAdminRecoveryStatus, getAdminUser, getLastAuthApiError, hasValidLocalToken, isLoginRequired, loginAdmin, logoutAdmin, recoverSuperAdminAccount, storeAdminSession, type AdminUserContext } from '../services/examService';
+import { bindEmailConfirm, bindEmailRequest, fetchEmailConfig, fetchEmailSendStatus, loginWithEmail, sendEmailCode, type EmailBindPolicy } from '../services/emailAuth';
 import { formatApiError } from '../services/apiError';
-import { changeOwnCredentials } from '../services/adminUsers';
+import { changeOwnCredentials, AdminApiError } from '../services/adminUsers';
 import { useRetryCountdown } from '../hooks/useRetryCountdown';
 import { computeLockedUntil, formatRetryMessage, loginLockoutRetryAfterMs } from '../utils/retryCountdown';
 import Watermark from '../components/Watermark';
@@ -27,6 +28,24 @@ export default function LoginPage() {
   const [recoveryConfigured, setRecoveryConfigured] = useState<boolean | null>(null);
   const [recoveryDraft, setRecoveryDraft] = useState({ username: 'admin', recoveryKey: '', next: '', confirm: '' });
   const [passwordUpgrade, setPasswordUpgrade] = useState<{ current: string; username: string; next: string; confirm: string; token: string } | null>(null);
+  const [emailEnabled, setEmailEnabled] = useState<boolean | null>(null);
+  const [emailPolicy, setEmailPolicy] = useState<EmailBindPolicy>('optional');
+  const [emailView, setEmailView] = useState(true);
+  const [emailAddr, setEmailAddr] = useState('');
+  const [emailCode, setEmailCode] = useState('');
+  const [emailLoading, setEmailLoading] = useState(false);
+  const [emailError, setEmailError] = useState('');
+  const [emailSendUntil, setEmailSendUntil] = useState<number | null>(null);
+  const emailSendRemaining = useRetryCountdown(emailSendUntil);
+  const [emailLockUntil, setEmailLockUntil] = useState<number | null>(null);
+  const emailLockRemaining = useRetryCountdown(emailLockUntil);
+  const [bindEmail, setBindEmail] = useState('');
+  const [bindCode, setBindCode] = useState('');
+  const [bindStatus, setBindStatus] = useState<'idle' | 'requested' | 'bound'>('idle');
+  const [bindLoading, setBindLoading] = useState(false);
+  const [bindError, setBindError] = useState('');
+  const [bindSendUntil, setBindSendUntil] = useState<number | null>(null);
+  const bindSendRemaining = useRetryCountdown(bindSendUntil);
   const search = new URLSearchParams(location.search);
   const next = safeLoginDestination(search.get('next'));
   const initializing = search.get('mode') === 'initialize';
@@ -43,6 +62,122 @@ export default function LoginPage() {
   useEffect(() => {
     if (lockedUntil && remainingLockSeconds <= 0) setLockedUntil(null);
   }, [lockedUntil, remainingLockSeconds]);
+
+  useEffect(() => {
+    if (emailLockUntil && emailLockRemaining <= 0) setEmailLockUntil(null);
+  }, [emailLockUntil, emailLockRemaining]);
+
+  useEffect(() => {
+    let alive = true;
+    fetchEmailConfig().then(config => {
+      if (!alive) return;
+      setEmailEnabled(config.enabled);
+      setEmailPolicy(config.initBindPolicy);
+      setEmailView(config.enabled);
+    }).catch(() => { if (alive) { setEmailEnabled(false); setEmailView(false); } });
+    return () => { alive = false; };
+  }, []);
+
+  const pollEmailSendStatus = async (email: string) => {
+    const delays = [4000, 8000, 12000];
+    for (const delay of delays) {
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      try {
+        const status = await fetchEmailSendStatus(email);
+        if (status.status === 'sent') { setNotice('验证码已发送到您的邮箱，5 分钟内有效'); return; }
+        if (status.status === 'failed') {
+          setEmailSendUntil(null);
+          setEmailError(`验证码发送失败：${status.lastError || '邮件服务错误'}，请重新发送`);
+          return;
+        }
+      } catch { /* 继续等待下一次轮询 */ }
+    }
+  };
+
+  const sendEmailLoginCode = async () => {
+    const email = emailAddr.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setEmailError('请输入有效的邮箱地址'); return; }
+    setEmailLoading(true); setEmailError('');
+    try {
+      const result = await sendEmailCode(email, 'login');
+      setEmailSendUntil(Date.now() + 60_000);
+      if (result?.queued) {
+        setNotice('验证码已加入发送队列，请留意查收（5 分钟内有效）');
+        void pollEmailSendStatus(email);
+      } else {
+        setNotice('验证码已发送到您的邮箱，5 分钟内有效');
+      }
+    } catch (cause) {
+      const retryAfterMs = cause instanceof AdminApiError ? cause.retryAfterMs : undefined;
+      if (retryAfterMs != null) {
+        setEmailSendUntil(Date.now() + retryAfterMs);
+        setEmailError(`发送过于频繁，请 ${Math.ceil(retryAfterMs / 1000)} 秒后再试`);
+      } else {
+        setEmailError(cause instanceof Error ? cause.message : '验证码发送失败，请稍后重试');
+      }
+    }
+    finally { setEmailLoading(false); }
+  };
+
+  const submitEmailLogin = async (event: FormEvent) => {
+    event.preventDefault();
+    if (emailLockUntil && emailLockRemaining > 0) return;
+    if (!emailAddr.trim() || !emailCode.trim()) { setEmailError('请输入邮箱和验证码'); return; }
+    setEmailLoading(true); setEmailError('');
+    try {
+      const session = await loginWithEmail(emailAddr.trim(), emailCode.trim());
+      storeAdminSession(session.token || null, session.expiresAt, session.user as AdminUserContext | null, session.firstLogin);
+      setNotice('');
+      if (session.user?.mustChangePassword) {
+        if (!session.token) { setEmailError('当前登录未获得有效会话，请刷新后重试'); return; }
+        setPasswordUpgrade({ current: '', username: session.user.username || emailAddr.trim(), next: '', confirm: '', token: session.token });
+        return;
+      }
+      navigate(next, { replace: true });
+    } catch (cause) {
+      const retryAfterMs = cause instanceof AdminApiError ? cause.retryAfterMs : undefined;
+      if (cause instanceof AdminApiError && cause.code === 'EMAIL_CODE_LOCKED' && retryAfterMs != null) {
+        setEmailLockUntil(Date.now() + retryAfterMs);
+        setEmailError(`验证失败次数过多，请 ${Math.ceil(retryAfterMs / 1000)} 秒后再试`);
+      } else {
+        setEmailError(cause instanceof Error ? cause.message : '验证码登录失败，请重试');
+      }
+    }
+    finally { setEmailLoading(false); }
+  };
+
+  const sendBindCode = async () => {
+    if (!passwordUpgrade) return;
+    const email = bindEmail.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setBindError('请输入有效的邮箱地址'); return; }
+    setBindLoading(true); setBindError('');
+    try {
+      await bindEmailRequest(email, passwordUpgrade.token);
+      setBindSendUntil(Date.now() + 60_000);
+      setBindStatus('requested');
+    } catch (cause) {
+      const retryAfterMs = cause instanceof AdminApiError ? cause.retryAfterMs : undefined;
+      if (retryAfterMs != null) {
+        setBindSendUntil(Date.now() + retryAfterMs);
+        setBindError(`发送过于频繁，请 ${Math.ceil(retryAfterMs / 1000)} 秒后再试`);
+      } else {
+        setBindError(cause instanceof Error ? cause.message : '验证码发送失败，请稍后重试');
+      }
+    }
+    finally { setBindLoading(false); }
+  };
+
+  const confirmBind = async () => {
+    if (!passwordUpgrade) return;
+    const email = bindEmail.trim();
+    if (!email || !bindCode.trim()) { setBindError('请输入邮箱和验证码'); return; }
+    setBindLoading(true); setBindError('');
+    try {
+      await bindEmailConfirm(email, bindCode.trim(), passwordUpgrade.token);
+      setBindStatus('bound'); setBindError('');
+    } catch (cause) { setBindError(cause instanceof Error ? cause.message : '邮箱绑定失败，请重试'); }
+    finally { setBindLoading(false); }
+  };
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -79,6 +214,7 @@ export default function LoginPage() {
     if (getAdminUser()?.roleId === 'class_admin' && passwordUpgrade.username.trim().toLowerCase() === getAdminUser()?.username.toLowerCase()) { setError('班级管理员首次登录必须设置新的用户名'); return; }
     if (passwordUpgrade.next.length < 8) { setError('新密码至少需要 8 位'); return; }
     if (passwordUpgrade.next !== passwordUpgrade.confirm) { setError('两次输入的新密码不一致'); return; }
+    if (emailEnabled === true && emailPolicy === 'force' && bindStatus !== 'bound') { setError('当前系统要求初始化时必须先绑定邮箱，请先完成绑定'); return; }
     setLoading(true); setError('');
     try { const nextUsername = await changeOwnCredentials(passwordUpgrade.current, passwordUpgrade.username.trim(), passwordUpgrade.next, passwordUpgrade.token); logoutAdmin(); setUsername(nextUsername); setPasswordUpgrade(null); setPassword(''); navigate(`/login?${initializing ? 'mode=initialize&' : ''}next=${encodeURIComponent(next)}`, { replace: true }); }
     catch (cause) { setError(cause instanceof Error ? cause.message : '账户信息修改失败'); }
@@ -127,7 +263,7 @@ export default function LoginPage() {
             <label className="login-form__label" htmlFor="recovery-key">超级管理员恢复密钥</label><div className="login-form__field"><span aria-hidden="true">◆</span><input id="recovery-key" type="password" autoComplete="off" value={recoveryDraft.recoveryKey} onChange={event => setRecoveryDraft(value => ({ ...value, recoveryKey: event.target.value }))} placeholder="初始化时保存的 NVR- 密钥" /></div>
             <label className="login-form__label" htmlFor="recovery-password">新密码</label><div className="login-form__field"><span aria-hidden="true">●</span><input id="recovery-password" type="password" autoComplete="new-password" value={recoveryDraft.next} onChange={event => setRecoveryDraft(value => ({ ...value, next: event.target.value }))} placeholder="至少 8 位" /></div>
             <label className="login-form__label" htmlFor="recovery-confirm">确认新密码</label><div className="login-form__field"><span aria-hidden="true">●</span><input id="recovery-confirm" type="password" autoComplete="new-password" value={recoveryDraft.confirm} onChange={event => setRecoveryDraft(value => ({ ...value, confirm: event.target.value }))} /></div>
-            {error && <p className="login-form__error">{error}</p>}<button className="login-form__submit" disabled={loading} type="submit">{loading ? '正在恢复…' : '确认恢复'}</button>
+          {error && <p className="login-form__error">{error}</p>}<button className="login-form__submit" disabled={loading} type="submit">{loading ? '正在恢复…' : '确认恢复'}</button>
           </form>}
           <button className="login-form__link" type="button" onClick={() => { setRecoveryView(recoveryView === 'form' ? 'guide' : null); setError(''); }}>{recoveryView === 'form' ? '返回找回说明' : '返回登录'}</button>
         </div> : passwordUpgrade ? <form className="login-form" onSubmit={upgradePassword}>
@@ -135,8 +271,79 @@ export default function LoginPage() {
           <label className="login-form__label" htmlFor="new-username">新登录用户名</label><div className={`login-form__field${error ? ' login-form__field--error' : ''}`}><span aria-hidden="true">@</span><input id="new-username" type="text" autoComplete="username" value={passwordUpgrade.username} onChange={event => { setPasswordUpgrade(value => value && ({ ...value, username: event.target.value })); setError(''); }} placeholder="3-40 位字母、数字、点、横线或下划线" /></div>
           <label className="login-form__label" htmlFor="new-password">新密码</label><div className={`login-form__field${error ? ' login-form__field--error' : ''}`}><span aria-hidden="true">●</span><input id="new-password" type="password" autoComplete="new-password" value={passwordUpgrade.next} onChange={event => { setPasswordUpgrade(value => value && ({ ...value, next: event.target.value })); setError(''); }} placeholder="至少 8 位" /></div>
           <label className="login-form__label" htmlFor="confirm-password">确认新密码</label><div className={`login-form__field${error ? ' login-form__field--error' : ''}`}><span aria-hidden="true">●</span><input id="confirm-password" type="password" autoComplete="new-password" value={passwordUpgrade.confirm} onChange={event => { setPasswordUpgrade(value => value && ({ ...value, confirm: event.target.value })); setError(''); }} placeholder="再次输入新密码" /></div>
-          {error && <p className="login-form__error">{error}</p>}<button className="login-form__submit" disabled={loading} type="submit">{loading ? '正在保存…' : '保存用户名和新密码'}</button>
+            {emailEnabled === true && emailPolicy !== 'skip' && (
+          <div className="login-email-bind">
+            <div className="login-email-bind__head">
+              <span>绑定邮箱{emailPolicy === 'force' ? '（必填）' : '（可选）'}</span>
+              {emailPolicy === 'force' && <strong>当前系统要求初始化时绑定邮箱</strong>}
+            </div>
+            {bindStatus === 'bound' ? (
+              <p className="login-email-bind__done">已绑定 {bindEmail.trim() || '邮箱'}，保存后将可用邮箱登录。</p>
+            ) : (
+              <>
+                <div className="login-form__field">
+                  <span aria-hidden="true">@</span>
+                  <input type="email" autoComplete="email" value={bindEmail} onChange={e => { setBindEmail(e.target.value); setBindError(''); }} placeholder="用于登录和找回的邮箱" />
+                </div>
+                <div className="login-email-bind__row">
+                  <div className="login-form__field">
+                    <span aria-hidden="true">#</span>
+                    <input type="text" inputMode="numeric" maxLength={6} value={bindCode} onChange={e => { setBindCode(e.target.value); setBindError(''); }} placeholder="6 位验证码" />
+                  </div>
+                  <button type="button" className="login-email-bind__send" disabled={bindLoading || bindSendRemaining > 0} onClick={() => void sendBindCode()}>
+                    {bindLoading ? '发送中…' : bindSendRemaining > 0 ? bindSendRemaining + 's' : '发送验证码'}
+                  </button>
+                </div>
+                <button type="button" className="login-email-bind__confirm" disabled={bindLoading || !bindEmail.trim() || !bindCode.trim()} onClick={() => void confirmBind()}>
+                  {bindLoading ? '正在绑定…' : '绑定邮箱'}
+                </button>
+                {bindError && <p className="login-email-bind__error">{bindError}</p>}
+                {emailPolicy === 'optional' && <p className="login-email-bind__skip">可稍后在“我的账户”中绑定，不影响本次保存。</p>}
+              </>
+            )}
+          </div>
+        )}
+          {error && <p className="login-form__error">{error}</p>}<button className="login-form__submit" disabled={loading || (emailEnabled === true && emailPolicy === 'force' && bindStatus !== 'bound')} type="submit">{loading ? '正在保存…' : '保存用户名和新密码'}</button>
         </form> : <>
+        {!initializing && emailEnabled === true && (
+          <div className="login-form__tabs" role="tablist" aria-label="登录方式">
+            <button type="button" className={emailView ? 'is-active' : ''} onClick={() => { setEmailView(true); setError(''); setEmailError(''); }}>验证码登录</button>
+            <button type="button" className={emailView ? '' : 'is-active'} onClick={() => { setEmailView(false); setError(''); setEmailError(''); }}>密码登录</button>
+          </div>
+        )}
+        {emailEnabled === true && emailView ? (
+        <form className="login-form" onSubmit={submitEmailLogin}>
+          <p className="login-form__notice">输入已绑定邮箱，我们会发送 6 位验证码到您的邮箱，5 分钟内有效。</p>
+          <label className="login-form__label" htmlFor="email-address">邮箱</label>
+          <div className={"login-form__field" + (emailError ? " login-form__field--error" : "")}>
+            <span aria-hidden="true">@</span>
+            <input id="email-address" type="email" autoComplete="email" value={emailAddr} onChange={e => { setEmailAddr(e.target.value); setEmailError(''); }} placeholder="已绑定的邮箱地址" />
+          </div>
+          <label className="login-form__label" htmlFor="email-code">验证码</label>
+          <div className="login-form__code-row">
+            <div className={"login-form__field" + (emailError ? " login-form__field--error" : "")}>
+              <span aria-hidden="true">#</span>
+              <input id="email-code" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={emailCode} onChange={e => { setEmailCode(e.target.value); setEmailError(''); }} placeholder="6 位验证码" />
+            </div>
+            <button type="button" className="login-form__send-code" disabled={emailLoading || emailSendRemaining > 0} onClick={() => void sendEmailLoginCode()}>
+              {emailLoading ? '发送中…' : emailSendRemaining > 0 ? emailSendRemaining + 's' : '发送验证码'}
+            </button>
+          </div>
+          {emailLockUntil && emailLockRemaining > 0 ? (
+            <p className="login-form__error">{formatRetryMessage(emailLockRemaining, '验证失败次数过多')}</p>
+          ) : emailError ? (
+            <p className="login-form__error">{emailError}</p>
+          ) : null}
+          <button
+            className="login-form__submit"
+            disabled={emailLoading || !emailAddr.trim() || !emailCode.trim() || (!!emailLockUntil && emailLockRemaining > 0)}
+            type="submit"
+          >
+            {emailLoading ? '正在登录…' : emailLockUntil && emailLockRemaining > 0 ? `请 ${emailLockRemaining} 秒后再试` : '验证并登录'}
+            {!emailLoading && <ArrowRight aria-hidden="true" />}
+          </button>
+        </form>
+        ) : (
         <form className="login-form" onSubmit={submit}>
           {initializing && <p className="login-form__notice">首次部署请使用用户名 admin 和 Vercel 中设置的 ADMIN_PASSWORD。首次验证会自动创建超级管理员。</p>}
           {deviceRemoved && <p className="login-form__notice">当前设备已从设备管理中删除，本机登录令牌已失效。请重新登录后绑定或调整设备角色。</p>}
@@ -166,6 +373,7 @@ export default function LoginPage() {
                 : initializing ? '验证并开始初始化' : '进入管理后台'} {!loading && <ArrowRight aria-hidden="true" />}
           </button>
         </form>
+        )}
         {!initializing && <button className="login-form__link" type="button" onClick={() => void openRecovery()}>忘记密码？</button>}
         {!initializing && <SuperAdminRepairLink />}
         </>}

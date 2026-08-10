@@ -189,7 +189,7 @@ export function useSchoolStructureActions(params: {
       classIds.length > 1 ? `设置 ${classIds.length} 个班级选科` : "设置班级选科",
     );
     if (changes.length) {
-      notify("info", `已按最新选科同步 ${changes.length} 个分考试范围。`, "选科变更同步");
+      notify("success", `已按最新选科同步 ${changes.length} 个分考试范围。`, "选科变更同步");
     }
   };
 

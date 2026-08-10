@@ -73,3 +73,19 @@ export function weeklyPlanDetailName(
 
   return detail || original;
 }
+
+/** 批量应用计划标题：班级名 · 基础名（基础名含源班级名时替换为目标班级名），可追加统一后缀。 */
+export function buildCopiedPlanTitle(
+  baseName: string,
+  sourceClassName: string,
+  targetClassName: string,
+  suffix = '',
+): string {
+  const base = baseName.trim();
+  const core =
+    sourceClassName && base.includes(sourceClassName)
+      ? base.replace(sourceClassName, targetClassName)
+      : `${targetClassName} · ${base}`;
+  const tail = suffix.trim();
+  return tail ? `${core} · ${tail}` : core;
+}

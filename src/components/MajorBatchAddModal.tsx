@@ -33,6 +33,7 @@ type SubjectTemplate = {
   description: string;
   subjects: string[];
   custom?: boolean;
+  source?: 'school' | 'local';
   category: TemplateCategory;
   /** 该模板允许勾选的最大科目总数（例如 3+1+2 固定为 6 门）；不设置表示不限制。 */
   maxTotal?: number;
@@ -44,6 +45,7 @@ type DayPattern = {
   description: string;
   slots: MajorBatchTimeSlot[];
   custom?: boolean;
+  source?: 'school' | 'local';
   category: TemplateCategory;
 };
 
@@ -287,6 +289,7 @@ function customSubjectToTemplate(item: MajorBatchSubjectGroup): SubjectTemplate 
     description: `${item.subjects.length} 个科目，已保存为常用组`,
     subjects: item.subjects,
     custom: true,
+    source: "local",
     category: "custom",
   };
 }
@@ -298,6 +301,7 @@ function customTimeToPattern(item: MajorBatchTimeGroup): DayPattern {
     description: `${item.slots.length} 个场次，已保存为常用时间组`,
     slots: item.slots,
     custom: true,
+    source: "local",
     category: "custom",
   };
 }
@@ -318,6 +322,8 @@ export default function MajorBatchAddModal({
   const [step, setStep] = useState(0);
   const [customSubjectGroups, setCustomSubjectGroups] = useState<MajorBatchSubjectGroup[]>(() => getAppSettings().majorBatch.subjectGroups);
   const [customTimeGroups, setCustomTimeGroups] = useState<MajorBatchTimeGroup[]>(() => getAppSettings().majorBatch.timeGroups);
+  const [schoolSubjectGroups, setSchoolSubjectGroups] = useState<MajorBatchSubjectGroup[]>(() => getAppSettings().exam.majorBatchPresets.subjectGroups);
+  const [schoolTimeGroups, setSchoolTimeGroups] = useState<MajorBatchTimeGroup[]>(() => getAppSettings().exam.majorBatchPresets.timeGroups);
   const [subjectTrackModeEnabled, setSubjectTrackModeEnabled] = useState(() => getAppSettings().exam.initialization.subjectTrackModeEnabled !== false);
   const [templateId, setTemplateId] = useState(SUBJECT_TEMPLATES[0].id);
   const [subjects, setSubjects] = useState(SUBJECT_TEMPLATES[0].subjects);
@@ -337,6 +343,8 @@ export default function MajorBatchAddModal({
       const settings = getAppSettings();
       setCustomSubjectGroups(settings.majorBatch.subjectGroups);
       setCustomTimeGroups(settings.majorBatch.timeGroups);
+      setSchoolSubjectGroups(settings.exam.majorBatchPresets.subjectGroups);
+      setSchoolTimeGroups(settings.exam.majorBatchPresets.timeGroups);
       setSubjectTrackModeEnabled(settings.exam.initialization.subjectTrackModeEnabled !== false);
     };
     window.addEventListener(APP_SETTINGS_CHANGED_EVENT, sync);
@@ -348,12 +356,12 @@ export default function MajorBatchAddModal({
   }, []);
 
   const subjectTemplates = useMemo(
-    () => [...SUBJECT_TEMPLATES, ...customSubjectGroups.map(customSubjectToTemplate)],
-    [customSubjectGroups],
+    () => [...SUBJECT_TEMPLATES, ...schoolSubjectGroups.map((group) => ({ ...customSubjectToTemplate(group), source: "school" as const })), ...customSubjectGroups.map(customSubjectToTemplate)],
+    [customSubjectGroups, schoolSubjectGroups],
   );
   const dayPatterns = useMemo(
-    () => [...DAY_PATTERNS, ...customTimeGroups.map(customTimeToPattern)],
-    [customTimeGroups],
+    () => [...DAY_PATTERNS, ...schoolTimeGroups.map((group) => ({ ...customTimeToPattern(group), source: "school" as const })), ...customTimeGroups.map(customTimeToPattern)],
+    [customTimeGroups, schoolTimeGroups],
   );
   const template = subjectTemplates.find((item) => item.id === templateId) ?? subjectTemplates[0];
   const pattern = dayPatterns.find((item) => item.id === patternId) ?? dayPatterns[0];
@@ -480,7 +488,7 @@ export default function MajorBatchAddModal({
     >
       <strong>{item.name}</strong>
       <span>{item.id === GAOKAO_THREE_DAY_SUBJECTS_ID ? "9 科" : `${item.subjects.length} 个`}</span>
-      {item.custom && <em>自定义</em>}
+      {item.source === 'school' ? <em className="is-school">学校</em> : item.custom ? <em>自定义</em> : null}
       <small>{item.description}</small>
     </button>
   );
@@ -497,7 +505,7 @@ export default function MajorBatchAddModal({
         {item.id === GAOKAO_THREE_DAY_PATTERN_ID ? "9 科 · " : ""}
         {item.slots.length} 场 · 约 {patternDaySpan(item)} 天
       </span>
-      {item.custom && <em>自定义</em>}
+      {item.source === 'school' ? <em className="is-school">学校</em> : item.custom ? <em>自定义</em> : null}
       <small>{item.description}</small>
     </button>
   );

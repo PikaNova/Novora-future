@@ -28,6 +28,7 @@ export interface ExamPayload {
   initialization?: ExamSettings['initialization'];
   weeklyConflictPolicy?: WeeklyConflictPolicy | null;
   designPolicy?: DesignPolicy;
+  majorBatchPresets?: { subjectGroups: unknown[]; timeGroups: unknown[]; updatedAt: number };
   binding?: { gradeId: string; classId: string; revoked: boolean; isManagement?: boolean } | null;
   updatedAt: number;
 }
@@ -308,6 +309,31 @@ export async function saveDesignPolicy(designPolicy: DesignPolicy): Promise<Desi
   }
 }
 
+
+export async function saveMajorBatchPresets(presets: { subjectGroups: unknown[]; timeGroups: unknown[] }): Promise<{ subjectGroups: unknown[]; timeGroups: unknown[]; updatedAt: number }> {
+  const token = localStorage.getItem(TOKEN_KEY) ?? '';
+  const response = await runQueued(() => fetchWithTimeout(
+    API_URL,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify({ action: 'major-batch-presets', presets }),
+    },
+    20_000,
+  ));
+  if (!response.ok) {
+    const error = await apiErrorFromResponse(response, '批量预设保存失败');
+    throw error;
+  }
+  const data = await response.json();
+  if (!data?.majorBatchPresets) throw new Error('服务器未返回批量预设');
+  const saved = data.majorBatchPresets;
+  const snapshot = getCloudSnapshot();
+  if (snapshot) rememberCloudSnapshot({ ...snapshot, majorBatchPresets: saved, updatedAt: Number(data.updatedAt ?? saved.updatedAt) });
+  else localStorage.setItem(CLOUD_VERSION_KEY, String(data.updatedAt ?? saved.updatedAt));
+  return saved;
+}
+
 export async function isLoginRequired(): Promise<boolean> {
   try {
     const res = await fetchWithTimeout(LOGIN_URL, { method: 'GET', headers: { 'Cache-Control': 'no-store' } }, 10_000);
@@ -457,6 +483,18 @@ export async function loginAdmin(username: string, password: string): Promise<Lo
   } catch (err) {
     lastAuthApiError = classifyFetchError(err);
     return null;
+  }
+}
+
+
+export function storeAdminSession(token: string | null, expiresAt: number, user: AdminUserContext | null, firstLogin = false): void {
+  if (token) {
+    localStorage.setItem(TOKEN_KEY, token);
+    localStorage.setItem(TOKEN_EXPIRES_KEY, String(expiresAt ?? 0));
+  }
+  if (user) {
+    localStorage.setItem(ADMIN_USER_KEY, JSON.stringify(user));
+    if (firstLogin === true && user.roleId === 'grade_admin') localStorage.setItem(GRADE_ADMIN_FIRST_LOGIN_KEY, String(user.id));
   }
 }
 

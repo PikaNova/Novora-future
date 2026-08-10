@@ -1,15 +1,20 @@
 .batch-preset-panel {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 18px;
 }
 
 .batch-preset-section {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
   gap: 10px;
 }
 
 .batch-preset-section__head {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
   gap: 3px;
 }
 
@@ -26,6 +31,8 @@
 
 .batch-preset-list {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
   gap: 8px;
   margin: 0;
   padding: 0;
@@ -37,6 +44,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  min-width: 0;
   padding: 10px 12px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
@@ -78,6 +86,8 @@
 
 .batch-preset-form {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
   gap: 8px;
   padding: 12px;
   border: 1px dashed rgba(255, 255, 255, 0.16);
@@ -98,6 +108,8 @@
 
 .batch-preset-slot-rows {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
   gap: 8px;
 }
 
@@ -106,10 +118,13 @@
   grid-template-columns: 84px minmax(0, 1fr) auto;
   align-items: end;
   gap: 8px;
+  min-width: 0;
 }
 
 .batch-preset-slot-row label {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
   gap: 5px;
   color: rgba(235, 244, 250, 0.62);
   font-size: 11px;
@@ -117,6 +132,8 @@
 
 .batch-preset-slot-row .admin-input {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   min-height: 36px;
   box-sizing: border-box;
 }
@@ -194,6 +211,7 @@
 }
 .batch-preset-custom-subject {
   display: flex;
+  min-width: 0;
   gap: 8px;
 }
 

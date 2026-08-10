@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
 import InlineSelect from './InlineSelect';
 import { Switch } from './settings/Switch';
 import { confirmDialog } from '../services/appDialog';
@@ -30,17 +30,24 @@ function detectPreset(host: string): 'qq' | '163' | 'custom' {
   return 'custom';
 }
 
-export default function EmailServicePanel({
-  canEditSettings,
-  showPolicy = false,
-  canEditPolicy = false,
-  onSaved,
-}: {
+export interface EmailServicePanelHandle {
+  /** 向导/外部调用：全空跳过(skipped)；有填写则保存，成功 saved，失败 error。 */
+  saveIfConfigured: () => Promise<'saved' | 'skipped' | 'error'>;
+}
+
+type EmailServicePanelProps = {
   canEditSettings: boolean;
   showPolicy?: boolean;
   canEditPolicy?: boolean;
   onSaved?: () => void;
-}) {
+};
+
+const EmailServicePanel = forwardRef<EmailServicePanelHandle, EmailServicePanelProps>(function EmailServicePanel({
+  canEditSettings,
+  showPolicy = false,
+  canEditPolicy = false,
+  onSaved,
+}, ref) {
   const [loaded, setLoaded] = useState(false);
   const [enabled, setEnabled] = useState(false);
   const [preset, setPreset] = useState<'qq' | '163' | 'custom'>('custom');
@@ -111,15 +118,23 @@ export default function EmailServicePanel({
     initBindPolicy,
   });
 
-  const save = async () => {
-    if (!smtpHost.trim() || !smtpFrom.trim()) { setErr('请填写 SMTP 主机与发件邮箱'); setMsg(''); return; }
+  const save = async (): Promise<boolean> => {
+    if (!smtpHost.trim() || !smtpFrom.trim()) { setErr('请填写 SMTP 主机与发件邮箱'); setMsg(''); return false; }
     setSaving(true); setErr(''); setMsg('');
     try {
       await saveEmailConfig(input());
       setEnabled(true); setMsg('邮件服务已保存并启用'); onSaved?.();
-    } catch (cause) { setErr(cause instanceof Error ? cause.message : '保存失败'); }
+      return true;
+    } catch (cause) { setErr(cause instanceof Error ? cause.message : '保存失败'); return false; }
     finally { setSaving(false); }
   };
+
+  useImperativeHandle(ref, () => ({
+    saveIfConfigured: async () => {
+      if (!smtpHost.trim() && !smtpFrom.trim()) return 'skipped';
+      return (await save()) ? 'saved' : 'error';
+    },
+  }));
 
   const test = async () => {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(testEmail.trim())) { setErr('请输入有效的测试邮箱'); setMsg(''); return; }
@@ -223,4 +238,6 @@ export default function EmailServicePanel({
       {err && <p className="set-note set-note--error">{err}</p>}
     </div>
   );
-}
+});
+
+export default EmailServicePanel;

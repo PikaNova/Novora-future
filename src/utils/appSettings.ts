@@ -75,10 +75,17 @@ export interface ExamSettings {
   /** 大型考试 vs 周测 的冲突处理策略（v1.24.0 全局默认）。 */
   weeklyConflictPolicy: WeeklyConflictPolicy;
   designPolicy: DesignPolicy;
+  majorBatchPresets: MajorBatchPresets;
   alertEnabled: boolean;
   announcementPermanentlyHidden: boolean;
   updatedAt?: number;
 }
+
+export type MajorBatchPresets = {
+  subjectGroups: MajorBatchSubjectGroup[];
+  timeGroups: MajorBatchTimeGroup[];
+  updatedAt: number;
+};
 
 export interface AppSettings {
   version: number;
@@ -183,6 +190,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     initialization: DEFAULT_INITIALIZATION,
     weeklyConflictPolicy: DEFAULT_WEEKLY_CONFLICT_POLICY,
     designPolicy: DEFAULT_DESIGN_POLICY,
+    majorBatchPresets: { subjectGroups: [], timeGroups: [], updatedAt: 0 },
     alertEnabled: true,
     announcementPermanentlyHidden: false,
     updatedAt: 0,
@@ -259,6 +267,12 @@ export function normalizeExam(raw: unknown): ExamSettings {
   const selectedClassId = normalizeSelectedClassId(src.selectedClassId, classes, selectedGradeId);
   const initialization = normalizeInitialization(src.initialization);
   base.designPolicy = normalizeDesignPolicy(src.designPolicy);
+  const rawPresets = (src.majorBatchPresets ?? {}) as { subjectGroups?: unknown; timeGroups?: unknown; updatedAt?: unknown };
+  base.majorBatchPresets = {
+    subjectGroups: Array.isArray(rawPresets.subjectGroups) ? (rawPresets.subjectGroups as MajorBatchSubjectGroup[]) : [],
+    timeGroups: Array.isArray(rawPresets.timeGroups) ? (rawPresets.timeGroups as MajorBatchTimeGroup[]) : [],
+    updatedAt: Number(rawPresets.updatedAt ?? 0),
+  };
   const weeklyConflictPolicy = normalizeConflictPolicy(src.weeklyConflictPolicy);
 
   return {

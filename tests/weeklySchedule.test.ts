@@ -8,8 +8,7 @@ import {
   isoWeekdayOfDateKey,
   resolveWeeklyOccurrences,
   validateWeeklyPlan,
-  weekIndexOfDateKey,
-} from '../src/utils/weeklySchedule.js';
+  weekIndexOfDateKey, weekRangeStarts } from '../src/utils/weeklySchedule.js';
 import type { WeeklyExamItem, WeeklyExamOverride, WeeklyPlan } from '../src/types/exam.js';
 
 function shanghaiNoonMsFor(dateKey: string): number {
@@ -232,4 +231,21 @@ test('validateWeeklyPlan: reports overrides that reference a missing item', () =
   }));
 
   assert.ok(issues.some(issue => issue.code === 'override.orphan'));
+});
+
+test('weekRangeStarts: returns 1-3 consecutive week starts', () => {
+  assert.deepEqual(weekRangeStarts('2026-08-03', 1), ['2026-08-03']);
+  assert.deepEqual(weekRangeStarts('2026-08-03', 2), ['2026-08-03', '2026-08-10']);
+  assert.deepEqual(weekRangeStarts('2026-08-03', 3), ['2026-08-03', '2026-08-10', '2026-08-17']);
+});
+
+test('weekRangeStarts: handles cross-month and cross-year boundaries', () => {
+  assert.deepEqual(weekRangeStarts('2026-08-31', 2), ['2026-08-31', '2026-09-07']);
+  assert.deepEqual(weekRangeStarts('2026-12-28', 2), ['2026-12-28', '2027-01-04']);
+});
+
+test('weekRangeStarts: clamps invalid counts to a safe range', () => {
+  assert.deepEqual(weekRangeStarts('2026-08-03', 0), ['2026-08-03']);
+  assert.deepEqual(weekRangeStarts('2026-08-03', 9).length, 4);
+  assert.deepEqual(weekRangeStarts('2026-08-03', Number.NaN), ['2026-08-03']);
 });

@@ -52,6 +52,7 @@
     "api/_exams/scopeCleanup.ts",
     "src/utils/zonedTime.ts",
     "src/utils/examMerge.ts",
+    "src/utils/examConflicts.ts",
     "src/utils/examSchedule.ts",
     "src/utils/weeklySchedule.ts",
     "src/data/subjects.ts",

@@ -75,6 +75,9 @@ export default function SettingsPage() {
   const canEditSettings = adminUser
     ? adminCan("settings.edit", adminUser)
     : !hasValidLocalToken();
+  const canEditPresets = adminUser
+    ? adminCan("majorBatch.preset_edit", adminUser)
+    : !hasValidLocalToken();
   const canEditWeekly = adminUser
     ? adminCan("weekly.edit", adminUser)
     : !hasValidLocalToken();
@@ -173,7 +176,7 @@ export default function SettingsPage() {
               <p className="set-note">
                 管理批量添加分考试时可复用的常用科目组和常用时间组，与批量添加弹窗中的设置共享，可在此新建、排序或删除。
               </p>
-              <BatchPresetSettingsPanel canEdit={canEditSettings} />
+              <BatchPresetSettingsPanel canEdit={canEditPresets} />
             </section>
           </div>
         </section>

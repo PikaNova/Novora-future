@@ -133,7 +133,7 @@ export default function QuickMajorPublishModal({
 
   const startTime = useCustomStart
     ? `${examDate}T${customStartTime}`
-    : localInputValue(delayMinutes === 0 ? Date.now() : roundUpToFiveMinutes(Date.now() + delayMinutes * 60_000));
+    : localInputValue(delayMinutes === 0 ? Date.now() + 60_000 : roundUpToFiveMinutes(Date.now() + delayMinutes * 60_000));
   const finalDuration = durationMinutes;
   const previewEndTime = Number.isFinite(new Date(startTime).getTime())
     ? localInputValue(new Date(startTime).getTime() + finalDuration * 60_000)

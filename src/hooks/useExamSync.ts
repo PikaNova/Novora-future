@@ -83,7 +83,7 @@ export function useExamSync({ onUpdate, intervalMs = 60000, minRefreshMs = AUTO_
     majors: any[]; activeMajorId: string; updatedAt: number;
     scheduleMode?: any; weeklyPlans?: any; activeWeeklyPlanId?: any;
     activeWeeklyPlanIdByClassId?: any; grades?: any; classes?: any;
-    initialization?: any; weeklyConflictPolicy?: any; designPolicy?: any;
+    initialization?: any; weeklyConflictPolicy?: any; designPolicy?: any; majorBatchPresets?: any;
   }) => {
     const updates: Record<string, unknown> = {
       items: payload.items,
@@ -101,6 +101,7 @@ export function useExamSync({ onUpdate, intervalMs = 60000, minRefreshMs = AUTO_
     if (payload.initialization !== undefined) updates.initialization = payload.initialization;
     if (payload.weeklyConflictPolicy !== undefined) updates.weeklyConflictPolicy = payload.weeklyConflictPolicy;
     if (payload.designPolicy !== undefined) updates.designPolicy = payload.designPolicy;
+    if (payload.majorBatchPresets !== undefined) updates.majorBatchPresets = payload.majorBatchPresets;
     updateExamSettings(updates as any);
     if (payload.alerts) updateAlertsSettings(payload.alerts);
     const s = getAppSettings();

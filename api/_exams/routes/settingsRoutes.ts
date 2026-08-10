@@ -80,6 +80,46 @@ export async function handleDesignPolicy(req: VercelRequest, res: VercelResponse
   return;
 }
 
+export function sanitizeMajorBatchPresets(raw: unknown): { subjectGroups: unknown[]; timeGroups: unknown[] } {
+  const src = (raw ?? {}) as Record<string, unknown>;
+  return {
+    subjectGroups: Array.isArray(src.subjectGroups) ? src.subjectGroups.slice(0, 500) : [],
+    timeGroups: Array.isArray(src.timeGroups) ? src.timeGroups.slice(0, 500) : [],
+  };
+}
+
+export async function handleMajorBatchPresets(req: VercelRequest, res: VercelResponse): Promise<void> {
+  const sql = database();
+  let presetActor: AdminActor | null = null;
+  if (await isPasswordRequired()) {
+    presetActor = await requireActor(req, res, "majorBatch.preset_edit");
+    if (!presetActor) return;
+  }
+  const source = (req.body as Record<string, unknown>)?.presets ?? (req.body as Record<string, unknown>)?.majorBatchPresets;
+  const presets = sanitizeMajorBatchPresets(source);
+  const updatedAt = Date.now();
+  const payload = { ...presets, updatedAt };
+  if (!(await acquireWriteSlotOrReject(req, res))) return;
+  const run = async () =>
+    sql`UPDATE exam_data SET major_batch_presets=${JSON.stringify(payload)}::jsonb, updated_at=${updatedAt} WHERE id=1`;
+  try {
+    await run();
+  } catch (error) {
+    if (!missingRelation(error)) throw error;
+    await ensureTableOnce();
+    await run();
+  }
+  await writeAudit(
+    presetActor,
+    "settings.major-batch-presets",
+    "exam_data",
+    "1",
+    { subjectGroups: payload.subjectGroups.length, timeGroups: payload.timeGroups.length },
+  );
+  res.status(200).json({ ok: true, majorBatchPresets: payload, updatedAt });
+}
+
+
 export type ResetCategoryFlags = {
   resetMajor: boolean;
   resetWeekly: boolean;

@@ -43,7 +43,7 @@ export async function handleBootstrap(req: VercelRequest, res: VercelResponse, s
   const selectBootstrap = async (): Promise<ExamRow[]> =>
     (await sql`
       SELECT items, title, majors, active_major_id, alerts, weekly_plans, schedule_mode,
-             active_weekly_plan_id, active_weekly_plan_by_class, weekly_conflict_policy, grades, classes, initialization, design_policy, updated_at,
+             active_weekly_plan_id, active_weekly_plan_by_class, weekly_conflict_policy, grades, classes, initialization, design_policy, major_batch_presets, updated_at,
              (SELECT grade_id FROM device_instances WHERE instance_id = ${instanceId}) AS bound_grade_id,
              (SELECT class_id FROM device_instances WHERE instance_id = ${instanceId}) AS bound_class_id,
              (SELECT revoked FROM device_instances WHERE instance_id = ${instanceId}) AS binding_revoked,
@@ -89,7 +89,7 @@ export async function handleExamDataGet(req: VercelRequest, res: VercelResponse,
   // 现在每次 GET 都直接查库，只用 ETag 做协商缓存（304），保证任何时刻返回的
   // 都是当次真实查询到的最新数据。
   const selectRow = async (): Promise<ExamRow[]> =>
-    (await sql`SELECT items, title, majors, active_major_id, alerts, weekly_plans, schedule_mode, active_weekly_plan_id, active_weekly_plan_by_class, weekly_conflict_policy, grades, classes, initialization, design_policy, updated_at FROM exam_data WHERE id = 1`) as unknown as ExamRow[];
+    (await sql`SELECT items, title, majors, active_major_id, alerts, weekly_plans, schedule_mode, active_weekly_plan_id, active_weekly_plan_by_class, weekly_conflict_policy, grades, classes, initialization, design_policy, major_batch_presets, updated_at FROM exam_data WHERE id = 1`) as unknown as ExamRow[];
   let rows: ExamRow[];
   try {
     rows = await selectRow();
@@ -141,12 +141,12 @@ export async function handleExamDataPost(req: VercelRequest, res: VercelResponse
     let currentRows: ExamRow[];
     try {
       currentRows =
-        (await sql`SELECT items, title, majors, active_major_id, alerts, weekly_plans, schedule_mode, active_weekly_plan_id, active_weekly_plan_by_class, weekly_conflict_policy, grades, classes, initialization, design_policy, updated_at FROM exam_data WHERE id=1`) as unknown as ExamRow[];
+        (await sql`SELECT items, title, majors, active_major_id, alerts, weekly_plans, schedule_mode, active_weekly_plan_id, active_weekly_plan_by_class, weekly_conflict_policy, grades, classes, initialization, design_policy, major_batch_presets, updated_at FROM exam_data WHERE id=1`) as unknown as ExamRow[];
     } catch (error) {
       if (!missingRelation(error)) throw error;
       await ensureTableOnce();
       currentRows =
-        (await sql`SELECT items, title, majors, active_major_id, alerts, weekly_plans, schedule_mode, active_weekly_plan_id, active_weekly_plan_by_class, weekly_conflict_policy, grades, classes, initialization, design_policy, updated_at FROM exam_data WHERE id=1`) as unknown as ExamRow[];
+        (await sql`SELECT items, title, majors, active_major_id, alerts, weekly_plans, schedule_mode, active_weekly_plan_id, active_weekly_plan_by_class, weekly_conflict_policy, grades, classes, initialization, design_policy, major_batch_presets, updated_at FROM exam_data WHERE id=1`) as unknown as ExamRow[];
     }
     const currentPayload = examPayload(currentRows[0] ?? {});
     if (action === "initialize") {
@@ -280,7 +280,7 @@ export async function handleExamDataPost(req: VercelRequest, res: VercelResponse
   }
   if (!updatedRows?.length) {
     const rows =
-      (await sql`SELECT items, title, majors, active_major_id, alerts, weekly_plans, schedule_mode, active_weekly_plan_id, active_weekly_plan_by_class, weekly_conflict_policy, grades, classes, initialization, design_policy, updated_at FROM exam_data WHERE id = 1`) as unknown as ExamRow[];
+      (await sql`SELECT items, title, majors, active_major_id, alerts, weekly_plans, schedule_mode, active_weekly_plan_id, active_weekly_plan_by_class, weekly_conflict_policy, grades, classes, initialization, design_policy, major_batch_presets, updated_at FROM exam_data WHERE id = 1`) as unknown as ExamRow[];
     const row = rows[0] ?? {};
     const { ok: _ok, ...remote } = examPayload(row);
     res

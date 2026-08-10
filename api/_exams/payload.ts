@@ -27,6 +27,7 @@ export function examPayload(row: ExamRow) {
     initialization: objectValue(row.initialization),
     weeklyConflictPolicy: row.weekly_conflict_policy ?? null,
     designPolicy: objectValue(row.design_policy),
+    majorBatchPresets: objectValue(row.major_batch_presets),
     updatedAt: Number(row.updated_at ?? 0),
   };
 }

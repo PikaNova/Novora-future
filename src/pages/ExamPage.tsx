@@ -428,7 +428,7 @@ function BoundExamPage() {
         onClose={() => setAnnouncementsOpen(false)}
       />
       {/* 设计切换窗由各设计顶栏按钮触发，避免悬浮按钮遮挡大屏元素。 */}
-      <DesignSwitcher open={switcherOpen} onClose={() => setSwitcherOpen(false)} currentId={designId} onSelect={chooseDesign} />
+      <DesignSwitcher open={switcherOpen} onClose={() => setSwitcherOpen(false)} currentId={designId} onSelect={chooseDesign} managed={managedDesign} />
       {/* 全屏提醒浮层：风格跟随当前展示设计自动切换 */}
       <ExamAlertOverlay
         item={overlayItem}

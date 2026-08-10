@@ -11,6 +11,7 @@ interface Props {
   onClose: () => void;
   currentId: string;
   onSelect: (id: string) => void;
+  managed?: boolean;
 }
 
 const tags: Record<string, string> = {
@@ -23,7 +24,7 @@ const groups: Array<{ theme: DesignTheme; title: string; hint: string }> = [
   { theme: 'dark', title: '暗色设计', hint: '暗场环境、远距离与高对比显示' },
 ];
 
-export default function DesignSwitcher({ open, onClose, currentId, onSelect }: Props) {
+export default function DesignSwitcher({ open, onClose, currentId, onSelect, managed = false }: Props) {
   const [favorites, setFavorites] = useState<string[]>(() => {
     try { return JSON.parse(localStorage.getItem('exam_design_favorites') || '[]'); } catch { return []; }
   });
@@ -57,6 +58,7 @@ export default function DesignSwitcher({ open, onClose, currentId, onSelect }: P
     <div className="dsw-window" onClick={event => event.stopPropagation()}>
       <header className="dsw-window__bar"><div><b>选择展示设计</b><span>{DESIGNS.length} 套方案</span></div><button onClick={onClose} aria-label="关闭"><X /></button></header>
       <main className="dsw-window__body">
+        {managed && <div className="dsw-managed-note"><LockKeyhole aria-hidden="true" />当前展示由学校设计托管，切换仅临时预览，刷新后仍以学校下发设计为准。</div>}
         {mobile && <div className="dsw-mobile-note"><Smartphone aria-hidden="true" />手机端仅已适配的设计可直接使用；其余设计标记为“电脑端最佳”，切换前会提示。</div>}
         {groups.map(group => {
           const list = DESIGNS.filter(design => design.theme === group.theme);

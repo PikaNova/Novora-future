@@ -12,6 +12,7 @@ import {
   Zap,
 } from "lucide-react";
 import type { MajorExam } from "../types";
+import { findMajorConflicts } from "../utils/examConflicts";
 import type { WeeklyPlan } from "../types/exam";
 import type { SchoolClass, SchoolGrade } from "../types/school";
 import {
@@ -226,39 +227,7 @@ export default function OverviewPanel({
   const runningDevices = onlineDevices.filter(
     (item) => item.status === "exam-running",
   );
-  const majorItems = activeMajors.flatMap((major) =>
-    major.items.filter((item) => item.enabled).map((item) => ({ major, item })),
-  );
-  const majorConflicts = majorItems.flatMap((left, index) =>
-    majorItems
-      .slice(index + 1)
-      .filter((right) => {
-        const timeOverlap =
-          new Date(left.item.startTime).getTime() <
-            new Date(right.item.endTime).getTime() &&
-          new Date(left.item.endTime).getTime() >
-            new Date(right.item.startTime).getTime();
-        const gradeOverlap =
-          !left.major.targetGradeIds?.length ||
-          !right.major.targetGradeIds?.length ||
-          left.major.targetGradeIds.some((id) =>
-            right.major.targetGradeIds?.includes(id),
-          );
-        const classOverlap =
-          !left.major.targetClassIds?.length ||
-          !right.major.targetClassIds?.length ||
-          left.major.targetClassIds.some((id) =>
-            right.major.targetClassIds?.includes(id),
-          );
-        return (
-          left.major.id !== right.major.id &&
-          timeOverlap &&
-          gradeOverlap &&
-          classOverlap
-        );
-      })
-      .map((right) => `${left.major.name} / ${right.major.name}`),
-  );
+  const majorConflicts = findMajorConflicts(activeMajors);
   const quickMajorDisplayStatuses: Array<{
     major: MajorExam;
     status: NonNullable<ReturnType<typeof getQuickMajorDisplayStatus>>;

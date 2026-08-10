@@ -100,6 +100,7 @@ import "../styles/admin.css";
 import "../styles/admin-wizard-mobile-fix.css";
 import "../styles/admin-track-additions.css";
 import {
+  AlertTriangle,
   ArrowLeft,
   Bell,
   CalendarDays,
@@ -107,6 +108,7 @@ import {
   Megaphone,
 } from "lucide-react";
 import { fmtAnnTime, makeId, fmtLocal, toISO, toLocalInput, duration, phase, syncMajorStateRef } from "../hooks/admin/adminPageUtils";
+import { findMajorConflicts, findMajorConflictItemKeys } from "../utils/examConflicts";
 import type { SyncState } from "../hooks/admin/adminPageUtils";
 import { useAdminAuthSession } from "../hooks/admin/useAdminAuthSession";
 import { useAnnouncements } from "../hooks/admin/useAnnouncements";
@@ -407,6 +409,8 @@ export default function AdminPage() {
     endQuickMajor,
     promoteQuickMajor,
   } = major;
+  const majorConflictLabels = findMajorConflicts(scopedMajors);
+  const majorConflictItemKeys = findMajorConflictItemKeys(scopedMajors);
   // 打通间接引用：其余 Hook 通过这些 ref 反向调用大型考试领域的最新实现
   commitRef.current = commit;
   buildPayloadRef.current = buildPayload;
@@ -1478,6 +1482,15 @@ export default function AdminPage() {
               </div>
             </aside>
             <main className="admin-main">
+              {majorConflictLabels.length > 0 && (
+                <div className="admin-major-conflict" role="alert">
+                  <AlertTriangle size={16} aria-hidden="true" />
+                  <div>
+                    <strong>检测到 {new Set(majorConflictLabels).size} 组大型考试时间冲突</strong>
+                    <span>{[...new Set(majorConflictLabels)].join("、")}</span>
+                  </div>
+                </div>
+              )}
               <div className="admin-list-header">
                 <h2 className="admin-list-title">
                   {activeMajor.name} · 考试安排
@@ -1541,7 +1554,7 @@ export default function AdminPage() {
                     const status = STATUS[phase(item)];
                     return (
                       <li
-                        className={`admin-item${canDeleteActiveMajor ? " admin-item--selectable" : ""}${!item.enabled ? " admin-item--disabled" : ""}`}
+                        className={`admin-item${canDeleteActiveMajor ? " admin-item--selectable" : ""}${!item.enabled ? " admin-item--disabled" : ""}${majorConflictItemKeys.has(activeMajor.id + ":" + item.id) ? " admin-item--conflict" : ""}`}
                         key={item.id}
                       >
                         {canDeleteActiveMajor && (
@@ -1594,6 +1607,9 @@ export default function AdminPage() {
                               >
                                 已禁用
                               </span>
+                            )}
+                            {majorConflictItemKeys.has(activeMajor.id + ":" + item.id) && (
+                              <span className="admin-item__conflict-badge">时间冲突</span>
                             )}
                           </div>
                           <div className="admin-item__times">

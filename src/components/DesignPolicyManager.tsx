@@ -27,7 +27,7 @@ export default function DesignPolicyManager({ grades, classes, devices, canEdit 
     else if (scope === 'grade') setScopeId(grades[0]?.id || '');
     else if (scope === 'class') setScopeId(classes[0]?.id || '');
     else setScopeId(devices[0]?.instanceId || '');
-  }, [scope, grades, classes, devices]);
+  }, [scope]); // 只在切换范围类型时初始化，避免同步重渲染（classes 引用变化）把已选对象弹回第一个
 
   const targets = useMemo(() => scope === 'grade'
     ? grades.map(item => ({ value: item.id, label: item.name }))
@@ -51,7 +51,12 @@ export default function DesignPolicyManager({ grades, classes, devices, canEdit 
 
   const targetLabel = (rule: DesignAssignmentRule) => rule.scope === 'school' ? '全校考试端'
     : rule.scope === 'grade' ? grades.find(item => item.id === rule.scopeId)?.name || rule.scopeId
-    : rule.scope === 'class' ? classes.find(item => item.id === rule.scopeId)?.name || rule.scopeId
+    : rule.scope === 'class' ? (() => {
+        const cls = classes.find(item => item.id === rule.scopeId);
+        if (!cls) return rule.scopeId;
+        const grade = grades.find(item => item.id === cls.gradeId);
+        return grade ? grade.name + ' · ' + cls.name : cls.name;
+      })()
     : devices.find(item => item.instanceId === rule.scopeId)?.instanceId || rule.scopeId;
   const coveringRuleFor = (rule: DesignAssignmentRule, rules = policy.rules) => {
     if (rule.scope === 'school') return undefined;

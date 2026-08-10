@@ -1,5 +1,5 @@
 /* 文档自然滚动（v1.16.1）：不再用 height:100%+内部滚动，改跟随文档滚动，修复移动端地址栏/键盘下无法下滑；大屏页由 body.lock-scroll 单独锁定 */
-.set-page { min-height: 100dvh; background: #0d0d0d; color: #e9edf2; padding-bottom: max(48px, env(safe-area-inset-bottom)); }
+.set-page { min-height: 100dvh; background: #0d0d0d; color: #e9edf2; padding-bottom: max(48px, env(safe-area-inset-bottom)); overflow-x: clip; }
 .set-header {
   position: sticky; top: 0; z-index: 5;
   display: flex; align-items: center; justify-content: space-between;

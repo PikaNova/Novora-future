@@ -304,7 +304,7 @@ async function handleEmailLogin(req: VercelRequest, res: VercelResponse): Promis
 }
 
 async function handleBindRequest(req: VercelRequest, res: VercelResponse): Promise<void> {
-  const actor = await requireActor(req, res);
+  const actor = await requireActor(req, res, undefined, true);
   if (!actor) return;
   const email = String((req.body ?? {}).email ?? '').trim().toLowerCase();
   if (!validateEmailFormat(email)) { fail(res, 400, 'EMAIL_FORMAT_INVALID', '邮箱格式无效'); return; }
@@ -333,7 +333,7 @@ async function handleBindRequest(req: VercelRequest, res: VercelResponse): Promi
 }
 
 async function handleBindConfirm(req: VercelRequest, res: VercelResponse): Promise<void> {
-  const actor = await requireActor(req, res);
+  const actor = await requireActor(req, res, undefined, true);
   if (!actor) return;
   const body = (req.body ?? {}) as Record<string, unknown>;
   const email = String(body.email ?? '').trim().toLowerCase();

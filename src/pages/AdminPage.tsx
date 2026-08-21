@@ -812,7 +812,7 @@ export default function AdminPage() {
                 提醒{alerts.enabled ? "" : "（停用）"}
               </button>
             )}
-            {can("settings.read") && (
+            {can("settings.read") && (can("settings.edit") || can("weekly.edit") || can("majorBatch.preset_edit") || can("alerts.edit") || can("initialization.run")) && (
               <button
                 className="admin-btn"
                 onClick={() => navigate("/settings")}
@@ -934,9 +934,6 @@ export default function AdminPage() {
                       首次初始化
                     </button>
                   )}
-                {adminTab === "major" && can("major.import") && (
-                  <button onClick={() => openMajorImport()}>导入大型考试 JSON</button>
-                )}
                 {adminTab === "major" && can("major.export") && (
                   <button
                     onClick={() => {
@@ -1502,6 +1499,14 @@ export default function AdminPage() {
                     onClick={() => setDeleteSelectedOpen(true)}
                   >
                     批量删除（{selectedItemIds.size}）
+                  </button>
+                )}
+                {can("major.import") && (
+                  <button
+                    className="admin-btn"
+                    onClick={() => openMajorImport()}
+                  >
+                    AI智能导入考试
                   </button>
                 )}
                 {items.length > 0 && (
@@ -2323,7 +2328,7 @@ export default function AdminPage() {
             className="admin-modal admin-modal--wide admin-modal--workflow"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="admin-modal__title admin-workflow-head">导入分考试 JSON</h2>
+            <h2 className="admin-modal__title admin-workflow-head">AI智能导入考试</h2>
             <AdminWorkflowClose onClick={() => { setImportOpen(false); setOpenImportGuide(false); setImportError(""); setMajorImportPreview(null); }} />
             {importError && <div className="admin-error">{importError}</div>}
             <div className="admin-workflow-layout">

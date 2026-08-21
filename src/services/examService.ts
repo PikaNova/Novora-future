@@ -487,6 +487,34 @@ export async function loginAdmin(username: string, password: string): Promise<Lo
 }
 
 
+
+export async function guestLogin(instanceId: string, gradeId: string, classId: string): Promise<{ token: string; user: AdminUserContext | null } | null> {
+  try {
+    const res = await fetchWithTimeout(
+      LOGIN_URL,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'guest-login', instanceId, gradeId, classId }),
+      },
+      15_000,
+    );
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data?.ok) {
+      lastAuthApiError = await apiErrorFromResponse(new Response(JSON.stringify(data), { status: res.status, headers: res.headers }), '访客登录失败');
+      return null;
+    }
+    const token = typeof data.token === 'string' && data.token ? data.token : null;
+    const user = data.user && typeof data.user === 'object' ? data.user as AdminUserContext : null;
+    storeAdminSession(token, Number(data.expiresAt ?? 0), user);
+    lastAuthApiError = null;
+    return { token: token ?? '', user };
+  } catch (err) {
+    lastAuthApiError = classifyFetchError(err);
+    return null;
+  }
+}
+
 export function storeAdminSession(token: string | null, expiresAt: number, user: AdminUserContext | null, firstLogin = false): void {
   if (token) {
     localStorage.setItem(TOKEN_KEY, token);

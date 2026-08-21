@@ -19,6 +19,8 @@ export default function SchoolInfoSection({
     setSchoolLogo,
     schoolSave,
     saveSchoolName,
+    seo,
+    setSeo,
   } = useSchoolInfoSettings(canEditSchool);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadError, setUploadError] = useState("");

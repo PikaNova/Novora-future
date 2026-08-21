@@ -3,17 +3,17 @@
 // “关系/列缺失”“INTEGER 溢出”等错误识别，保持单一职责。
 
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { neon } from "@neondatabase/serverless";
+import { createDbClient, type DbClient } from "../_dbAdapter.js";
 import { SCHEMA_MIGRATION_LOCK_ID } from "../_auth.js";
 import { sendRateLimited } from "../_apiError.js";
 
 // 性能：缓存 neon 客户端（同一 warm 实例复用）。
-let _sql: ReturnType<typeof neon> | null = null;
+let _sql: DbClient | null = null;
 export function database() {
   if (_sql) return _sql;
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) throw new Error("DATABASE_URL is not set");
-  _sql = neon(connectionString);
+  _sql = createDbClient(connectionString);
   return _sql;
 }
 

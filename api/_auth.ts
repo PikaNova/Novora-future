@@ -1,4 +1,4 @@
-﻿import { neon } from '@neondatabase/serverless';
+﻿import { createDbClient, type DbClient } from './_dbAdapter.js';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createHmac, randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
@@ -26,6 +26,7 @@ const BOOTSTRAP_PASSWORD = process.env.ADMIN_PASSWORD || '';
 // 仅用于兼容已经配置过旧版环境变量的部署。新部署会在首次初始化时自动生成恢复密钥。
 const LEGACY_ADMIN_RECOVERY_KEY = process.env.ADMIN_RECOVERY_KEY || '';
 const TOKEN_TTL = 24 * 60 * 60 * 1000;
+const GUEST_TOKEN_TTL = 180 * 24 * 60 * 60 * 1000;
 const REPAIR_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 const REPAIR_RATE_LIMIT_MAX_ATTEMPTS = 5;
 const LOGIN_LOCKOUT_WINDOW_MS = 15 * 60 * 1000;
@@ -74,6 +75,8 @@ const isCountRow = rowShape<{ count: number }>({ count: isNumberLike });
 const isUserIdRow = rowShape<{ id: DatabaseInt8 }>({ id: isDatabaseInt8 });
 const isAuthIdRow = rowShape<{ id: number }>({ id: isNumberLike });
 const isIpSaltRow = rowShape<{ ip_salt: string }>({ ip_salt: isString });
+const isGuestDeviceRow = rowShape<{ revoked: boolean; grade_id: string; class_id: string; is_management: boolean }>({ revoked: isBoolean, grade_id: isString, class_id: isString, is_management: isBoolean });
+const isGuestRoleNameRow = rowShape<{ name: string }>({ name: isString });
 const isAuthRow = rowShape<AuthRow>({
   password_hash: isString,
   password_salt: isString,
@@ -110,14 +113,14 @@ const isScopeRow = rowShape<{ scope_type: string; grade_id: string; class_id: st
   class_id: isString,
 });
 
-let sqlClient: ReturnType<typeof neon> | null = null;
+let sqlClient: DbClient | null = null;
 let setupPromise: Promise<void> | null = null;
 
 export function authSql() {
   if (sqlClient) return sqlClient;
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error('DATABASE_URL is not set');
-  sqlClient = neon(url);
+  sqlClient = createDbClient(url);
   return sqlClient;
 }
 
@@ -125,7 +128,7 @@ export const BUILTIN_ROLES: Array<{ id: string; name: string; description: strin
   { id: 'super_admin', name: '超级管理员', description: '拥有全校数据与全部系统权限，可管理用户、角色、部署及所有业务设置。', permissions: ['*'] },
   { id: 'grade_admin', name: '年级管理员', description: '管理授权年级的考试、周测、班级、设备和下级用户，可批量创建该年级的班级管理员，并查看该年级完整运行总览。', permissions: ['overview.read', 'major.read', 'major.create', 'major.quick_create', 'major.edit', 'major.delete', 'major.import', 'major.export', 'weekly.read', 'weekly.create', 'weekly.edit', 'weekly.delete', 'weekly.copy', 'weekly.override', 'weekly.import', 'weekly.export', 'school.read', 'school.class_manage', 'device.read', 'device.bind', 'device.revoke', 'alerts.read', 'settings.read', 'user.read', 'user.create', 'user.edit', 'user.disable', 'user.delete', 'user.reset_password'] },
   { id: 'class_admin', name: '班级管理员', description: '管理授权班级的周测、考试安排和绑定设备，可快速发布本班临时考试并修改自己的用户名与密码，不显示项目运行总览。', permissions: ['major.read', 'major.quick_create', 'weekly.read', 'weekly.create', 'weekly.edit', 'weekly.delete', 'weekly.copy', 'weekly.override', 'weekly.import', 'weekly.export', 'school.read', 'device.read', 'device.bind', 'device.revoke', 'alerts.read'] },
-  { id: 'viewer', name: '巡考员', description: '巡考期间查看考试安排、周测与教室大屏显示，可导出安排用于核对，不修改任何数据。', permissions: ['major.read', 'major.export', 'weekly.read', 'weekly.export', 'school.read', 'device.read', 'alerts.read', 'settings.read'] },
+  { id: 'viewer', name: '班级访客', description: '未登录设备可查看本班考试安排、周测与教室大屏，可导出核对，不修改任何数据。', permissions: ['major.read', 'major.export', 'weekly.read', 'weekly.export', 'school.read', 'device.read', 'alerts.read', 'settings.read'] },
 ];
 
 export async function ensureAuthTables(): Promise<void> {
@@ -255,6 +258,7 @@ export async function ensureAuthTables(): Promise<void> {
     await sql`UPDATE app_users SET role_id='grade_admin', token_version=token_version+1, updated_at=${now} WHERE role_id='academic_admin'`;
     await sql`UPDATE app_users SET role_id='viewer', token_version=token_version+1, updated_at=${now} WHERE role_id='device_admin'`;
     await sql`DELETE FROM app_roles WHERE id IN ('academic_admin','device_admin') AND NOT EXISTS (SELECT 1 FROM app_users WHERE app_users.role_id=app_roles.id)`;
+    await sql`UPDATE app_roles SET name='班级访客', description='未登录设备可查看本班考试安排、周测与教室大屏，可导出核对，不修改任何数据。', updated_at=${now} WHERE id='viewer'`;
     // 已经完成过旧版密码初始化的数据库可直接生成默认超级管理员，无需再次输入或重置数据。
     const [legacyRowsRaw, userCountRowsRaw] = await Promise.all([
       sql`SELECT password_hash, password_salt FROM app_auth WHERE id=1`,
@@ -495,6 +499,21 @@ export async function issueTokenForUser(row: { id: number | bigint | string; tok
   return { token, expiresAt };
 }
 
+function guestSignature(instanceId: string, gradeId: string, classId: string, expiresAt: number, version: number, secret: string): string {
+  return createHmac('sha256', secret).update(`guest.${instanceId}.${gradeId}.${classId}.${expiresAt}.${version}`).digest('base64url');
+}
+
+export async function issueGuestToken(instanceId: string, gradeId: string, classId: string): Promise<{ token: string; expiresAt: number } | null> {
+  await ensureAuthTables();
+  const auth = await config();
+  if (!auth) return null;
+  const expiresAt = Date.now() + GUEST_TOKEN_TTL;
+  const version = auth.token_version;
+  const sig = guestSignature(instanceId, gradeId, classId, expiresAt, version, auth.token_secret);
+  const token = Buffer.from(`g.${instanceId}.${gradeId}.${classId}.${expiresAt}.${version}.${sig}`).toString('base64url');
+  return { token, expiresAt };
+}
+
 export type LoginAttemptRow = { action: string; created_at: DatabaseInt8 };
 export type LoginFailureAlert = { username: string; failureCount: number; windowStart: number; latestFailureAt: number };
 const isLoginAttemptRow = rowShape<LoginAttemptRow>({ action: isString, created_at: isDatabaseInt8 });
@@ -617,6 +636,34 @@ export async function getActor(token: string | undefined): Promise<AdminActor | 
   if (!auth) return null;
   try {
     const parts = Buffer.from(token, 'base64url').toString().split('.');
+    if (parts.length === 7 && parts[0] === 'g') {
+      const guestInstanceId = parts[1];
+      const guestGradeId = parts[2];
+      const guestClassId = parts[3];
+      const guestExpiresAt = Number(parts[4]);
+      const guestVersion = Number(parts[5]);
+      const guestReceived = parts[6];
+      if (!Number.isFinite(guestExpiresAt) || !Number.isFinite(guestVersion) || !isTokenNotExpired(guestExpiresAt, Date.now()) || guestVersion !== auth.token_version) return null;
+      const expectedGuest = guestSignature(guestInstanceId, guestGradeId, guestClassId, guestExpiresAt, guestVersion, auth.token_secret);
+      const guestA = Buffer.from(guestReceived || ''); const guestB = Buffer.from(expectedGuest);
+      if (guestA.length !== guestB.length || !timingSafeEqual(guestA, guestB)) return null;
+      const deviceRows = assertRows(await authSql()`SELECT revoked, grade_id, class_id, is_management FROM device_instances WHERE instance_id=${guestInstanceId} LIMIT 1`, isGuestDeviceRow, 'device_instances');
+      const guestDevice = deviceRows[0];
+      if (!guestDevice || guestDevice.revoked !== false || guestDevice.is_management === true) return null;
+      if (String(guestDevice.grade_id) !== guestGradeId || String(guestDevice.class_id) !== guestClassId) return null;
+      const roleNameRows = assertRows(await authSql()`SELECT name FROM app_roles WHERE id='viewer' LIMIT 1`, isGuestRoleNameRow, 'app_roles');
+      const rolePermRows = assertRows(await authSql()`SELECT permissions FROM app_roles WHERE id='viewer' LIMIT 1`, rowShape<{ permissions: unknown }>({ permissions: (_value: unknown): _value is unknown => true }), 'app_roles');
+      return {
+        id: 0,
+        username: guestInstanceId,
+        displayName: '班级访客',
+        roleId: 'viewer',
+        roleName: roleNameRows[0]?.name ?? '班级访客',
+        permissions: parsePermissions(rolePermRows[0]?.permissions),
+        scopes: [{ type: 'class', gradeId: guestGradeId, classId: guestClassId }],
+        mustChangePassword: false,
+      };
+    }
     let userId: number; let expiresAt: number; let version: number; let received: string;
     if (parts.length === 4) {
       [userId, expiresAt, version] = parts.slice(0, 3).map(Number); received = parts[3];

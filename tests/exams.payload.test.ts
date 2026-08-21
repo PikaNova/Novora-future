@@ -54,6 +54,7 @@ test('examPayload: maps every snake_case DB column to its camelCase API field wi
     initialization: { completedAt: 123 },
     weeklyConflictPolicy: { enabled: true, scope: 'whole-day' },
     designPolicy: { rules: [], updatedAt: 5 },
+    majorBatchPresets: {},
     updatedAt: 1700000000000,
   });
 });
@@ -76,6 +77,7 @@ test('examPayload: fills in safe defaults for a bare/empty row', () => {
     initialization: {},
     weeklyConflictPolicy: null,
     designPolicy: {},
+    majorBatchPresets: {},
     updatedAt: 0,
   });
 });

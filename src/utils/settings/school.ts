@@ -3,6 +3,30 @@
 import type { SchoolClass, SchoolGrade } from '../../types/school.js';
 import { normalizeSubjectList } from '../../data/subjects.js';
 
+export interface SeoSettings {
+  titleSuffix: string;
+  description: string;
+  keywords: string;
+  siteUrl: string;
+}
+
+export const DEFAULT_SEO_SETTINGS: SeoSettings = {
+  titleSuffix: "",
+  description: "",
+  keywords: "",
+  siteUrl: "",
+};
+
+export function normalizeSeoSettings(raw: unknown): SeoSettings {
+  const src = (raw && typeof raw === "object" ? raw : {}) as Partial<SeoSettings>;
+  return {
+    titleSuffix: String(src.titleSuffix ?? "").trim(),
+    description: String(src.description ?? "").trim(),
+    keywords: String(src.keywords ?? "").trim(),
+    siteUrl: String(src.siteUrl ?? "").trim().replace(/\/+$/, ""),
+  };
+}
+
 export interface InitializationState {
   completedAt: number;
   wizardVersion: number;
@@ -12,6 +36,7 @@ export interface InitializationState {
   schoolFullName: string;
   schoolLogo?: string;
   subjectTrackModeEnabled: boolean;
+  seo: SeoSettings;
 }
 
 export const DEFAULT_INITIALIZATION: InitializationState = {
@@ -22,7 +47,8 @@ export const DEFAULT_INITIALIZATION: InitializationState = {
   schoolName: '',
   schoolFullName: '',
   schoolLogo: '',
-  subjectTrackModeEnabled: true,
+  subjectTrackModeEnabled: false,
+  seo: DEFAULT_SEO_SETTINGS,
 };
 
 export function normalizeGrades(raw: unknown): SchoolGrade[] {
@@ -68,6 +94,7 @@ export function normalizeInitialization(raw: unknown): InitializationState {
     schoolName: String(src.schoolName ?? '').trim(),
     schoolFullName: String(src.schoolFullName ?? src.schoolName ?? '').trim(),
     schoolLogo: typeof src.schoolLogo === 'string' ? src.schoolLogo : '',
-    subjectTrackModeEnabled: src.subjectTrackModeEnabled !== false,
+    subjectTrackModeEnabled: src.subjectTrackModeEnabled === true,
+    seo: normalizeSeoSettings(src.seo),
   };
 }

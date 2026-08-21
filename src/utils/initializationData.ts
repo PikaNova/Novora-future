@@ -2,6 +2,7 @@ import type { MajorExam } from '../types';
 import type { ScheduleMode, WeeklyPlan, WeeklyWeekMode } from '../types/exam';
 import type { SchoolClass, SchoolGrade } from '../types/school';
 import { addDaysToDateKey, createEmptyWeeklyPlan, getShanghaiDateKey } from './weeklySchedule';
+import { DEFAULT_SEO_SETTINGS, type SeoSettings } from './settings/school';
 
 export interface SchoolDraftRow { name: string; classes: string; }
 export interface InitializationResult {
@@ -15,7 +16,7 @@ export interface InitializationResult {
   scheduleMode: ScheduleMode;
   selectedGradeId: string;
   selectedClassId: string;
-  initialization: { completedAt: number; wizardVersion: number; demoDataImported: boolean; province: string; schoolName: string; schoolFullName: string; schoolLogo?: string; subjectTrackModeEnabled: boolean };
+  initialization: { completedAt: number; wizardVersion: number; demoDataImported: boolean; province: string; schoolName: string; schoolFullName: string; schoolLogo?: string; subjectTrackModeEnabled: boolean; seo: SeoSettings };
 }
 
 const cleanNames = (value: string) => value.split(/[，,、\n]/).map(item => item.trim()).filter(Boolean);
@@ -29,6 +30,9 @@ export function buildInitializationData(options: {
   scheduleMode: ScheduleMode;
   schoolName: string;
   province: string;
+  schoolLogo?: string;
+  subjectTrackModeEnabled?: boolean;
+  seo?: Partial<SeoSettings>;
 }): InitializationResult {
   const stamp = Date.now();
   const prefix = options.mode === 'demo' ? 'demo' : 'school';
@@ -81,6 +85,6 @@ export function buildInitializationData(options: {
     scheduleMode: options.scheduleMode,
     selectedGradeId: '',
     selectedClassId: '',
-    initialization: { completedAt: Date.now(), wizardVersion: 2, demoDataImported: options.mode === 'demo', province: options.province.trim(), schoolName: options.schoolName.trim(), schoolFullName: `${options.province.trim()}${options.schoolName.trim()}`, schoolLogo: '', subjectTrackModeEnabled: true },
+    initialization: { completedAt: Date.now(), wizardVersion: 2, demoDataImported: options.mode === 'demo', province: options.province.trim(), schoolName: options.schoolName.trim(), schoolFullName: `${options.province.trim()}${options.schoolName.trim()}`, schoolLogo: options.schoolLogo ?? '', subjectTrackModeEnabled: options.subjectTrackModeEnabled === true, seo: { ...DEFAULT_SEO_SETTINGS, ...(options.seo ?? {}) } },
   };
 }

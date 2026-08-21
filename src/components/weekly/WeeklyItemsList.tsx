@@ -52,7 +52,7 @@ export default function WeeklyItemsList({
             className="admin-btn"
             onClick={openImport}
           >
-            导入周测 JSON
+            AI智能导入周测
           </button>
           <button className="admin-btn" onClick={exportJson}>
             导出周测 JSON

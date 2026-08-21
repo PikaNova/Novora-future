@@ -67,7 +67,7 @@ export default function ImportJsonModal({
         className="admin-modal admin-modal--wide admin-modal--workflow weekly-import-modal"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="admin-modal__title admin-workflow-head">导入周测 JSON</h2>
+        <h2 className="admin-modal__title admin-workflow-head">AI智能导入周测</h2>
         <AdminWorkflowClose onClick={() => closeImport()} />
         <div className="admin-workflow-layout">
           <AdminWizardSteps

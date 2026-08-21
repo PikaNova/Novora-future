@@ -5,7 +5,7 @@
 - **云端**：Vercel Functions + Neon PostgreSQL（原样保留，见 README「从零部署」）
 - **本地/内网**：单个 Node 进程托管静态站点与全部 API，内嵌 PostgreSQL 16（本文档）
 
-本地与云端共用同一份代码：server/ 里的适配器把 Node 请求转成现有 api/*.ts handler 认识的形状，handler 零改动；数据库驱动（@neondatabase/serverless）本身就是标准 PostgreSQL 客户端，本地连接串换一下即可。
+本地与云端共用同一份代码：server/ 里的适配器把 Node 请求转成现有 api/*.ts handler 认识的形状，handler 零改动；数据库驱动为双模式：Neon 云连接串（host 含 neon.tech 或带 channel_binding）走 @neondatabase/serverless 的 neon()（Neon HTTP 协议）；本地/内网标准 PostgreSQL 连接串自动改用 pg 直连 5432（原生协议），两种模式对外调用形状一致，handler 零改动。
 
 ## 快速开始（Docker Compose，推荐）
 

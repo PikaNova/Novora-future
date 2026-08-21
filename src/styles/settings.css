@@ -292,3 +292,31 @@ select.set-input { cursor: pointer; }
 .system-status__event-user{flex:0 0 auto;color:#93a0ad}
 @media(max-width:620px){.system-status__summary{grid-template-columns:repeat(2,1fr)}.system-status__grid{grid-template-columns:1fr}.system-status__summary-item{padding:9px 10px}}
 @media(max-width:620px){.set-actions .set-btn{flex:1 1 100%;min-width:0}.set-row__inline .set-input{flex:1 1 100%}.set-row__inline .set-btn{flex:1 1 100%}}
+/* 2026-08-21 系统状态：动态状态点 / 内存条 / 手机端溢出修复 */
+.system-status__dot{animation:system-status-pulse 2.4s ease-in-out infinite}
+.system-status__dot.is-warn{animation-duration:1.2s}
+.system-status__dot.is-err{animation-duration:.9s}
+.system-status__dot.is-idle{animation:none}
+@keyframes system-status-pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.system-status__usage{display:inline-block;width:min(140px,46vw);height:7px;border-radius:99px;background:rgba(255,255,255,.12);overflow:hidden;vertical-align:middle}
+.system-status__usage b{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#2ecc71,#f1c40f 70%,#e74c3c);transition:width .6s ease}
+.system-status__usage.is-err b{background:#e74c3c}
+.system-status__usage.is-warn b{background:#f1c40f}
+.system-status__usage.is-idle b{background:#8b95a1}
+.set-status__list li{min-width:0}
+.set-status__list li b{min-width:0;overflow-wrap:anywhere;text-align:right}
+.system-status__summary-item{min-width:0}
+.system-status__summary-item b{min-width:0;overflow-wrap:anywhere}
+.system-status__summary-item span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.is-err-text{color:#ff7c70}
+.set-card{min-width:0}
+@media (prefers-reduced-motion: reduce){.system-status__dot{animation:none}}
+
+/* 2026-08-21 学校信息 SEO 板块 */
+.set-seo{border-top:1px solid rgba(255,255,255,.07);margin-top:14px;padding-top:12px}
+.set-seo__title{font-size:13px;font-weight:700;color:#c4ccd4;margin:0 0 8px}
+
+/* 2026-08-21 版本与更新：一键命令复制 */
+.set-deploy-command{display:grid;gap:8px;margin-top:8px}
+.set-deploy-command__row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;border:1px solid rgba(255,255,255,.1);border-radius:8px;background:rgba(255,255,255,.03)}
+.set-deploy-command__row code{flex:1;min-width:0;overflow-wrap:anywhere;color:#9fd8ff;font-size:12px}

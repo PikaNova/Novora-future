@@ -1,6 +1,8 @@
 import React, { FormEvent, useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { getAdminRecoveryStatus, getAdminUser, getLastAuthApiError, hasValidLocalToken, isLoginRequired, loginAdmin, logoutAdmin, recoverSuperAdminAccount, storeAdminSession, type AdminUserContext } from '../services/examService';
+import { getAdminRecoveryStatus, getAdminUser, getLastAuthApiError, guestLogin, hasValidLocalToken, isLoginRequired, loginAdmin, logoutAdmin, recoverSuperAdminAccount, storeAdminSession, type AdminUserContext } from '../services/examService';
+import { getCachedDeviceBinding, getClassBindingInstanceId } from '../services/classBinding';
+import { getAppSettings } from '../utils/appSettings';
 import { bindEmailConfirm, bindEmailRequest, fetchEmailConfig, fetchEmailSendStatus, loginWithEmail, sendEmailCode, type EmailBindPolicy } from '../services/emailAuth';
 import { formatApiError } from '../services/apiError';
 import { changeOwnCredentials, AdminApiError } from '../services/adminUsers';
@@ -16,6 +18,26 @@ import '../styles/login.css';
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const schoolNameForLogin = getAppSettings().exam.initialization.schoolName?.trim() ?? '';
+  const handleGuestLogin = async () => {
+    const binding = getCachedDeviceBinding();
+    if (!binding || binding.revoked || !binding.gradeId || !binding.classId) {
+      setError('当前设备未绑定班级，无法使用班级访客登录');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      const result = await guestLogin(getClassBindingInstanceId(), binding.gradeId, binding.classId);
+      if (!result || !result.token) {
+        setError(getLastAuthApiError()?.message ?? '访客登录失败');
+        return;
+      }
+      navigate('/admin', { replace: true });
+    } finally {
+      setLoading(false);
+    }
+  };
   const location = useLocation();
   const [username, setUsername] = useState('admin');
   const [password, setPassword] = useState('');
@@ -248,7 +270,7 @@ export default function LoginPage() {
       <div className="login-page__ambient login-page__ambient--two" />
       <section className="login-card" aria-label="考试管理登录">
         <BrandMark className="login-card__brand" />
-        <h1 className="login-card__title">{initializing ? '系统初始化' : '考试管理'}</h1>
+        <h1 className="login-card__title">{initializing ? '系统初始化' : schoolNameForLogin ? schoolNameForLogin + ' · 考试管理' : '考试管理'}</h1>
         <p className="login-card__subtitle">{initializing ? '验证超级管理员后直接打开初始化向导' : '使用管理员账号登录以继续'}</p>
         {recoveryView ? <div className="login-recovery">
           {recoveryView === 'guide' ? <>
@@ -377,6 +399,11 @@ export default function LoginPage() {
         {!initializing && <button className="login-form__link" type="button" onClick={() => void openRecovery()}>忘记密码？</button>}
         {!initializing && <SuperAdminRepairLink />}
         </>}
+        {!initializing && !recoveryView && !passwordUpgrade && (
+          <button className="login-card__guest" type="button" disabled={loading} onClick={() => void handleGuestLogin()}>
+            使用班级访客身份查看
+          </button>
+        )}
         <Link className="login-card__back" to="/"><ArrowLeft aria-hidden="true" />返回首页</Link>
         <Mascot className="login-mascot" size={52} alt="" />
       </section>

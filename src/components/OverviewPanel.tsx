@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import AdminModalPortal from "./AdminModalPortal";
 import {
   Activity,
   AlertTriangle,
@@ -480,7 +481,7 @@ export default function OverviewPanel({
       </section>
 
       {detailOpen && (
-        <div
+        <AdminModalPortal
           className="overview-device-drawer"
           role="dialog"
           aria-modal="true"
@@ -619,7 +620,7 @@ export default function OverviewPanel({
               ) : null}
             </footer>
           </aside>
-        </div>
+        </AdminModalPortal>
       )}
     </main>
   );

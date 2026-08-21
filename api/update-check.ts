@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { applyCors } from './_cors.js';
+import { telemetryConfig } from './_telemetryConfig.js';
 
 /**
  * 检查更新：读取 GitHub 最新发布版本，与客户端当前版本比较。
@@ -9,7 +10,18 @@ import { applyCors } from './_cors.js';
  */
 
 const DEFAULT_REPOSITORY_URL = 'https://github.com/PikaNova/Novora';
+const DOCS_UPDATE_URL = 'https://docs.pikachu2026.space/guide/12-maintenance';
 const CACHE_TTL = 5 * 60 * 1000;
+
+async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 interface LatestInfo {
   latest: string | null;
@@ -68,14 +80,14 @@ function ghHeaders(): Record<string, string> {
 
 async function fetchLatest(repo: string): Promise<LatestInfo> {
   // 1) 优先 releases/latest
-  const relRes = await fetch(`https://api.github.com/repos/${repo}/releases/latest`, { headers: ghHeaders() });
+  const relRes = await fetchWithTimeout(`https://api.github.com/repos/${repo}/releases/latest`, { headers: ghHeaders() }, 8000);
   if (relRes.ok) {
     const r: any = await relRes.json();
     const tag = typeof r?.tag_name === 'string' ? r.tag_name : null;
     if (tag) {
       return {
         latest: tag.replace(/^v/i, ''),
-        releaseUrl: typeof r?.html_url === 'string' ? r.html_url : `https://github.com/${repo}/releases`,
+        releaseUrl: DOCS_UPDATE_URL,
         notes: typeof r?.body === 'string' && r.body.trim() ? r.body.trim().slice(0, 4000) : null,
         publishedAt: typeof r?.published_at === 'string' ? r.published_at : null,
         source: 'release',
@@ -83,7 +95,7 @@ async function fetchLatest(repo: string): Promise<LatestInfo> {
     }
   }
   // 2) 回退 tags（尚未发布 release 时）
-  const tagRes = await fetch(`https://api.github.com/repos/${repo}/tags?per_page=100`, { headers: ghHeaders() });
+  const tagRes = await fetchWithTimeout(`https://api.github.com/repos/${repo}/tags?per_page=100`, { headers: ghHeaders() }, 8000);
   if (tagRes.ok) {
     const tags: any = await tagRes.json();
     if (Array.isArray(tags) && tags.length > 0) {
@@ -93,7 +105,7 @@ async function fetchLatest(repo: string): Promise<LatestInfo> {
       if (top) {
         return {
           latest: top.replace(/^v/i, ''),
-          releaseUrl: `https://github.com/${repo}/releases`,
+          releaseUrl: DOCS_UPDATE_URL,
           notes: null,
           publishedAt: null,
           source: 'tag',
@@ -105,7 +117,7 @@ async function fetchLatest(repo: string): Promise<LatestInfo> {
   if (!relRes.ok && relRes.status !== 404) {
     throw new Error(`GitHub API ${relRes.status}`);
   }
-  return { latest: null, releaseUrl: `https://github.com/${repo}/releases`, notes: null, publishedAt: null, source: 'none' };
+  return { latest: null, releaseUrl: DOCS_UPDATE_URL, notes: null, publishedAt: null, source: 'none' };
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -140,6 +152,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       source: data.source,
     });
   } catch (error: unknown) {
+    try {
+      const authorUrl = `${telemetryConfig.baseUrl}/api/update-check?current=${encodeURIComponent(current)}`;
+      const authorRes = await fetchWithTimeout(authorUrl, { headers: { 'Accept': 'application/json' } }, 8000);
+      if (authorRes.ok) {
+        const author = await authorRes.json().catch(() => null);
+        const latest = author && typeof author.latest === 'string' ? author.latest : null;
+        if (latest) {
+          res.status(200).json({
+            ok: true,
+            repo: 'author',
+            current,
+            latest,
+            hasUpdate: cmpSemver(current, latest) < 0,
+            releaseUrl: typeof author.releaseUrl === 'string' && author.releaseUrl ? author.releaseUrl : DOCS_UPDATE_URL,
+            notes: typeof author.notes === 'string' ? author.notes : null,
+            publishedAt: typeof author.publishedAt === 'string' ? author.publishedAt : null,
+            source: 'author',
+          });
+          return;
+        }
+      }
+    } catch { /* fall through to 502 */ }
     res.status(502).json({ ok: false, error: error instanceof Error ? error.message : '检查更新失败' });
   }
 }

@@ -4,7 +4,7 @@ import { APP_VERSION } from "../../services/telemetry";
 import { useAboutSettings } from "../../hooks/settings/useAboutSettings";
 
 const AUTHOR_NAME = "PikaNova";
-const REPOSITORY_URL = "https://github.com/PikaNova/Novora";
+const REPOSITORY_URL = "https://docs.pikachu2026.space/guide/12-maintenance";
 
 /**
  * 设置页“关于”卡片（含作者水印页脚）。

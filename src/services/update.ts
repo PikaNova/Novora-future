@@ -24,9 +24,17 @@ export interface UpdateInfo {
 
 export async function checkForUpdate(current: string): Promise<UpdateInfo> {
   try {
-    const res = await fetch(`${CHECK_URL}?current=${encodeURIComponent(current)}`, {
-      headers: { 'Cache-Control': 'no-store' },
-    });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    let res: Response;
+    try {
+      res = await fetch(`${CHECK_URL}?current=${encodeURIComponent(current)}`, {
+        headers: { 'Cache-Control': 'no-store' },
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
     const data = await res.json().catch(() => null);
     if (!res.ok || !data?.ok) {
       return { ok: false, current, latest: null, hasUpdate: false, error: data?.error || `HTTP ${res.status}` };

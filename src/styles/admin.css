@@ -721,6 +721,7 @@
   .overview-device-drawer{
     display:flex;
     align-items:flex-end;
+    min-height:100vh;
     min-height:100dvh;
   }
   .overview-device-drawer aside{
@@ -730,6 +731,7 @@
     bottom:0!important;
     top:auto!important;
     width:100%!important;
+    height:min(76vh,calc(100vh - env(safe-area-inset-top) - 12px))!important;
     height:min(76dvh,calc(100dvh - env(safe-area-inset-top) - 12px))!important;
     max-height:none!important;
     padding:18px 16px 0!important;
@@ -816,3 +818,14 @@
 .admin-item--conflict{border-color:rgba(231,76,60,.5)!important;background:rgba(231,76,60,.07)!important}
 .admin-item--conflict:hover{border-color:rgba(231,76,60,.7)!important}
 .admin-item__conflict-badge{flex:none;padding:2px 8px;border-radius:999px;background:rgba(231,76,60,.16);border:1px solid rgba(231,76,60,.45);color:#ff9c91;font-size:11px;font-weight:700}
+
+/* 2026-08-21 初始化向导：学校图标 / SEO / 文档内嵌 */
+.init-seo{display:grid;gap:10px;margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.08)}
+.init-seo>strong{font-size:13px;color:#eaf3f9}
+.init-logo-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.init-logo-preview{width:44px;height:44px;border-radius:10px;object-fit:cover;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.04)}
+.init-logo-empty{font-size:12px;color:rgba(230,240,247,.45)}
+.init-logo-row input[type=file]{max-width:180px;font-size:12px}
+.init-logo-row button{border:0;background:transparent;color:#ff9b8f;cursor:pointer;font-size:12px}
+.init-documents__frame{width:100%;height:56vh;border:1px solid rgba(255,255,255,.14);border-radius:10px;background:#fff}
+.init-documents__confirm{margin-top:12px}

@@ -93,6 +93,8 @@ export default function SettingsPage() {
   const canResetDatabase = adminUser
     ? adminUser.permissions.includes("*")
     : !hasValidLocalToken();
+  const hasAnyEditable =
+    canEditSettings || canEditPresets || canEditWeekly || canEditAlerts || canEditSchool || canResetDatabase;
 
   const groups = [
     { id: "basic", label: "基础信息" },
@@ -123,6 +125,11 @@ export default function SettingsPage() {
       </header>
 
       <div className="set-body">
+        {!hasAnyEditable && (
+          <div className="set-note set-note--warn">
+            当前账号没有可修改的系统设置项，以下仅保留“我的账户/关于”等个人与只读板块。
+          </div>
+        )}
         {!canEditSettings && (
           <div className="set-note set-note--warn">
             当前账号只能修改已授权的系统设置项，其余全局设置保持只读。如需修改登录密码，请前往“用户与权限”。
@@ -138,8 +145,9 @@ export default function SettingsPage() {
         <section id="set-group-basic" className="set-group" data-group="basic">
           <h2 className="set-group__title">基础信息</h2>
           <div className="set-group__body">
-            <SchoolInfoSection canEditSchool={canEditSchool} />
+            {canEditSchool && <SchoolInfoSection canEditSchool={canEditSchool} />}
             {canResetDatabase && <SystemStatusSection />}
+            {canEditSettings && (
             <SettingsCollapsibleCard
               storageKey="novora_set_collapse_deploy"
               title="版本与更新"
@@ -147,6 +155,7 @@ export default function SettingsPage() {
             >
               <DeploymentSection adminUser={adminUser} />
             </SettingsCollapsibleCard>
+            )}
             <AnnouncementsSection />
           </div>
         </section>
@@ -154,20 +163,23 @@ export default function SettingsPage() {
         <section id="set-group-account" className="set-group" data-group="account">
           <h2 className="set-group__title">登录与账号</h2>
           <div className="set-group__body">
+            {(canEditSettings || canResetDatabase) && (
             <EmailServiceSection
               canEditSettings={canEditSettings}
               canEditPolicy={canResetDatabase}
             />
+            )}
           </div>
         </section>
 
         <section id="set-group-exam" className="set-group" data-group="exam">
           <h2 className="set-group__title">考试与排课</h2>
           <div className="set-group__body">
-            <WeeklyCalendarSection canEditWeekly={canEditWeekly} adminUser={adminUser} />
-            <SubjectTrackModeSection canEditSettings={canEditSettings} />
+            {canEditWeekly && <WeeklyCalendarSection canEditWeekly={canEditWeekly} adminUser={adminUser} />}
+            {canEditSettings && <SubjectTrackModeSection canEditSettings={canEditSettings} />}
 
             {/* ―― 批量添加分考试预设 ―― */}
+            {canEditPresets && (
             <section className="set-card">
               <h2 className="set-card__title">
                 <ListChecks size={18} />
@@ -178,18 +190,22 @@ export default function SettingsPage() {
               </p>
               <BatchPresetSettingsPanel canEdit={canEditPresets} />
             </section>
+            )}
           </div>
         </section>
 
         <section id="set-group-runtime" className="set-group" data-group="runtime">
           <h2 className="set-group__title">系统运行</h2>
           <div className="set-group__body">
-            <TimeSyncSection canEditSettings={canEditSettings} />
+            {canEditSettings && <TimeSyncSection canEditSettings={canEditSettings} />}
+            {canEditAlerts ? (
             <AlertsAdvancedSection
               canReadAlerts={canReadAlerts}
               canEditAlerts={canEditAlerts}
               canEditSettings={canEditSettings}
             />
+            ) : null}
+            {canEditSettings && (
             <SettingsCollapsibleCard
               storageKey="novora_set_collapse_telemetry"
               title="使用遥测"
@@ -197,6 +213,7 @@ export default function SettingsPage() {
             >
               <TelemetrySection canEditSettings={canEditSettings} />
             </SettingsCollapsibleCard>
+            )}
           </div>
         </section>
 

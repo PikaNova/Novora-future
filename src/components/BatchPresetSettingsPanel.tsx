@@ -12,6 +12,7 @@ import {
 } from "../utils/appSettings";
 import { fetchExamsFromServer, saveMajorBatchPresets } from "../services/examService";
 import { notify } from "../services/notify";
+import { confirmDialog } from "../services/appDialog";
 import "../styles/batch-preset-settings-panel.css";
 
 function makeSubjectGroupId() {
@@ -34,7 +35,6 @@ type DraftSlot = MajorBatchTimeSlot & { key: string };
  * reorder, and delete presets outside of the batch-add modal itself.
  */
 export default function BatchPresetSettingsPanel({ canEdit }: { canEdit: boolean }) {
-  const [source, setSource] = useState<'school' | 'local'>('school');
   const [subjectGroups, setSubjectGroups] = useState<MajorBatchSubjectGroup[]>(
     () => getAppSettings().exam.majorBatchPresets.subjectGroups,
   );
@@ -55,7 +55,7 @@ export default function BatchPresetSettingsPanel({ canEdit }: { canEdit: boolean
 
   useEffect(() => {
     const sync = () => {
-      const settings = source === 'school' ? getAppSettings().exam.majorBatchPresets : getAppSettings().majorBatch;
+      const settings = getAppSettings().exam.majorBatchPresets;
       setSubjectGroups(settings.subjectGroups);
       setTimeGroups(settings.timeGroups);
     };
@@ -65,7 +65,7 @@ export default function BatchPresetSettingsPanel({ canEdit }: { canEdit: boolean
       window.removeEventListener(APP_SETTINGS_CHANGED_EVENT, sync);
       window.removeEventListener("storage", sync);
     };
-  }, [source]);
+  }, []);
 
   useEffect(() => {
     void fetchExamsFromServer().then((payload) => {
@@ -75,20 +75,55 @@ export default function BatchPresetSettingsPanel({ canEdit }: { canEdit: boolean
     }).catch(() => {});
   }, []);
 
+  useEffect(() => {
+    const local = getAppSettings().majorBatch;
+    const localGroups = (local.subjectGroups ?? []).filter((group) => group.subjects.length > 0);
+    const localTimeGroups = (local.timeGroups ?? []).filter((group) => group.slots.length > 0);
+    if (!localGroups.length && !localTimeGroups.length) return;
+    const names = [...localGroups.map((group) => '科目组：' + group.name), ...localTimeGroups.map((group) => '时间组：' + group.name)].slice(0, 12).join('、');
+    void confirmDialog({
+      title: '导入本机预设到学校云端',
+      message: '检测到本机保存的旧预设，导入后将全校共享（按名称去重）：' + names + '。确认导入？',
+    }).then((ok) => {
+      if (!ok) return;
+      const current = getAppSettings().exam.majorBatchPresets;
+      const seen = new Set<string>();
+      const mergeGroups = (base: MajorBatchSubjectGroup[] | MajorBatchTimeGroup[], extra: Array<MajorBatchSubjectGroup | MajorBatchTimeGroup>, kind: string) => {
+        const merged = [...base];
+        for (const item of extra) {
+          const key = item.name.trim();
+          if (!key || seen.has(kind + key)) continue;
+          seen.add(kind + key);
+          if (!merged.some((group) => group.name.trim() === key)) merged.push({ ...item, order: merged.length } as MajorBatchSubjectGroup & MajorBatchTimeGroup);
+        }
+        return merged;
+      };
+      const next = {
+        subjectGroups: mergeGroups(current.subjectGroups, localGroups, 's') as MajorBatchSubjectGroup[],
+        timeGroups: mergeGroups(current.timeGroups, localTimeGroups, 't') as MajorBatchTimeGroup[],
+      };
+      void saveMajorBatchPresets(next)
+        .then((saved) => {
+          updateExamSettings({ majorBatchPresets: { subjectGroups: saved.subjectGroups as MajorBatchSubjectGroup[], timeGroups: saved.timeGroups as MajorBatchTimeGroup[], updatedAt: saved.updatedAt }, updatedAt: saved.updatedAt });
+          updateMajorBatchSettings({ subjectGroups: [], timeGroups: [] });
+          setSubjectGroups(saved.subjectGroups as MajorBatchSubjectGroup[]);
+          setTimeGroups(saved.timeGroups as MajorBatchTimeGroup[]);
+          notify('success', '本机预设已导入学校云端并清空本地。');
+        })
+        .catch((error) => notify('error', error instanceof Error ? error.message : '本机预设导入失败'));
+    });
+  }, []);
+
   const commit = (patch: { subjectGroups?: MajorBatchSubjectGroup[]; timeGroups?: MajorBatchTimeGroup[] }) => {
     if (patch.subjectGroups) setSubjectGroups(patch.subjectGroups);
     if (patch.timeGroups) setTimeGroups(patch.timeGroups);
-    if (source === 'school') {
-      const next = {
+    const next = {
         subjectGroups: patch.subjectGroups ?? subjectGroups,
         timeGroups: patch.timeGroups ?? timeGroups,
       };
       void saveMajorBatchPresets(next)
         .then((saved) => updateExamSettings({ majorBatchPresets: { subjectGroups: saved.subjectGroups as MajorBatchSubjectGroup[], timeGroups: saved.timeGroups as MajorBatchTimeGroup[], updatedAt: saved.updatedAt }, updatedAt: saved.updatedAt }))
         .catch((error) => notify('error', error instanceof Error ? error.message : '学校预设保存失败'));
-    } else {
-      updateMajorBatchSettings({ ...patch });
-    }
   };
 
   const moveSubjectGroup = (id: string, direction: -1 | 1) => {
@@ -193,10 +228,7 @@ export default function BatchPresetSettingsPanel({ canEdit }: { canEdit: boolean
 
   return (
     <div className="batch-preset-panel">
-      <div className="batch-preset-source" role="tablist" aria-label="预设来源">
-        <button type="button" className={source === 'school' ? 'is-active' : ''} onClick={() => setSource('school')} role="tab" aria-selected={source === 'school'}>学校预设<span>全校共享</span></button>
-        <button type="button" className={source === 'local' ? 'is-active' : ''} onClick={() => setSource('local')} role="tab" aria-selected={source === 'local'}>本机预设<span>仅当前设备</span></button>
-      </div>
+      <div className="batch-preset-source"><span className="batch-preset-source__single">学校预设 · 全校共享</span></div>
       <section className="batch-preset-section">
         <div className="batch-preset-section__head">
           <strong>常用科目组</strong>

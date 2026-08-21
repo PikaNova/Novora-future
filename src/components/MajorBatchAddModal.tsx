@@ -320,8 +320,6 @@ export default function MajorBatchAddModal({
   onCommit: (nextItems: ExamItem[]) => void;
 }) {
   const [step, setStep] = useState(0);
-  const [customSubjectGroups, setCustomSubjectGroups] = useState<MajorBatchSubjectGroup[]>(() => getAppSettings().majorBatch.subjectGroups);
-  const [customTimeGroups, setCustomTimeGroups] = useState<MajorBatchTimeGroup[]>(() => getAppSettings().majorBatch.timeGroups);
   const [schoolSubjectGroups, setSchoolSubjectGroups] = useState<MajorBatchSubjectGroup[]>(() => getAppSettings().exam.majorBatchPresets.subjectGroups);
   const [schoolTimeGroups, setSchoolTimeGroups] = useState<MajorBatchTimeGroup[]>(() => getAppSettings().exam.majorBatchPresets.timeGroups);
   const [subjectTrackModeEnabled, setSubjectTrackModeEnabled] = useState(() => getAppSettings().exam.initialization.subjectTrackModeEnabled !== false);
@@ -341,8 +339,6 @@ export default function MajorBatchAddModal({
   useEffect(() => {
     const sync = () => {
       const settings = getAppSettings();
-      setCustomSubjectGroups(settings.majorBatch.subjectGroups);
-      setCustomTimeGroups(settings.majorBatch.timeGroups);
       setSchoolSubjectGroups(settings.exam.majorBatchPresets.subjectGroups);
       setSchoolTimeGroups(settings.exam.majorBatchPresets.timeGroups);
       setSubjectTrackModeEnabled(settings.exam.initialization.subjectTrackModeEnabled !== false);
@@ -356,12 +352,12 @@ export default function MajorBatchAddModal({
   }, []);
 
   const subjectTemplates = useMemo(
-    () => [...SUBJECT_TEMPLATES, ...schoolSubjectGroups.map((group) => ({ ...customSubjectToTemplate(group), source: "school" as const })), ...customSubjectGroups.map(customSubjectToTemplate)],
-    [customSubjectGroups, schoolSubjectGroups],
+    () => [...SUBJECT_TEMPLATES, ...schoolSubjectGroups.map((group) => ({ ...customSubjectToTemplate(group), source: "school" as const }))],
+    [schoolSubjectGroups],
   );
   const dayPatterns = useMemo(
-    () => [...DAY_PATTERNS, ...schoolTimeGroups.map((group) => ({ ...customTimeToPattern(group), source: "school" as const })), ...customTimeGroups.map(customTimeToPattern)],
-    [customTimeGroups, schoolTimeGroups],
+    () => [...DAY_PATTERNS, ...schoolTimeGroups.map((group) => ({ ...customTimeToPattern(group), source: "school" as const }))],
+    [schoolTimeGroups],
   );
   const template = subjectTemplates.find((item) => item.id === templateId) ?? subjectTemplates[0];
   const pattern = dayPatterns.find((item) => item.id === patternId) ?? dayPatterns[0];
@@ -641,23 +637,6 @@ export default function MajorBatchAddModal({
                           .map((item) => renderTemplateCard(item, templateId === item.id, () => selectTemplate(item)))}
                       </div>
                     </div>
-                    {customSubjectGroups.length > 0 && (
-                      <div className="major-batch-template-group">
-                        <div className="major-batch-group-title">
-                          <span className="with-help-tip">
-                            我的自定义
-                            <HelpTip title="我的自定义科目组">
-                              保存的常用科目组会显示在这里，排在高考常用的下一项；如需新增、编辑或调整顺序，请前往「系统设置 → 批量预设管理」。
-                            </HelpTip>
-                          </span>
-                        </div>
-                        <div className="major-batch-template-grid">
-                          {subjectTemplates
-                            .filter((item) => item.category === "custom")
-                            .map((item) => renderTemplateCard(item, templateId === item.id, () => selectTemplate(item)))}
-                        </div>
-                      </div>
-                    )}
                     <div className="major-batch-template-group">
                       <div className="major-batch-group-title">{CATEGORY_LABELS.school}</div>
                       <div className="major-batch-template-grid">
@@ -718,7 +697,7 @@ export default function MajorBatchAddModal({
                       </button>
                     </div>
                     <p className="major-batch-preset-hint">
-                      需要新建自定义科目组？请前往「系统设置 → 批量预设管理」添加，添加后会自动显示在上方“我的自定义”分组中。
+                      需要新建科目组？请前往「系统设置 → 批量预设管理」添加，添加后会自动显示在上方“学校预设”分组中。
                     </p>
                   </section>
                 </div>
@@ -746,23 +725,6 @@ export default function MajorBatchAddModal({
                           .map((item) => renderPatternCard(item, patternId === item.id, () => setPatternId(item.id)))}
                       </div>
                     </div>
-                    {customTimeGroups.length > 0 && (
-                      <div className="major-batch-template-group">
-                        <div className="major-batch-group-title">
-                          <span className="with-help-tip">
-                            我的自定义
-                            <HelpTip title="我的自定义时间组">
-                              保存的常用时间组会显示在这里，排在高考常用的下一项；如需新增、编辑或调整顺序，请前往「系统设置 → 批量预设管理」。
-                            </HelpTip>
-                          </span>
-                        </div>
-                        <div className="quick-major-choice-grid major-batch-pattern-grid">
-                          {dayPatterns
-                            .filter((item) => item.category === "custom")
-                            .map((item) => renderPatternCard(item, patternId === item.id, () => setPatternId(item.id)))}
-                        </div>
-                      </div>
-                    )}
                     <div className="major-batch-template-group">
                       <div className="major-batch-group-title">{CATEGORY_LABELS.school}</div>
                       <div className="quick-major-choice-grid major-batch-pattern-grid">
@@ -772,7 +734,7 @@ export default function MajorBatchAddModal({
                       </div>
                     </div>
                     <p className="major-batch-preset-hint">
-                      需要新建自定义时间组？请前往「系统设置 → 批量预设管理」添加，添加后会自动显示在上方“我的自定义”分组中。
+                      需要新建时间组？请前往「系统设置 → 批量预设管理」添加，添加后会自动显示在上方“学校预设”分组中。
                     </p>
                   </section>
                   {needsMoreSlots && (

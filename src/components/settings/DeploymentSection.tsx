@@ -2,6 +2,7 @@ import { Rocket } from "lucide-react";
 import { APP_VERSION } from "../../services/telemetry";
 import { adminCan, type AdminUserContext } from "../../services/examService";
 import { useDeploymentSettings } from "../../hooks/settings/useDeploymentSettings";
+import { notify } from "../../services/notify";
 
 export default function DeploymentSection({
   adminUser,
@@ -21,6 +22,14 @@ export default function DeploymentSection({
     doRedeploy,
   } = useDeploymentSettings();
   const isLocal = deployTarget === "local";
+  const copyCommand = async (command: string) => {
+    try {
+      await navigator.clipboard.writeText(command);
+      notify("success", "命令已复制，可在部署机粘贴执行。");
+    } catch {
+      notify("error", "复制失败，请手动选择复制。");
+    }
+  };
 
   return (
     <>
@@ -33,6 +42,10 @@ export default function DeploymentSection({
         <li>
           <span>当前版本</span>
           <b>v{APP_VERSION}</b>
+        </li>
+        <li>
+          <span>部署平台</span>
+          <b>{isLocal ? "本地 / 内网" : "Vercel"}</b>
         </li>
         <li>
           <span>最新版本</span>
@@ -120,9 +133,17 @@ export default function DeploymentSection({
         </button>
       </div>
       {isLocal ? (
-        <p className="set-note">
-          本地部署：更新请执行 <code>npm run update:local</code>，详细流程见仓库 DEPLOY_LOCAL.md。
-        </p>
+        <div className="set-deploy-command">
+          <div className="set-deploy-command__row">
+            <code>npm run update:local</code>
+            <button className="set-btn" type="button" onClick={() => void copyCommand("npm run update:local")}>复制</button>
+          </div>
+          <div className="set-deploy-command__row">
+            <code>git pull --ff-only && docker compose up -d --build</code>
+            <button className="set-btn" type="button" onClick={() => void copyCommand("git pull --ff-only && docker compose up -d --build")}>复制</button>
+          </div>
+          <p className="set-note">在部署机仓库目录执行任一条即可完成升级（自动拉取代码、重建并健康检查）。</p>
+        </div>
       ) : !redeployOk ? (
         <p className="set-note set-note--warn">
           当前部署缺少必填的 <code>VERCEL_DEPLOY_HOOK_URL</code>。请在
@@ -188,7 +209,7 @@ export default function DeploymentSection({
             </ol>
           )}
           <a
-            href="https://github.com/PikaNova/novora-vitepress-docs/blob/main/guide/12-maintenance.md"
+            href="https://docs.pikachu2026.space/guide/12-maintenance"
             target="_blank"
             rel="noopener noreferrer"
           >

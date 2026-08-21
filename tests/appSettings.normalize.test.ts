@@ -198,7 +198,8 @@ test('normalizeInitialization: trims strings and defaults missing fields', () =>
   assert.equal(init.completedAt, 0);
   assert.equal(init.demoDataImported, false);
   assert.equal(init.province, '');
-  assert.equal(init.subjectTrackModeEnabled, true);
+  assert.equal(init.subjectTrackModeEnabled, false);
+  assert.deepEqual(init.seo, { titleSuffix: '', description: '', keywords: '', siteUrl: '' });
 
   const custom = normalizeInitialization({
     completedAt: 100,

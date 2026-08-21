@@ -32,3 +32,8 @@
 .login-email-bind__error{margin:8px 0 0;color:#ff949b;font-size:.74rem}
 .login-email-bind__skip{margin:8px 0 0;color:rgba(235,240,255,.5);font-size:.72rem}
 .login-email-bind__done{margin:0;padding:10px 12px;border:1px solid rgba(70,194,128,.38);border-radius:8px;background:rgba(70,194,128,.1);color:#9ce2ba;font-size:.78rem;line-height:1.5}
+
+/* 2026-08-21 班级访客登录 */
+.login-card__guest{margin-top:12px;width:100%;padding:10px 14px;border:1px solid rgba(92,188,240,.35);border-radius:8px;background:rgba(52,152,219,.1);color:#9fd8ff;font:inherit;font-size:13px;cursor:pointer;text-align:center}
+.login-card__guest:hover{background:rgba(52,152,219,.18);border-color:rgba(92,188,240,.55)}
+.login-card__guest:disabled{opacity:.55;cursor:default}

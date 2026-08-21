@@ -1,11 +1,13 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { authenticateUser, checkLoginLockout, extractBearer, getActor, isAdminRecoveryConfigured, isPasswordRequired, recoverSuperAdmin, repairSuperAdmin, writeAudit } from './_auth.js';
+import { authenticateUser, authSql, checkLoginLockout, extractBearer, getActor, isAdminRecoveryConfigured, isPasswordRequired, issueGuestToken, recoverSuperAdmin, repairSuperAdmin, writeAudit } from './_auth.js';
+import { assertRows, isBoolean, isString, rowShape } from './_validation.js';
 import { handleEmailAuth, loadSmtpConfig } from './emailAuth.js';
 import { opportunisticDrain } from './_emailQueue.js';
 import { requestId, sendDatabaseError } from './_apiError.js';
 import { applyCors } from './_cors.js';
 
 const AUTH_FAILURE_DELAY_MS = 400;
+const isGuestLoginDeviceRow = rowShape<{ revoked: boolean; grade_id: string; class_id: string; is_management: boolean }>({ revoked: isBoolean, grade_id: isString, class_id: isString, is_management: isBoolean });
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   requestId(req, res);
@@ -48,6 +50,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         res.status(result.error?.includes('未配置') ? 503 : result.error?.includes('频繁') ? 429 : 401).json({ ok: false, code: 'REPAIR_FAILED', error: result.error }); return;
       }
       res.json({ ok: true, created: result.created === true }); return;
+    }
+    const guestBody = (req.body ?? {}) as Record<string, unknown>;
+    if (action === 'guest-login') {
+      const instanceId = String(guestBody.instanceId ?? '').trim();
+      const gradeId = String(guestBody.gradeId ?? '').trim();
+      const classId = String(guestBody.classId ?? '').trim();
+      if (!instanceId || !gradeId || !classId) { res.status(400).json({ ok: false, error: '缺少设备或班级信息' }); return; }
+      const deviceRows = assertRows(await authSql()`SELECT revoked, grade_id, class_id, is_management FROM device_instances WHERE instance_id=${instanceId} LIMIT 1`, isGuestLoginDeviceRow, 'device_instances');
+      const device = deviceRows[0];
+      if (!device || device.revoked !== false || device.is_management === true) { res.status(403).json({ ok: false, error: '设备未绑定或不允许访客登录' }); return; }
+      if (String(device.grade_id) !== gradeId || String(device.class_id) !== classId) { res.status(403).json({ ok: false, error: '班级信息不匹配' }); return; }
+      const issued = await issueGuestToken(instanceId, gradeId, classId);
+      if (!issued) { res.status(500).json({ ok: false, error: '访客令牌签发失败' }); return; }
+      const actor = await getActor(issued.token);
+      const guestActor = actor ?? { id: 0, username: instanceId, displayName: '班级访客', roleId: 'viewer', roleName: '班级访客', permissions: [] as never[], scopes: [], mustChangePassword: false };
+      await writeAudit(guestActor, 'auth.guest.login', 'device', instanceId, {});
+      res.json({ ok: true, token: issued.token, expiresAt: issued.expiresAt, user: actor, guest: true });
+      return;
     }
     if (!await isPasswordRequired()) { res.json({ ok: true, token: null }); return; }
     const usernameInput = String(username ?? 'admin');

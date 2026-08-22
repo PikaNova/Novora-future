@@ -74,9 +74,31 @@
   letter-spacing: 0.19em;
 }
 .login-card__title {
-  margin: 0;
+  width: 100%;
+  max-width: 300px;
+  margin: 0 auto;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  overflow-wrap: anywhere;
   font-size: 1.7rem;
-  letter-spacing: 0.03em;
+  line-height: 1.15;
+  letter-spacing: 0.01em;
+}
+.login-card__school,
+.login-card__product {
+  display: block;
+  max-width: 100%;
+  text-align: center;
+}
+.login-card__school {
+  font-size: clamp(1.05rem, 4vw, 1.55rem);
+  line-height: 1.2;
+}
+.login-card__product {
+  color: rgba(235, 240, 255, 0.78);
+  font-size: clamp(1.2rem, 4.6vw, 1.7rem);
+  line-height: 1.1;
 }
 .login-card__subtitle {
   margin: 11px 0 28px;
@@ -194,6 +216,15 @@
   .login-card {
     padding: 30px 22px 24px;
     border-radius: 20px;
+  }
+  .login-card__title {
+    max-width: 260px;
+  }
+  .login-card__school {
+    font-size: clamp(0.95rem, 4.5vw, 1.3rem);
+  }
+  .login-card__product {
+    font-size: clamp(1.1rem, 5vw, 1.45rem);
   }
   .login-page {
     padding: 18px;

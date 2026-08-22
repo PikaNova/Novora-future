@@ -86,6 +86,16 @@ function toPayload(data: any): ExamPayload {
         : undefined,
     designPolicy:
       data?.designPolicy && typeof data.designPolicy === 'object' ? (data.designPolicy as DesignPolicy) : undefined,
+    majorBatchPresets:
+      data?.majorBatchPresets && typeof data.majorBatchPresets === 'object' && !Array.isArray(data.majorBatchPresets)
+        ? {
+            subjectGroups: Array.isArray(data.majorBatchPresets.subjectGroups)
+              ? data.majorBatchPresets.subjectGroups
+              : [],
+            timeGroups: Array.isArray(data.majorBatchPresets.timeGroups) ? data.majorBatchPresets.timeGroups : [],
+            updatedAt: Number(data.majorBatchPresets.updatedAt ?? 0),
+          }
+        : undefined,
     binding: data?.binding && typeof data.binding === 'object' ? data.binding : null,
     updatedAt: Number(data?.updatedAt ?? 0),
   };
@@ -286,6 +296,7 @@ async function saveExamsToServerNow(input: SaveExamsInput): Promise<SaveExamsRes
       initialization: input.initialization ?? previousSnapshot?.initialization,
       weeklyConflictPolicy: input.weeklyConflictPolicy ?? previousSnapshot?.weeklyConflictPolicy,
       designPolicy: previousSnapshot?.designPolicy,
+      majorBatchPresets: previousSnapshot?.majorBatchPresets,
       updatedAt,
     });
     lastExamApiError = null;

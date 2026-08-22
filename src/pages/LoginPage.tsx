@@ -418,7 +418,14 @@ export default function LoginPage() {
       <section className="login-card" aria-label="考试管理登录">
         <BrandMark className="login-card__brand" />
         <h1 className="login-card__title">
-          {initializing ? '系统初始化' : schoolNameForLogin ? schoolNameForLogin + ' · 考试管理' : '考试管理'}
+          {initializing ? (
+            '系统初始化'
+          ) : (
+            <>
+              {schoolNameForLogin && <span className="login-card__school">{schoolNameForLogin}</span>}
+              <span className="login-card__product">考试管理</span>
+            </>
+          )}
         </h1>
         <p className="login-card__subtitle">
           {initializing ? '验证超级管理员后直接打开初始化向导' : '使用管理员账号登录以继续'}

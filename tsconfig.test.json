@@ -62,6 +62,7 @@
     "src/types/index.ts",
     "src/utils/scheduleConflict.ts",
     "src/components/weekly/weeklyShared.ts",
+    "src/components/major-batch/majorBatchAdd.helpers.ts",
     "src/services/syncQueue.ts",
     "src/services/userManagementAccess.ts",
     "src/utils/majorOwnership.ts",

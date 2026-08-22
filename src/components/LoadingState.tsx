@@ -79,16 +79,18 @@ export default function LoadingState({
   kind = 'loading',
   title,
   message,
+  layout = 'viewport',
 }: {
   kind?: LoadingStateKind;
   title?: string;
   message?: string;
+  layout?: 'viewport' | 'panel';
 }) {
   const copy = COPY[kind];
   const copyKey = `${kind}-${title || copy.title}-${message || copy.message}`;
   const seats = buildSeats(kind);
   return (
-    <main className={`loading-state loading-state--${kind}`} aria-live="polite" role="status">
+    <main className={`loading-state loading-state--${kind} loading-state--${layout}`} aria-live="polite" role="status">
       <section className="loading-state__stage">
         <div className="loading-state__brand" aria-hidden="true">
           <span className="loading-state__wordmark">NOVORA</span>

@@ -1,5 +1,8 @@
 .loading-state {
+  width: 100%;
   min-height: 100vh;
+  min-height: 100dvh;
+  height: 100%;
   display: grid;
   place-items: center;
   padding: 24px;
@@ -9,6 +12,19 @@
     linear-gradient(180deg, #0b1018 0%, #06080d 100%);
   color: #eef6ff;
   font-family: 'Exam Source Han', 'Microsoft YaHei', 'PingFang SC', 'Noto Sans SC', system-ui, sans-serif;
+}
+
+/* Lazy-loaded admin panels live inside a two-column grid. Keep the loader in
+   the content area instead of letting Grid place it in the sidebar column. */
+.loading-state--panel {
+  grid-column: 1 / -1;
+  min-height: clamp(360px, calc(100dvh - 150px), 760px);
+  height: 100%;
+}
+
+.loading-state--viewport {
+  min-height: 100vh;
+  min-height: 100dvh;
 }
 
 .loading-state__stage {

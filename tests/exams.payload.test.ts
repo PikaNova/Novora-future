@@ -35,6 +35,11 @@ test('examPayload: maps every snake_case DB column to its camelCase API field wi
     classes: [{ id: 'c1' }],
     initialization: { completedAt: 123 },
     design_policy: { rules: [], updatedAt: 5 },
+    major_batch_presets: {
+      subjectGroups: [{ id: 'subjects-1', name: '理科组' }],
+      timeGroups: [{ id: 'times-1', name: '上午场' }],
+      updatedAt: 1700000000100,
+    },
     updated_at: 1700000000000,
   };
   const payload = examPayload(row);
@@ -54,7 +59,11 @@ test('examPayload: maps every snake_case DB column to its camelCase API field wi
     initialization: { completedAt: 123 },
     weeklyConflictPolicy: { enabled: true, scope: 'whole-day' },
     designPolicy: { rules: [], updatedAt: 5 },
-    majorBatchPresets: {},
+    majorBatchPresets: {
+      subjectGroups: [{ id: 'subjects-1', name: '理科组' }],
+      timeGroups: [{ id: 'times-1', name: '上午场' }],
+      updatedAt: 1700000000100,
+    },
     updatedAt: 1700000000000,
   });
 });

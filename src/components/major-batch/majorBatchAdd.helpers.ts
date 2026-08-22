@@ -146,8 +146,8 @@ export function customSubjectToTemplate(item: MajorBatchSubjectGroup): SubjectTe
     description: `${item.subjects.length} 个科目，已保存为常用组`,
     subjects: item.subjects,
     custom: true,
-    source: 'local',
-    category: 'custom',
+    source: 'school',
+    category: 'school',
   };
 }
 
@@ -158,7 +158,7 @@ export function customTimeToPattern(item: MajorBatchTimeGroup): DayPattern {
     description: `${item.slots.length} 个场次，已保存为常用时间组`,
     slots: item.slots,
     custom: true,
-    source: 'local',
-    category: 'custom',
+    source: 'school',
+    category: 'school',
   };
 }

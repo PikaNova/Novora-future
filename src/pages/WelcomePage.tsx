@@ -352,7 +352,10 @@ export default function WelcomePage() {
     <div className="welcome-page">
       <div className="welcome-header">
         <BrandMark className="welcome-brand" />
-        <h1 className="welcome-title">{schoolNameTitle ? schoolNameTitle + ' · 考试看板' : '考试看板'}</h1>
+        <h1 className="welcome-title">
+          {schoolNameTitle && <span className="welcome-title__school">{schoolNameTitle}</span>}
+          <span className="welcome-title__product">考试看板</span>
+        </h1>
         <p className="welcome-subtitle">
           {isBound ? `${currentClass} · ` : ''}
           {resolvedTitle} · {new Date(now).toLocaleTimeString('zh-CN', { hour12: false })}

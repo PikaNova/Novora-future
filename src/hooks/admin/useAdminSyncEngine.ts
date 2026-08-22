@@ -234,6 +234,7 @@ export function useAdminSyncEngine(params: {
         if (remote.classes !== undefined) remoteUpdates.classes = remote.classes;
         if (remote.initialization !== undefined) remoteUpdates.initialization = remote.initialization;
         if (remote.weeklyConflictPolicy !== undefined) remoteUpdates.weeklyConflictPolicy = remote.weeklyConflictPolicy;
+        if (remote.majorBatchPresets !== undefined) remoteUpdates.majorBatchPresets = remote.majorBatchPresets;
         updateExamSettings(remoteUpdates as never);
         if (remote.alerts) {
           updateAlertsSettings(remote.alerts as never);

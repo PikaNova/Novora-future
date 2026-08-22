@@ -105,6 +105,67 @@ export default function SchoolInfoSection({ canEditSchool }: { canEditSchool: bo
         完整校名：
         <strong>{schoolFullName(province, schoolName) || '尚未填写'}</strong>
       </div>
+      <div className="set-seo">
+        <h3 className="set-seo__title">站点信息（SEO）</h3>
+        <p className="set-note">用于浏览器标题、搜索引擎描述、关键词和公开站点地址，可随时修改。</p>
+        <div className="set-row">
+          <label className="set-label" htmlFor="settings-seo-title-suffix">
+            浏览器标题后缀
+          </label>
+          <input
+            id="settings-seo-title-suffix"
+            className="set-input"
+            maxLength={60}
+            disabled={!canEditSchool}
+            value={seo.titleSuffix}
+            onChange={(event) => setSeo((value) => ({ ...value, titleSuffix: event.target.value }))}
+            placeholder="如：考试看板"
+          />
+        </div>
+        <div className="set-row">
+          <label className="set-label" htmlFor="settings-seo-description">
+            SEO 描述
+          </label>
+          <input
+            id="settings-seo-description"
+            className="set-input"
+            maxLength={200}
+            disabled={!canEditSchool}
+            value={seo.description}
+            onChange={(event) => setSeo((value) => ({ ...value, description: event.target.value }))}
+            placeholder="一句话介绍本校考试看板"
+          />
+        </div>
+        <div className="set-row">
+          <label className="set-label" htmlFor="settings-seo-keywords">
+            关键词
+          </label>
+          <input
+            id="settings-seo-keywords"
+            className="set-input"
+            maxLength={120}
+            disabled={!canEditSchool}
+            value={seo.keywords}
+            onChange={(event) => setSeo((value) => ({ ...value, keywords: event.target.value }))}
+            placeholder="学校名称, 考试安排, 教室大屏"
+          />
+        </div>
+        <div className="set-row">
+          <label className="set-label" htmlFor="settings-seo-site-url">
+            站点公开地址
+          </label>
+          <input
+            id="settings-seo-site-url"
+            className="set-input"
+            type="url"
+            maxLength={200}
+            disabled={!canEditSchool}
+            value={seo.siteUrl}
+            onChange={(event) => setSeo((value) => ({ ...value, siteUrl: event.target.value }))}
+            placeholder="https://exam.example.edu.cn"
+          />
+        </div>
+      </div>
       <button
         className="set-btn set-btn--primary"
         disabled={!canEditSchool || !province || !schoolName.trim()}

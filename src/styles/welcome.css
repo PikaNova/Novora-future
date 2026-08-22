@@ -28,11 +28,31 @@
   color: #f7f4ec;
 }
 .welcome-title {
+  width: min(100%, 900px);
+  display: grid;
+  justify-items: center;
+  gap: clamp(2px, 0.7vh, 8px);
+  overflow-wrap: anywhere;
   font-family: var(--font-region-display);
-  font-size: clamp(2.25rem, 7vw, 4.3rem);
   font-weight: 750;
-  letter-spacing: 0.04em;
   margin: 0 0 8px;
+}
+.welcome-title__school,
+.welcome-title__product {
+  display: block;
+  max-width: 100%;
+  text-align: center;
+}
+.welcome-title__school {
+  font-size: clamp(1.8rem, 5.2vw, 3.9rem);
+  line-height: 1.08;
+  letter-spacing: 0.015em;
+}
+.welcome-title__product {
+  color: rgba(240, 245, 250, 0.78);
+  font-size: clamp(1.15rem, 2.4vw, 1.75rem);
+  line-height: 1.1;
+  letter-spacing: 0.08em;
 }
 .welcome-subtitle {
   font-size: 1rem;
@@ -747,8 +767,13 @@
     display: none;
   }
   .welcome-title {
-    font-size: clamp(1.55rem, 5vh, 2.25rem);
     margin-bottom: 2px;
+  }
+  .welcome-title__school {
+    font-size: clamp(1.35rem, 5vh, 2.25rem);
+  }
+  .welcome-title__product {
+    font-size: clamp(1rem, 2.9vh, 1.35rem);
   }
   .welcome-lastopen {
     display: none;
@@ -842,7 +867,13 @@
     display: none;
   }
   .welcome-title {
+    gap: 1px;
+  }
+  .welcome-title__school {
     font-size: 1.7rem;
+  }
+  .welcome-title__product {
+    font-size: 1rem;
   }
   .welcome-exam-banner {
     min-height: 70px;
@@ -869,6 +900,12 @@
   }
   .welcome-title {
     font-size: 1.25rem;
+  }
+  .welcome-title__school {
+    font-size: 1.25rem;
+  }
+  .welcome-title__product {
+    font-size: 0.8rem;
   }
   .welcome-subtitle {
     font-size: 0.65rem;

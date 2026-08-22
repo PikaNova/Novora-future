@@ -647,7 +647,7 @@ export default function AdminPage() {
         key={adminTab}
         className={`admin-body admin-tab-transition${(['overview', 'dashboard', 'classes', 'devices', 'users'] as AdminTab[]).includes(adminTab) ? ' admin-body--wide' : ''}`}
       >
-        <Suspense fallback={<LoadingState kind="loading" />}>
+        <Suspense fallback={<LoadingState kind="loading" layout="panel" />}>
           {adminTab === 'overview' ? (
             <OverviewPanel
               user={adminUser}

@@ -18,23 +18,22 @@ import {
 } from '../utils/appSettings';
 import { getDesignId, setDesignId } from '../utils/designPref';
 import { applyMotionSettings } from '../utils/motionSettings';
-import { applyTypographySettings } from '../utils/typographySettings';
+import {
+  applyTypographySettings,
+  loadTypographyFont,
+  TYPOGRAPHY_FONT_OPTIONS,
+} from '../utils/typographySettings';
 import '../styles/settings.css';
 import ClassMultiPicker from '../components/ClassMultiPicker';
 import InlineSelect from '../components/InlineSelect';
 import AboutSection from '../components/settings/AboutSection';
 
-const FONT_OPTIONS: Array<{ value: TypographyFontId; label: string }> = [
-  { value: 'alibaba', label: '阿里巴巴普惠体 3' },
-  { value: 'sourceHan', label: '思源黑体' },
-  { value: 'smiley', label: '得意黑' },
-  { value: 'wenkai', label: '霞鹜文楷' },
-  { value: 'general', label: 'General Sans' },
-];
-const NUMERIC_OPTIONS: Array<{ value: TypographyFontId; label: string }> = [
-  { value: 'jbmono', label: 'JetBrains Mono' },
-  { value: 'sourceHan', label: '思源黑体' },
-  ...FONT_OPTIONS.filter((item) => item.value !== 'sourceHan'),
+const FONT_OPTIONS = TYPOGRAPHY_FONT_OPTIONS;
+const NUMERIC_OPTIONS = TYPOGRAPHY_FONT_OPTIONS;
+
+const selectFontOptions = (includeDesign = false) => [
+  ...(includeDesign ? [{ value: 'design' as TypographyFontId, label: '按设计默认' }] : []),
+  ...FONT_OPTIONS,
 ];
 
 export default function LocalSettingsPage() {
@@ -74,6 +73,7 @@ export default function LocalSettingsPage() {
     setFonts(next);
     updateAppSettings((current) => ({ general: { ...current.general, typography: next } }));
     applyTypographySettings(next);
+    void loadTypographyFont(value);
   };
   const bind = async (value: string) => {
     if (!value || bindingClassId) return;
@@ -259,7 +259,7 @@ export default function LocalSettingsPage() {
                 className="set-input"
                 value={fonts.navigation}
                 onChange={(value) => patchFont('navigation', value as TypographyFontId)}
-                options={FONT_OPTIONS.map((item) => ({ value: item.value, label: item.label }))}
+                options={selectFontOptions()}
               />
               <small>页眉、状态、标签与说明</small>
               <i className="set-font-preview set-font-preview--nav">导航 · 在线 · 已校时</i>
@@ -270,7 +270,7 @@ export default function LocalSettingsPage() {
                 className="set-input"
                 value={fonts.display}
                 onChange={(value) => patchFont('display', value as TypographyFontId)}
-                options={[{ value: 'design', label: '按设计默认' }, ...FONT_OPTIONS]}
+                options={selectFontOptions(true)}
               />
               <small>科目主标题与核心强调</small>
               <i className="set-font-preview set-font-preview--display">语文考试</i>
@@ -281,7 +281,7 @@ export default function LocalSettingsPage() {
                 className="set-input"
                 value={fonts.content}
                 onChange={(value) => patchFont('content', value as TypographyFontId)}
-                options={FONT_OPTIONS.map((item) => ({ value: item.value, label: item.label }))}
+                options={selectFontOptions()}
               />
               <small>下一科、卡片内容与动态中文</small>
               <i className="set-font-preview set-font-preview--content">下一科：数学 · 14:30</i>

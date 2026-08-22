@@ -44,9 +44,12 @@
   text-align: center;
 }
 .welcome-title__school {
-  font-size: clamp(1.8rem, 5.2vw, 3.9rem);
-  line-height: 1.08;
-  letter-spacing: 0.015em;
+  color: rgba(240, 245, 250, 0.88);
+  font-family: 'Exam WenKai', 'Exam Source Han', var(--font-fallback);
+  font-size: clamp(1.35rem, 4.1vw, 2.85rem);
+  font-weight: 500;
+  line-height: 1.16;
+  letter-spacing: 0.02em;
 }
 .welcome-title__product {
   color: rgba(240, 245, 250, 0.78);
@@ -770,7 +773,7 @@
     margin-bottom: 2px;
   }
   .welcome-title__school {
-    font-size: clamp(1.35rem, 5vh, 2.25rem);
+    font-size: clamp(1.15rem, 4.2vh, 1.85rem);
   }
   .welcome-title__product {
     font-size: clamp(1rem, 2.9vh, 1.35rem);
@@ -870,7 +873,7 @@
     gap: 1px;
   }
   .welcome-title__school {
-    font-size: 1.7rem;
+    font-size: 1.45rem;
   }
   .welcome-title__product {
     font-size: 1rem;
@@ -898,11 +901,8 @@
   .welcome-brand {
     margin: 0;
   }
-  .welcome-title {
-    font-size: 1.25rem;
-  }
   .welcome-title__school {
-    font-size: 1.25rem;
+    font-size: 1.1rem;
   }
   .welcome-title__product {
     font-size: 0.8rem;

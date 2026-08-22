@@ -6,6 +6,8 @@ All font files in this folder are locally packaged; the app requests no external
 - Smiley Sans / 得意黑: original WOFF2 asset (SIL Open Font License 1.1)
 - Source Han Sans SC: GB2312-standard and project-UI subset, Regular/Heavy (SIL Open Font License 1.1)
 - LXGW WenKai / 霞鹜文楷: GB2312-standard and project-UI subset (SIL Open Font License 1.1)
+- LXGW WenKai GB/TC, LXGW ZhenKai GB, LXGW Marker Gothic / 霞鹜漫黑 (SIL Open Font License 1.1)
+- Zhuque Fangsong / 朱雀仿宋 (SIL Open Font License 1.1)
 - LXGW WenKai Mono / 霞鹜文楷等宽: digits and time punctuation subset (SIL Open Font License 1.1)
 
 Alibaba PuHuiTi remains subject to its upstream license terms. Preserve upstream notices when redistributing.

@@ -3,6 +3,12 @@ import { createPortal } from 'react-dom';
 import { ChevronLeft, ChevronRight, Download, X } from 'lucide-react';
 import { getClassBindingInstanceId } from '../services/classBinding';
 import { getAppSettings } from '../utils/appSettings';
+import {
+  loadTypographyFont,
+  typographyFontStack,
+  TYPOGRAPHY_FONT_OPTIONS,
+} from '../utils/typographySettings';
+import type { TypographyFontId } from '../utils/settings/typography';
 import { addDaysToDateKey, getShanghaiDateKey, isoWeekdayOfDateKey, weekRangeStarts } from '../utils/weeklySchedule';
 import InlineSelect from './InlineSelect';
 import SubjectIcon from './SubjectIcon';
@@ -22,13 +28,22 @@ export interface PrintScheduleDocument {
   className: string;
 }
 
-type FontKey = 'smiley' | 'source' | 'alibaba' | 'wenkai';
-const FONT_OPTIONS: Array<{ id: FontKey; label: string; css: string }> = [
-  { id: 'smiley', label: '得意黑', css: '"Exam Smiley","Exam Source Han",sans-serif' },
-  { id: 'source', label: '思源黑体', css: '"Exam Source Han",sans-serif' },
-  { id: 'alibaba', label: '阿里巴巴普惠体', css: '"Exam Alibaba","Exam Source Han",sans-serif' },
-  { id: 'wenkai', label: '霞鹜文楷', css: '"Exam WenKai","Exam Source Han",sans-serif' },
-];
+type FontKey = Exclude<TypographyFontId, 'design'>;
+const FONT_OPTIONS: Array<{
+  id: FontKey;
+  label: string;
+  css: string;
+  group: string;
+  fontFamily: string;
+  loadId: TypographyFontId;
+}> = TYPOGRAPHY_FONT_OPTIONS.map((font) => ({
+  id: font.value,
+  label: font.label,
+  css: typographyFontStack(font.value),
+  group: font.group,
+  fontFamily: font.fontFamily,
+  loadId: font.value,
+}));
 const WEEKDAYS = ['', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六', '星期日'];
 
 function mondayOf(date: string) {
@@ -72,7 +87,7 @@ export default function SchedulePrintPreview({
   const [weekCount, setWeekCount] = useState(1);
   const [titleFont, setTitleFont] = useState<FontKey>('smiley');
   const [bodyFont, setBodyFont] = useState<FontKey>('wenkai');
-  const [numericFont, setNumericFont] = useState<FontKey>('source');
+  const [numericFont, setNumericFont] = useState<FontKey>('sourceHan');
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState('');
   const exportSheetRefs = useRef<Array<HTMLElement | null>>([]);
@@ -134,15 +149,11 @@ export default function SchedulePrintPreview({
     });
   }, [documents, mode, weekCount, weekStart]);
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      const fonts = (document as Document & { fonts?: FontFaceSet }).fonts;
-      if (fonts)
-        void Promise.allSettled(
-          ['Exam Smiley', 'Exam Source Han', 'Exam Alibaba', 'Exam WenKai'].map((name) => fonts.load(`16px "${name}"`)),
-        );
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, []);
+    [titleFont, bodyFont, numericFont].forEach((id) => {
+      const selected = FONT_OPTIONS.find((font) => font.id === id);
+      if (selected) void loadTypographyFont(selected.loadId);
+    });
+  }, [bodyFont, numericFont, titleFont]);
   useEffect(() => {
     document.body.classList.add('preview-scroll-lock');
     return () => document.body.classList.remove('preview-scroll-lock');
@@ -257,7 +268,7 @@ export default function SchedulePrintPreview({
             <InlineSelect
               value={titleFont}
               onChange={(value) => setTitleFont(value as FontKey)}
-              options={FONT_OPTIONS.map((font) => ({ value: font.id, label: font.label }))}
+              options={FONT_OPTIONS.map((font) => ({ value: font.id, label: font.label, group: font.group, fontFamily: font.fontFamily }))}
             />
           </label>
           <label>
@@ -265,7 +276,7 @@ export default function SchedulePrintPreview({
             <InlineSelect
               value={bodyFont}
               onChange={(value) => setBodyFont(value as FontKey)}
-              options={FONT_OPTIONS.map((font) => ({ value: font.id, label: font.label }))}
+              options={FONT_OPTIONS.map((font) => ({ value: font.id, label: font.label, group: font.group, fontFamily: font.fontFamily }))}
             />
           </label>
           <label>
@@ -273,7 +284,7 @@ export default function SchedulePrintPreview({
             <InlineSelect
               value={numericFont}
               onChange={(value) => setNumericFont(value as FontKey)}
-              options={FONT_OPTIONS.map((font) => ({ value: font.id, label: font.label }))}
+              options={FONT_OPTIONS.map((font) => ({ value: font.id, label: font.label, group: font.group, fontFamily: font.fontFamily }))}
             />
           </label>
         </div>

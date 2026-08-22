@@ -48,6 +48,36 @@
   font-display: swap;
 }
 @font-face {
+  font-family: 'Exam WenKai GB';
+  src: url('/fonts/lxgw-wenkai-gb-subset.woff2') format('woff2');
+  font-weight: 400 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Exam WenKai TC';
+  src: url('/fonts/lxgw-wenkai-tc-subset.woff2') format('woff2');
+  font-weight: 400 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Exam ZhenKai GB';
+  src: url('/fonts/lxgw-zhenkai-gb-subset.woff2') format('woff2');
+  font-weight: 400 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Exam Marker Gothic';
+  src: url('/fonts/lxgw-marker-gothic-subset.woff2') format('woff2');
+  font-weight: 400 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Exam Zhuque Fangsong';
+  src: url('/fonts/zhuque-fangsong-subset.woff2') format('woff2');
+  font-weight: 400 900;
+  font-display: swap;
+}
+@font-face {
   font-family: 'Exam Numeric Mono';
   src: url('/fonts/exam-numeric-subset.ttf') format('truetype');
   font-weight: 400 900;

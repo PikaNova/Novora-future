@@ -74,6 +74,14 @@
   opacity: 0.4;
   cursor: not-allowed;
 }
+.inline-select__group {
+  padding: 8px 10px 4px;
+  color: rgba(216, 229, 238, 0.58);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: none;
+}
 .inline-select.set-input,
 .inline-select.admin-input {
   width: 100%;

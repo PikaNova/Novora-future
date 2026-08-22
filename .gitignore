@@ -6,6 +6,7 @@ integrations/ClassIsland.ExamReminder/bin/
 integrations/ClassIsland.ExamReminder/obj/
 integrations/ClassIsland.ExamReminder/cipx/
 .npm-cache/
+fonts-src/
 .vercel/
 *.log
 *.tmp

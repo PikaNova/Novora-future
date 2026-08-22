@@ -92,8 +92,12 @@
   text-align: center;
 }
 .login-card__school {
-  font-size: clamp(1.05rem, 4vw, 1.55rem);
-  line-height: 1.2;
+  color: rgba(235, 240, 255, 0.9);
+  font-family: 'Exam WenKai', 'Exam Source Han', var(--font-fallback);
+  font-size: clamp(0.95rem, 3.2vw, 1.25rem);
+  font-weight: 500;
+  line-height: 1.25;
+  letter-spacing: 0.02em;
 }
 .login-card__product {
   color: rgba(235, 240, 255, 0.78);
@@ -221,7 +225,7 @@
     max-width: 260px;
   }
   .login-card__school {
-    font-size: clamp(0.95rem, 4.5vw, 1.3rem);
+    font-size: clamp(0.9rem, 3.8vw, 1.12rem);
   }
   .login-card__product {
     font-size: clamp(1.1rem, 5vw, 1.45rem);

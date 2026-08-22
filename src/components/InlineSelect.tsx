@@ -3,7 +3,13 @@ import { Check, ChevronDown } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import '../styles/inline-select.css';
 
-export type InlineSelectOption = { value: string; label: React.ReactNode; disabled?: boolean };
+export type InlineSelectOption = {
+  value: string;
+  label: React.ReactNode;
+  disabled?: boolean;
+  fontFamily?: string;
+  group?: string;
+};
 
 type Props = {
   value: string;
@@ -85,32 +91,40 @@ export default function InlineSelect({
           setOpen((value) => !value);
         }}
       >
-        <span>{selected?.label ?? placeholder}</span>
+        <span style={selected?.fontFamily ? { fontFamily: selected.fontFamily } : undefined}>
+          {selected?.label ?? placeholder}
+        </span>
         <ChevronDown aria-hidden="true" size={16} />
       </button>
       {open &&
         typeof document !== 'undefined' &&
         createPortal(
           <div ref={menuRef} className="inline-select__menu" style={style} role="listbox" aria-label={ariaLabel}>
-            {options.map((option) => (
-              <button
-                type="button"
-                key={option.value}
-                role="option"
-                aria-selected={option.value === value}
-                disabled={option.disabled}
-                className={option.value === value ? 'is-selected' : ''}
-                onClick={() => {
-                  if (!option.disabled) {
-                    onChange(option.value);
-                    setOpen(false);
-                  }
-                }}
-              >
-                <span>{option.label}</span>
-                {option.value === value && <Check aria-hidden="true" size={15} />}
-              </button>
-            ))}
+            {options.map((option, index) => {
+              const previous = options[index - 1];
+              const showGroup = option.group && option.group !== previous?.group;
+              return (
+                <React.Fragment key={option.value}>
+                  {showGroup && <div className="inline-select__group" role="presentation">{option.group}</div>}
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={option.value === value}
+                    disabled={option.disabled}
+                    className={option.value === value ? 'is-selected' : ''}
+                    onClick={() => {
+                      if (!option.disabled) {
+                        onChange(option.value);
+                        setOpen(false);
+                      }
+                    }}
+                  >
+                    <span style={option.fontFamily ? { fontFamily: option.fontFamily } : undefined}>{option.label}</span>
+                    {option.value === value && <Check aria-hidden="true" size={15} />}
+                  </button>
+                </React.Fragment>
+              );
+            })}
           </div>,
           document.body,
         )}

@@ -11,6 +11,8 @@ Novora 是面向学校教室大屏的考试与周测安排系统，包含客户�
 
 项目预览:[Novora](https://novora.pikachu2026.space)
 
+考试看板Classisland插件仓库[插件仓库](https://github.com/PikaNova/ClassIsland.ExamReminder)
+
 ## 推荐部署区域
 
 ```text

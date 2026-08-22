@@ -5,9 +5,5 @@
     "outDir": ".integration-check",
     "strict": true
   },
-  "include": [
-    "api/**/*.ts",
-    "src/shared/permissionRules.ts",
-    "tests/integration/**/*.ts"
-  ]
+  "include": ["api/**/*.ts", "src/shared/permissionRules.ts", "tests/integration/**/*.ts"]
 }

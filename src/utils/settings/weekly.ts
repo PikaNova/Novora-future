@@ -15,7 +15,7 @@ export const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 export const HM_RE = /^([01]?\d|2[0-3]):[0-5]\d$/;
 
 export function planTitleForClass(className: string | undefined) {
-  return className?.trim() || "\u73ed\u7ea7";
+  return className?.trim() || '\u73ed\u7ea7';
 }
 
 export function genWeeklyPlanId(): string {
@@ -65,11 +65,11 @@ export function normalizeWeeklyPlan(raw: unknown, index = 0): WeeklyPlan {
     activeFrom: DATE_RE.test(src.activeFrom || '') ? (src.activeFrom as string) : '',
     activeUntil: DATE_RE.test(src.activeUntil || '') ? (src.activeUntil as string) : null,
     repeatEveryWeeks: clampRepeat(src.repeatEveryWeeks as number),
-    anchorDate: DATE_RE.test(src.anchorDate || '') ? (src.anchorDate as string) : (src.activeFrom || ''),
+    anchorDate: DATE_RE.test(src.anchorDate || '') ? (src.anchorDate as string) : src.activeFrom || '',
     weekMode: src.weekMode === 'ab' ? 'ab' : 'single',
     excludeOfficialHolidays: src.excludeOfficialHolidays === true,
     items,
-    excludedDates: (Array.isArray(src.excludedDates) ? src.excludedDates : []).filter(date => DATE_RE.test(date)),
+    excludedDates: (Array.isArray(src.excludedDates) ? src.excludedDates : []).filter((date) => DATE_RE.test(date)),
     overrides: (Array.isArray(src.overrides) ? src.overrides : []).filter(Boolean) as WeeklyExamOverride[],
     order: typeof src.order === 'number' ? src.order : index,
     gradeId: typeof src.gradeId === 'string' ? src.gradeId : '',
@@ -79,9 +79,7 @@ export function normalizeWeeklyPlan(raw: unknown, index = 0): WeeklyPlan {
 
 function normalizeWeeklyItem(raw: unknown, index: number): WeeklyExamItem {
   const src = (raw ?? {}) as Partial<WeeklyExamItem>;
-  const weekday = ([1, 2, 3, 4, 5, 6, 7] as number[]).includes(src.weekday as number)
-    ? (src.weekday as IsoWeekday)
-    : 1;
+  const weekday = ([1, 2, 3, 4, 5, 6, 7] as number[]).includes(src.weekday as number) ? (src.weekday as IsoWeekday) : 1;
   return {
     id: src.id || genWeeklyItemId(),
     name: (src.name && String(src.name).trim()) || `周测${index + 1}`,
@@ -105,8 +103,12 @@ export function normalizeConflictPolicy(raw: unknown): WeeklyConflictPolicy {
   return {
     enabled: src.enabled !== false,
     scope,
-    bufferBeforeMinutes: Number.isFinite(src.bufferBeforeMinutes) ? Math.max(0, Math.round(src.bufferBeforeMinutes as number)) : 0,
-    bufferAfterMinutes: Number.isFinite(src.bufferAfterMinutes) ? Math.max(0, Math.round(src.bufferAfterMinutes as number)) : 0,
+    bufferBeforeMinutes: Number.isFinite(src.bufferBeforeMinutes)
+      ? Math.max(0, Math.round(src.bufferBeforeMinutes as number))
+      : 0,
+    bufferAfterMinutes: Number.isFinite(src.bufferAfterMinutes)
+      ? Math.max(0, Math.round(src.bufferAfterMinutes as number))
+      : 0,
   };
 }
 
@@ -119,9 +121,10 @@ export function resolveActiveWeeklyPlanIdByClass(
   const result: Record<string, string | null> = {};
   for (const item of classes) {
     const value = rawByClass[item.id];
-    result[item.id] = typeof value === 'string' && weeklyPlans.some(plan => plan.id === value && plan.classId === item.id)
-      ? value
-      : (weeklyPlans.find(plan => plan.classId === item.id)?.id ?? null);
+    result[item.id] =
+      typeof value === 'string' && weeklyPlans.some((plan) => plan.id === value && plan.classId === item.id)
+        ? value
+        : (weeklyPlans.find((plan) => plan.classId === item.id)?.id ?? null);
   }
   return result;
 }

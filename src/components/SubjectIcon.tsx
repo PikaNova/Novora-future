@@ -14,7 +14,7 @@ import {
   Palette,
   ScrollText,
   type LucideIcon,
-} from "lucide-react";
+} from 'lucide-react';
 
 const SUBJECT_ICON_RULES: Array<[RegExp, LucideIcon]> = [
   [/语文|阅读|写作/, BookOpen],
@@ -33,14 +33,14 @@ const SUBJECT_ICON_RULES: Array<[RegExp, LucideIcon]> = [
 ];
 
 export function getSubjectIcon(subject: string): LucideIcon {
-  const normalized = subject.replace(/\s+/g, "");
+  const normalized = subject.replace(/\s+/g, '');
   return SUBJECT_ICON_RULES.find(([rule]) => rule.test(normalized))?.[1] ?? BookMarked;
 }
 
 export default function SubjectIcon({
   subject,
   size = 18,
-  className = "",
+  className = '',
 }: {
   subject: string;
   size?: number;

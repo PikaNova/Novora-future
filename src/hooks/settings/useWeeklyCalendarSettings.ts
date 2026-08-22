@@ -1,48 +1,35 @@
-import { useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { getAppSettings, updateExamSettings } from "../../utils/appSettings";
+import { useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { getAppSettings, updateExamSettings } from '../../utils/appSettings';
 import {
   saveExamsToServer,
   getCloudSnapshot,
   adminCanClass,
   adminCanGrade,
   type AdminUserContext,
-} from "../../services/examService";
-import { sortedClasses, sortedGrades } from "../../utils/classSettings";
-import { formatApiError } from "../../services/apiError";
-import { notify } from "../../services/notify";
-import type { WeeklyPlan } from "../../types/exam";
+} from '../../services/examService';
+import { sortedClasses, sortedGrades } from '../../utils/classSettings';
+import { formatApiError } from '../../services/apiError';
+import { notify } from '../../services/notify';
+import type { WeeklyPlan } from '../../types/exam';
 
-export function useWeeklyCalendarSettings(
-  canEditWeekly: boolean,
-  adminUser: AdminUserContext | null,
-) {
+export function useWeeklyCalendarSettings(canEditWeekly: boolean, adminUser: AdminUserContext | null) {
   const navigate = useNavigate();
   const initialExam = useMemo(() => getAppSettings().exam, []);
-  const [weeklyPlans, setWeeklyPlans] = useState<WeeklyPlan[]>(
-    initialExam.weeklyPlans,
-  );
+  const [weeklyPlans, setWeeklyPlans] = useState<WeeklyPlan[]>(initialExam.weeklyPlans);
   const [calendarGradeId, setCalendarGradeId] = useState(
-    initialExam.selectedGradeId || initialExam.grades[0]?.id || "",
+    initialExam.selectedGradeId || initialExam.grades[0]?.id || '',
   );
-  const [calendarClassId, setCalendarClassId] = useState(
-    initialExam.selectedClassId,
-  );
+  const [calendarClassId, setCalendarClassId] = useState(initialExam.selectedClassId);
   const [calendarPlanId, setCalendarPlanId] = useState(
-    () =>
-      initialExam.activeWeeklyPlanIdByClassId[initialExam.selectedClassId] ??
-      initialExam.activeWeeklyPlanId ??
-      "",
+    () => initialExam.activeWeeklyPlanIdByClassId[initialExam.selectedClassId] ?? initialExam.activeWeeklyPlanId ?? '',
   );
-  const [calendarSave, setCalendarSave] = useState("");
+  const [calendarSave, setCalendarSave] = useState('');
   const [calendarSaving, setCalendarSaving] = useState(false);
   const calendarSavingRef = useRef(false);
 
   const grades = useMemo(
-    () =>
-      sortedGrades(initialExam.grades).filter((grade) =>
-        adminUser ? adminCanGrade(grade.id, adminUser) : true,
-      ),
+    () => sortedGrades(initialExam.grades).filter((grade) => (adminUser ? adminCanGrade(grade.id, adminUser) : true)),
     [adminUser, initialExam],
   );
   const classes = useMemo(
@@ -52,21 +39,14 @@ export function useWeeklyCalendarSettings(
       ),
     [adminUser, initialExam, calendarGradeId],
   );
-  const classPlans = weeklyPlans.filter(
-    (plan) => plan.classId === calendarClassId,
-  );
-  const calendarPlan =
-    classPlans.find((plan) => plan.id === calendarPlanId) ??
-    classPlans[0] ??
-    null;
+  const classPlans = weeklyPlans.filter((plan) => plan.classId === calendarClassId);
+  const calendarPlan = classPlans.find((plan) => plan.id === calendarPlanId) ?? classPlans[0] ?? null;
 
   const selectCalendarClass = (classId: string) => {
     setCalendarClassId(classId);
     const exam = getAppSettings().exam;
     setCalendarPlanId(
-      exam.activeWeeklyPlanIdByClassId[classId] ??
-        weeklyPlans.find((plan) => plan.classId === classId)?.id ??
-        "",
+      exam.activeWeeklyPlanIdByClassId[classId] ?? weeklyPlans.find((plan) => plan.classId === classId)?.id ?? '',
     );
   };
 
@@ -74,12 +54,10 @@ export function useWeeklyCalendarSettings(
     if (!calendarPlan || !canEditWeekly || calendarSavingRef.current) return;
     calendarSavingRef.current = true;
     setCalendarSaving(true);
-    const nextPlans = weeklyPlans.map((plan) =>
-      plan.id === calendarPlan.id ? { ...plan, ...updates } : plan,
-    );
+    const nextPlans = weeklyPlans.map((plan) => (plan.id === calendarPlan.id ? { ...plan, ...updates } : plan));
     setWeeklyPlans(nextPlans);
     updateExamSettings({ weeklyPlans: nextPlans, updatedAt: Date.now() });
-    setCalendarSave("正在保存到云端…");
+    setCalendarSave('正在保存到云端…');
     const exam = getAppSettings().exam;
     const input = {
       items: exam.items,
@@ -101,18 +79,12 @@ export function useWeeklyCalendarSettings(
         ...input,
         baseUpdatedAt: getCloudSnapshot()?.updatedAt ?? 0,
       });
-      if (
-        result &&
-        typeof result === "object" &&
-        result.kind === "conflict" &&
-        result.remote
-      ) {
+      if (result && typeof result === 'object' && result.kind === 'conflict' && result.remote) {
         const remote = result.remote;
         const mergedPlans = (remote.weeklyPlans ?? nextPlans).map((plan) =>
           plan.id === calendarPlan.id ? { ...plan, ...updates } : plan,
         );
-        if (!mergedPlans.some((plan) => plan.id === calendarPlan.id))
-          mergedPlans.push({ ...calendarPlan, ...updates });
+        if (!mergedPlans.some((plan) => plan.id === calendarPlan.id)) mergedPlans.push({ ...calendarPlan, ...updates });
         persistedPlans = mergedPlans;
         result = await saveExamsToServer({
           ...input,
@@ -123,34 +95,30 @@ export function useWeeklyCalendarSettings(
           alerts: remote.alerts,
           scheduleMode: remote.scheduleMode ?? input.scheduleMode,
           weeklyPlans: mergedPlans,
-          activeWeeklyPlanId:
-            remote.activeWeeklyPlanId ?? input.activeWeeklyPlanId,
-          activeWeeklyPlanIdByClassId:
-            remote.activeWeeklyPlanIdByClassId ??
-            input.activeWeeklyPlanIdByClassId,
+          activeWeeklyPlanId: remote.activeWeeklyPlanId ?? input.activeWeeklyPlanId,
+          activeWeeklyPlanIdByClassId: remote.activeWeeklyPlanIdByClassId ?? input.activeWeeklyPlanIdByClassId,
           grades: remote.grades ?? input.grades,
           classes: remote.classes ?? input.classes,
-          weeklyConflictPolicy:
-            remote.weeklyConflictPolicy ?? input.weeklyConflictPolicy,
+          weeklyConflictPolicy: remote.weeklyConflictPolicy ?? input.weeklyConflictPolicy,
           baseUpdatedAt: remote.updatedAt,
         });
       }
-      if (result === "unauthorized") {
-        navigate("/login?next=/settings", { replace: true });
+      if (result === 'unauthorized') {
+        navigate('/login?next=/settings', { replace: true });
         return;
       }
-      if (typeof result === "number") {
+      if (typeof result === 'number') {
         setWeeklyPlans(persistedPlans);
         updateExamSettings({ weeklyPlans: persistedPlans, updatedAt: result });
-        setCalendarSave("已保存到云端");
-        notify("success", "周测日历设置已保存到云端。");
+        setCalendarSave('已保存到云端');
+        notify('success', '周测日历设置已保存到云端。');
       } else {
         const message =
-          result && result.kind === "error"
-            ? formatApiError(result.error, "周测日历保存失败")
-            : "周测日历保存失败，请刷新后重试。";
+          result && result.kind === 'error'
+            ? formatApiError(result.error, '周测日历保存失败')
+            : '周测日历保存失败，请刷新后重试。';
         setCalendarSave(message);
-        notify("error", message, "保存失败");
+        notify('error', message, '保存失败');
       }
     } finally {
       calendarSavingRef.current = false;

@@ -6,18 +6,28 @@ type CorsOptions = {
 };
 
 function first(value: string | string[] | undefined): string {
-  return String(Array.isArray(value) ? value[0] ?? '' : value ?? '').split(',')[0].trim();
+  return String(Array.isArray(value) ? (value[0] ?? '') : (value ?? ''))
+    .split(',')[0]
+    .trim();
 }
 
 function appendVary(res: VercelResponse, value: string): void {
-  const current = String(res.getHeader('Vary') ?? '').split(',').map(item => item.trim()).filter(Boolean);
+  const current = String(res.getHeader('Vary') ?? '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
   if (!current.includes(value)) res.setHeader('Vary', [...current, value].join(', '));
 }
 
 function allowedOrigins(req: VercelRequest): Set<string> {
   const host = first(req.headers['x-forwarded-host']) || first(req.headers.host);
-  const protocol = first(req.headers['x-forwarded-proto']) || (host.startsWith('localhost') || host.startsWith('127.0.0.1') ? 'http' : 'https');
-  const configured = String(process.env.CORS_ALLOWED_ORIGINS ?? '').split(',').map(item => item.trim()).filter(Boolean);
+  const protocol =
+    first(req.headers['x-forwarded-proto']) ||
+    (host.startsWith('localhost') || host.startsWith('127.0.0.1') ? 'http' : 'https');
+  const configured = String(process.env.CORS_ALLOWED_ORIGINS ?? '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
   const origins = new Set(configured);
   if (host) origins.add(`${protocol}://${host}`);
   if (process.env.VERCEL_URL) origins.add(`https://${process.env.VERCEL_URL}`);

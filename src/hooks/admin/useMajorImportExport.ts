@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
-import type { ExamItem, MajorExam } from "../../types";
-import { normalizeExamItems } from "../../utils/examSchedule";
-import { adminCan, type AdminUserContext } from "../../services/examService";
-import { notify } from "../../services/notify";
-import { makeId, fmtLocal, duration } from "./adminPageUtils";
-import type { MajorModal } from "./useMajorScheduleActions";
+import { useEffect, useState } from 'react';
+import type { ExamItem, MajorExam } from '../../types';
+import { normalizeExamItems } from '../../utils/examSchedule';
+import { adminCan, type AdminUserContext } from '../../services/examService';
+import { notify } from '../../services/notify';
+import { makeId, fmtLocal, duration } from './adminPageUtils';
+import type { MajorModal } from './useMajorScheduleActions';
 
 type ImportPreviewItem = ExamItem & { include: boolean };
 
@@ -20,12 +20,7 @@ export function useMajorImportExport(params: {
   items: ExamItem[];
   majors: MajorExam[];
   selectedGradeId: string;
-  commit: (
-    ms: MajorExam[],
-    activeId: string,
-    immediate?: boolean,
-    syncLabel?: string,
-  ) => void;
+  commit: (ms: MajorExam[], activeId: string, immediate?: boolean, syncLabel?: string) => void;
   setMoreOpen: (open: boolean) => void;
   setMajorError: (error: string) => void;
   setMajorModal: (modal: MajorModal) => void;
@@ -47,8 +42,8 @@ export function useMajorImportExport(params: {
   const [importOpen, setImportOpen] = useState(false);
   const [majorImportStep, setMajorImportStep] = useState(0);
   const [openImportGuide, setOpenImportGuide] = useState(false);
-  const [importText, setImportText] = useState("");
-  const [importError, setImportError] = useState("");
+  const [importText, setImportText] = useState('');
+  const [importError, setImportError] = useState('');
   const [majorImportPreview, setMajorImportPreview] = useState<{
     title: string;
     items: ImportPreviewItem[];
@@ -58,22 +53,22 @@ export function useMajorImportExport(params: {
   useEffect(() => {
     if (importOpen) {
       setMajorImportStep(0);
-      setImportText("");
-      setImportError("");
+      setImportText('');
+      setImportError('');
       setMajorImportPreview(null);
     }
   }, [importOpen]);
 
   const validateMajorImportJson = () => {
-    setImportError("");
+    setImportError('');
     if (!hasScopedMajor || !activeMajor.id) {
-      setImportError("请先填写标题并创建大型考试，再导入分考试安排。");
+      setImportError('请先填写标题并创建大型考试，再导入分考试安排。');
       return;
     }
     try {
       const source = JSON.parse(importText);
       const list = Array.isArray(source) ? source : source.items;
-      if (!Array.isArray(list)) throw new Error("JSON 必须是考试数组，或包含 items 数组");
+      if (!Array.isArray(list)) throw new Error('JSON 必须是考试数组，或包含 items 数组');
       const next = list.map((raw: unknown, index: number) => {
         const row = raw as Record<string, unknown>;
         if (!row.name || !row.startTime || !row.endTime)
@@ -91,15 +86,12 @@ export function useMajorImportExport(params: {
           startTime,
           endTime,
           enabled: row.enabled !== false,
-          order: typeof row.order === "number" ? row.order : index,
+          order: typeof row.order === 'number' ? row.order : index,
           include: true,
         };
       });
       const chronological = normalizeExamItems(next);
-      const nextName =
-        typeof source.title === "string" && source.title.trim()
-          ? source.title.trim()
-          : activeMajor.name;
+      const nextName = typeof source.title === 'string' && source.title.trim() ? source.title.trim() : activeMajor.name;
       const warnings: string[] = [];
       chronological.forEach((item, index) => {
         const previous = chronological[index - 1];
@@ -113,12 +105,12 @@ export function useMajorImportExport(params: {
       });
       setMajorImportStep(2);
     } catch (error) {
-      setImportError(error instanceof Error ? error.message : "JSON 格式错误");
+      setImportError(error instanceof Error ? error.message : 'JSON 格式错误');
     }
   };
 
   const importJson = () => {
-    setImportError("");
+    setImportError('');
     if (!majorImportPreview) {
       validateMajorImportJson();
       return;
@@ -127,36 +119,28 @@ export function useMajorImportExport(params: {
       const selectedItems = majorImportPreview.items
         .filter((item) => item.include)
         .map(({ include: _include, ...item }) => item);
-      if (!selectedItems.length) throw new Error("请至少保留一项分考试安排");
+      if (!selectedItems.length) throw new Error('请至少保留一项分考试安排');
       const ms = majors.map((m) =>
-        m.id === activeMajor.id
-          ? { ...m, name: majorImportPreview.title, items: selectedItems }
-          : m,
+        m.id === activeMajor.id ? { ...m, name: majorImportPreview.title, items: selectedItems } : m,
       );
       commit(ms, activeMajorId, false, `导入「${majorImportPreview.title}」`);
-      setImportText("");
+      setImportText('');
       setImportOpen(false);
       setMajorImportPreview(null);
     } catch (error) {
-      setImportError(error instanceof Error ? error.message : "JSON 格式错误");
+      setImportError(error instanceof Error ? error.message : 'JSON 格式错误');
     }
   };
 
   const exportJson = () => {
     const file = new Blob(
-      [
-        JSON.stringify(
-          { title: activeMajor.name, items, exportedAt: new Date().toISOString() },
-          null,
-          2,
-        ),
-      ],
-      { type: "application/json;charset=utf-8" },
+      [JSON.stringify({ title: activeMajor.name, items, exportedAt: new Date().toISOString() }, null, 2)],
+      { type: 'application/json;charset=utf-8' },
     );
     const url = URL.createObjectURL(file);
-    const link = document.createElement("a");
+    const link = document.createElement('a');
     link.href = url;
-    link.download = `${activeMajor.name || "exam-board"}-${new Date().toISOString().slice(0, 10)}.json`;
+    link.download = `${activeMajor.name || 'exam-board'}-${new Date().toISOString().slice(0, 10)}.json`;
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -165,9 +149,9 @@ export function useMajorImportExport(params: {
 
   const openMajorImport = () => {
     setMoreOpen(false);
-    setImportError("");
+    setImportError('');
     if (!selectedGradeId) {
-      notify("warning", "请先选择要导入考试安排的年级。", "请选择年级");
+      notify('warning', '请先选择要导入考试安排的年级。', '请选择年级');
       return;
     }
     if (hasScopedMajor) {
@@ -175,16 +159,16 @@ export function useMajorImportExport(params: {
       setImportOpen(true);
       return;
     }
-    if (!adminCan("major.create", adminUser)) {
-      notify("error", "当前年级尚无大型考试，且当前账号没有新建考试权限。", "无法导入");
+    if (!adminCan('major.create', adminUser)) {
+      notify('error', '当前年级尚无大型考试，且当前账号没有新建考试权限。', '无法导入');
       return;
     }
-    setMajorError("");
+    setMajorError('');
     setMajorModal({
-      mode: "add",
-      name: "",
+      mode: 'add',
+      name: '',
       targetGradeIds: selectedGradeId ? [selectedGradeId] : [],
-      next: "import",
+      next: 'import',
     });
   };
 

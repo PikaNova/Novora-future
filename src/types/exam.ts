@@ -27,8 +27,8 @@ export interface DesignPolicy {
 
 /** 大型考试与周测的冲突作用范围。 */
 export type WeeklyConflictScope =
-  | 'time-overlap'        // 仅实际时间段重叠时暂停周测（月考、部分时段考试）
-  | 'whole-day'           // 当天存在大型考试即暂停当天全部周测（推荐默认）
+  | 'time-overlap' // 仅实际时间段重叠时暂停周测（月考、部分时段考试）
+  | 'whole-day' // 当天存在大型考试即暂停当天全部周测（推荐默认）
   | 'whole-major-period'; // 从第一门到最后一门期间全部暂停周测（中高考、期末考试周）
 
 /** 冲突处理策略。v1.24.0 作为全局默认策略存在 ExamBoardData 上。 */

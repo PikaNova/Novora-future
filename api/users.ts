@@ -21,45 +21,151 @@ import {
   type AdminScope,
   type Permission,
 } from './_auth.js';
+import {
+  assertRows,
+  rowShape,
+  isString,
+  isNumberLike,
+  isDatabaseInt8,
+  isBoolean,
+  type DatabaseInt8,
+} from './_validation.js';
 
-const text = (value: unknown, max = 120) => String(value ?? '').trim().slice(0, max);
-const jsonPermissions = (value: unknown): Permission[] => Array.isArray(value)
-  ? [...new Set(value.filter(item => item === '*' || ALL_PERMISSIONS.includes(item as any)))] as Permission[]
-  : [];
+const text = (value: unknown, max = 120) =>
+  String(value ?? '')
+    .trim()
+    .slice(0, max);
+const jsonPermissions = (value: unknown): Permission[] =>
+  Array.isArray(value)
+    ? ([
+        ...new Set(
+          value.filter((item) => item === '*' || ALL_PERMISSIONS.includes(item as (typeof ALL_PERMISSIONS)[number])),
+        ),
+      ] as Permission[])
+    : [];
+
+const isUnknown = (_value: unknown): _value is unknown => true;
+const isScopeType = (value: unknown): value is AdminScope['type'] =>
+  value === 'all' || value === 'grade' || value === 'class';
+const isDatabaseInt8OrNull = (value: unknown): value is DatabaseInt8 | null => value == null || isDatabaseInt8(value);
+
+const isIdRow = rowShape<{ id: DatabaseInt8 }>({ id: isDatabaseInt8 });
+const isCountRow = rowShape<{ count: number }>({ count: isNumberLike });
+const isPermissionsRow = rowShape<{ permissions: unknown }>({ permissions: isUnknown });
+const isRolePermissionsRow = rowShape<{ id: string; permissions: unknown }>({
+  id: isString,
+  permissions: isUnknown,
+});
+const isUserRoleStatusRow = rowShape<{ role_id: string; status: string }>({
+  role_id: isString,
+  status: isString,
+});
+const isBuiltInRow = rowShape<{ built_in: boolean }>({ built_in: isBoolean });
+const isTargetInfoRow = rowShape<{ username: string; role_id: string; status: string }>({
+  username: isString,
+  role_id: isString,
+  status: isString,
+});
+const isScopeRow = rowShape<{
+  user_id: DatabaseInt8;
+  scope_type: AdminScope['type'];
+  grade_id: string;
+  class_id: string;
+}>({
+  user_id: isDatabaseInt8,
+  scope_type: isScopeType,
+  grade_id: isString,
+  class_id: isString,
+});
+const isUserListRow = rowShape<{
+  id: DatabaseInt8;
+  username: string;
+  displayName: string;
+  roleId: string;
+  roleName: string;
+  status: string;
+  mustChangePassword: boolean;
+  lastLoginAt: DatabaseInt8 | null;
+  createdAt: DatabaseInt8;
+  permissions: unknown;
+}>({
+  id: isDatabaseInt8,
+  username: isString,
+  displayName: isString,
+  roleId: isString,
+  roleName: isString,
+  status: isString,
+  mustChangePassword: isBoolean,
+  lastLoginAt: isDatabaseInt8OrNull,
+  createdAt: isDatabaseInt8,
+  permissions: isUnknown,
+});
+const isRoleListRow = rowShape<{
+  id: string;
+  name: string;
+  description: string;
+  permissions: unknown;
+  builtIn: boolean;
+  createdAt: DatabaseInt8;
+  updatedAt: DatabaseInt8;
+}>({
+  id: isString,
+  name: isString,
+  description: isString,
+  permissions: isUnknown,
+  builtIn: isBoolean,
+  createdAt: isDatabaseInt8,
+  updatedAt: isDatabaseInt8,
+});
 
 function scopes(value: unknown): AdminScope[] {
   if (!Array.isArray(value)) return [];
   const result: AdminScope[] = [];
   for (const raw of value) {
     if (!raw || typeof raw !== 'object') continue;
-    const type = text((raw as any).type, 12) as AdminScope['type'];
-    const gradeId = text((raw as any).gradeId, 128);
-    const classId = text((raw as any).classId, 128);
+    const type = text((raw as Record<string, unknown>).type, 12) as AdminScope['type'];
+    const gradeId = text((raw as Record<string, unknown>).gradeId, 128);
+    const classId = text((raw as Record<string, unknown>).classId, 128);
     if (type === 'all') return [{ type: 'all', gradeId: '', classId: '' }];
     if (type === 'grade' && gradeId) result.push({ type, gradeId, classId: '' });
     if (type === 'class' && gradeId && classId) result.push({ type, gradeId, classId });
   }
-  return result.filter((item, index, all) => all.findIndex(other => `${other.type}|${other.gradeId}|${other.classId}` === `${item.type}|${item.gradeId}|${item.classId}`) === index);
+  return result.filter(
+    (item, index, all) =>
+      all.findIndex(
+        (other) => `${other.type}|${other.gradeId}|${other.classId}` === `${item.type}|${item.gradeId}|${item.classId}`,
+      ) === index,
+  );
 }
 
 async function replaceScopes(userId: number, next: AdminScope[]): Promise<void> {
   const sql = authSql();
-  await sql.transaction(transaction => [
+  await sql.transaction((transaction) => [
     transaction`DELETE FROM app_user_scopes WHERE user_id=${userId}`,
-    ...next.map(scope => transaction`INSERT INTO app_user_scopes (user_id, scope_type, grade_id, class_id)
-      VALUES (${userId}, ${scope.type}, ${scope.gradeId}, ${scope.classId}) ON CONFLICT DO NOTHING`),
+    ...next.map(
+      (scope) => transaction`INSERT INTO app_user_scopes (user_id, scope_type, grade_id, class_id)
+      VALUES (${userId}, ${scope.type}, ${scope.gradeId}, ${scope.classId}) ON CONFLICT DO NOTHING`,
+    ),
   ]);
 }
 
 function canDelegatePermissions(actor: AdminActor, permissions: Permission[]): boolean {
-  return actor.permissions.includes('*') || (!permissions.includes('*') && permissions.every(permission => actor.permissions.includes(permission)));
+  return (
+    actor.permissions.includes('*') ||
+    (!permissions.includes('*') && permissions.every((permission) => actor.permissions.includes(permission)))
+  );
 }
 
 export function canDelegateScopes(actor: AdminActor, next: AdminScope[]): boolean {
-  if (actor.permissions.includes('*') || actor.scopes.some(scope => scope.type === 'all')) return true;
-  return next.length > 0 && next.every(scope => scope.type === 'grade'
-    ? hasGradeLevelAccess(actor, scope.gradeId)
-    : scope.type === 'class' && canAccessClass(actor, scope.gradeId, scope.classId));
+  if (actor.permissions.includes('*') || actor.scopes.some((scope) => scope.type === 'all')) return true;
+  return (
+    next.length > 0 &&
+    next.every((scope) =>
+      scope.type === 'grade'
+        ? hasGradeLevelAccess(actor, scope.gradeId)
+        : scope.type === 'class' && canAccessClass(actor, scope.gradeId, scope.classId),
+    )
+  );
 }
 
 export type VisibilityCandidate = {
@@ -68,31 +174,45 @@ export type VisibilityCandidate = {
 };
 
 export function filterVisibleUsers<T extends VisibilityCandidate>(actor: AdminActor | undefined, users: T[]): T[] {
-  if (!actor || actor.permissions.includes('*') || actor.scopes.some(scope => scope.type === 'all')) return users;
-  return users.filter(user =>
-    canDelegatePermissions(actor, user.permissions) &&
-    user.scopes.length > 0 &&
-    user.scopes.every(scope => scope.type !== 'all' && (scope.type === 'grade'
-      ? hasGradeLevelAccess(actor, scope.gradeId)
-      : canAccessClass(actor, scope.gradeId, scope.classId))),
+  if (!actor || actor.permissions.includes('*') || actor.scopes.some((scope) => scope.type === 'all')) return users;
+  return users.filter(
+    (user) =>
+      canDelegatePermissions(actor, user.permissions) &&
+      user.scopes.length > 0 &&
+      user.scopes.every(
+        (scope) =>
+          scope.type !== 'all' &&
+          (scope.type === 'grade'
+            ? hasGradeLevelAccess(actor, scope.gradeId)
+            : canAccessClass(actor, scope.gradeId, scope.classId)),
+      ),
   );
 }
 
 // Historical audit rows cannot be safely filtered to a grade or class scope.
 export function canReadAuditLog(actor: AdminActor): boolean {
-  return actor.permissions.includes('*') || actor.scopes.some(scope => scope.type === 'all');
+  return actor.permissions.includes('*') || actor.scopes.some((scope) => scope.type === 'all');
 }
 
 function roleScopeError(roleId: string, next: AdminScope[]): string {
   if (roleId === 'super_admin') return '';
-  if (roleId === 'class_admin' && !next.some(scope => scope.type === 'class')) return '班级管理员必须选择至少一个具体班级';
-  if (roleId === 'grade_admin' && !next.some(scope => scope.type === 'grade' || scope.type === 'all')) return '年级管理员必须选择至少一个年级';
+  if (roleId === 'class_admin' && !next.some((scope) => scope.type === 'class'))
+    return '班级管理员必须选择至少一个具体班级';
+  if (roleId === 'grade_admin' && !next.some((scope) => scope.type === 'grade' || scope.type === 'all'))
+    return '年级管理员必须选择至少一个年级';
   if (!next.length) return '至少选择一个年级或班级';
   return '';
 }
 
-async function delegatedRole(actor: AdminActor, roleId: string): Promise<{ id: string; permissions: Permission[] } | null> {
-  const rows = await authSql()`SELECT id, permissions FROM app_roles WHERE id=${roleId}` as unknown as Array<{ id: string; permissions: unknown }>;
+async function delegatedRole(
+  actor: AdminActor,
+  roleId: string,
+): Promise<{ id: string; permissions: Permission[] } | null> {
+  const rows = assertRows(
+    await authSql()`SELECT id, permissions FROM app_roles WHERE id=${roleId}`,
+    isRolePermissionsRow,
+    'app_roles',
+  );
   if (!rows[0]) return null;
   const role = { id: rows[0].id, permissions: jsonPermissions(rows[0].permissions) };
   return canDelegatePermissions(actor, role.permissions) ? role : null;
@@ -100,61 +220,91 @@ async function delegatedRole(actor: AdminActor, roleId: string): Promise<{ id: s
 
 async function listUsers(actor?: AdminActor) {
   const sql = authSql();
-  type UserRow = {
-    id: number;
-    username: string;
-    displayName: string;
-    roleId: string;
-    roleName: string;
-    status: string;
-    mustChangePassword: boolean;
-    lastLoginAt: number | null;
-    createdAt: number;
-    permissions: unknown;
-  };
-  type ScopeRow = { user_id: number; scope_type: AdminScope['type']; grade_id: string; class_id: string };
   const [users, scopeRows] = await Promise.all([
     sql`SELECT u.id, u.username, u.display_name AS "displayName", u.role_id AS "roleId", r.name AS "roleName",
       u.status, u.must_change_password AS "mustChangePassword", u.last_login_at AS "lastLoginAt", u.created_at AS "createdAt", r.permissions
-      FROM app_users u JOIN app_roles r ON r.id=u.role_id ORDER BY u.created_at ASC` as unknown as Promise<UserRow[]>,
-    sql`SELECT user_id, scope_type, grade_id, class_id FROM app_user_scopes ORDER BY id` as unknown as Promise<ScopeRow[]>,
+      FROM app_users u JOIN app_roles r ON r.id=u.role_id ORDER BY u.created_at ASC`.then((rows) =>
+      assertRows(rows, isUserListRow, 'app_users'),
+    ),
+    sql`SELECT user_id, scope_type, grade_id, class_id FROM app_user_scopes ORDER BY id`.then((rows) =>
+      assertRows(rows, isScopeRow, 'app_user_scopes'),
+    ),
   ]);
-  const scopesByUser = new Map<number, ScopeRow[]>();
+  const scopesByUser = new Map<number, (typeof scopeRows)[number][]>();
   for (const scope of scopeRows) {
     const userId = Number(scope.user_id);
     const bucket = scopesByUser.get(userId);
     if (bucket) bucket.push(scope);
     else scopesByUser.set(userId, [scope]);
   }
-  const internal = users.map(user => ({
-    id: Number(user.id), username: user.username, displayName: user.displayName, roleId: user.roleId, roleName: user.roleName,
-    status: user.status, mustChangePassword: user.mustChangePassword, lastLoginAt: user.lastLoginAt, createdAt: user.createdAt,
-    scopes: (scopesByUser.get(Number(user.id)) ?? []).map(scope => ({ type: scope.scope_type, gradeId: scope.grade_id, classId: scope.class_id })),
+  const internal = users.map((user) => ({
+    id: Number(user.id),
+    username: user.username,
+    displayName: user.displayName,
+    roleId: user.roleId,
+    roleName: user.roleName,
+    status: user.status,
+    mustChangePassword: user.mustChangePassword,
+    lastLoginAt: user.lastLoginAt,
+    createdAt: user.createdAt,
+    scopes: (scopesByUser.get(Number(user.id)) ?? []).map((scope) => ({
+      type: scope.scope_type,
+      gradeId: scope.grade_id,
+      classId: scope.class_id,
+    })),
     permissions: jsonPermissions(user.permissions),
   }));
   return filterVisibleUsers(actor, internal).map(({ permissions: _permissions, ...publicUser }) => publicUser);
 }
 
 async function canManageTarget(actor: AdminActor, userId: number): Promise<boolean> {
-  if (actor.permissions.includes('*') || actor.scopes.some(scope => scope.type === 'all')) return true;
+  if (actor.permissions.includes('*') || actor.scopes.some((scope) => scope.type === 'all')) return true;
   const sql = authSql();
   const [target, targetScopes] = await Promise.all([
-    sql`SELECT r.permissions FROM app_users u JOIN app_roles r ON r.id=u.role_id WHERE u.id=${userId}` as unknown as Array<{ permissions: unknown }>,
-    sql`SELECT scope_type, grade_id, class_id FROM app_user_scopes WHERE user_id=${userId}` as unknown as Array<{ scope_type: AdminScope['type']; grade_id: string; class_id: string }>,
+    sql`SELECT r.permissions FROM app_users u JOIN app_roles r ON r.id=u.role_id WHERE u.id=${userId}`.then((rows) =>
+      assertRows(rows, isPermissionsRow, 'app_users'),
+    ),
+    sql`SELECT scope_type, grade_id, class_id FROM app_user_scopes WHERE user_id=${userId}`.then((rows) =>
+      assertRows(rows, isScopeRow, 'app_user_scopes'),
+    ),
   ]);
-  if (!target[0] || !canDelegatePermissions(actor, jsonPermissions(target[0].permissions)) || !targetScopes.length) return false;
-  return targetScopes.every(scope => scope.scope_type !== 'all' && (scope.scope_type === 'grade' ? hasGradeLevelAccess(actor, scope.grade_id) : canAccessClass(actor, scope.grade_id, scope.class_id)));
+  if (!target[0] || !canDelegatePermissions(actor, jsonPermissions(target[0].permissions)) || !targetScopes.length)
+    return false;
+  return targetScopes.every(
+    (scope) =>
+      scope.scope_type !== 'all' &&
+      (scope.scope_type === 'grade'
+        ? hasGradeLevelAccess(actor, scope.grade_id)
+        : canAccessClass(actor, scope.grade_id, scope.class_id)),
+  );
 }
 
 async function listRoles() {
-  const rows = await authSql()`SELECT id, name, description, permissions, built_in AS "builtIn", created_at AS "createdAt", updated_at AS "updatedAt" FROM app_roles ORDER BY built_in DESC, created_at ASC` as unknown as Array<Record<string, any>>;
-  return rows.map((row: any) => ({ ...row, permissions: jsonPermissions(row.permissions) }));
+  const rows = assertRows(
+    await authSql()`SELECT id, name, description, permissions, built_in AS "builtIn", created_at AS "createdAt", updated_at AS "updatedAt" FROM app_roles ORDER BY built_in DESC, created_at ASC`,
+    isRoleListRow,
+    'app_roles',
+  );
+  return rows.map((row) => ({ ...row, permissions: jsonPermissions(row.permissions) }));
 }
 
 async function ensureNotLastSuperAdmin(userId: number, nextRoleId: string, nextStatus: string): Promise<boolean> {
-  const rows = await authSql()`SELECT role_id, status FROM app_users WHERE id=${userId}` as unknown as Array<{ role_id: string; status: string }>;
-  if (rows[0]?.role_id !== 'super_admin' || rows[0]?.status !== 'active' || (nextRoleId === 'super_admin' && nextStatus === 'active')) return true;
-  const count = await authSql()`SELECT COUNT(*)::int AS count FROM app_users WHERE role_id='super_admin' AND status='active'` as unknown as Array<{ count: number }>;
+  const rows = assertRows(
+    await authSql()`SELECT role_id, status FROM app_users WHERE id=${userId}`,
+    isUserRoleStatusRow,
+    'app_users',
+  );
+  if (
+    rows[0]?.role_id !== 'super_admin' ||
+    rows[0]?.status !== 'active' ||
+    (nextRoleId === 'super_admin' && nextStatus === 'active')
+  )
+    return true;
+  const count = assertRows(
+    await authSql()`SELECT COUNT(*)::int AS count FROM app_users WHERE role_id='super_admin' AND status='active'`,
+    isCountRow,
+    'app_users',
+  );
   return Number(count[0]?.count) > 1;
 }
 
@@ -163,13 +313,26 @@ async function handleUsers(req: VercelRequest, res: VercelResponse, actor: Admin
   const body = req.body ?? {};
   const action = text(body.action, 40);
   if (req.method === 'POST' && action === 'change-own-credentials') {
-    const result = await changeOwnCredentials(actor.id, String(body.currentPassword ?? ''), String(body.username ?? ''), String(body.newPassword ?? ''));
+    const result = await changeOwnCredentials(
+      actor.id,
+      String(body.currentPassword ?? ''),
+      String(body.username ?? ''),
+      String(body.newPassword ?? ''),
+    );
     if (!result.ok) return res.status(400).json(result);
-    await writeAudit(actor, 'user.credentials.change', 'user', String(actor.id), { from: result.oldUsername, to: result.username, passwordChanged: Boolean(body.newPassword) });
+    await writeAudit(actor, 'user.credentials.change', 'user', String(actor.id), {
+      from: result.oldUsername,
+      to: result.username,
+      passwordChanged: Boolean(body.newPassword),
+    });
     return res.json({ ok: true, username: result.username, message: 'Credentials changed. Please sign in again.' });
   }
   if (req.method === 'POST' && action === 'change-own-password') {
-    const result = await changeOwnPassword(actor.id, String(body.currentPassword ?? ''), String(body.newPassword ?? ''));
+    const result = await changeOwnPassword(
+      actor.id,
+      String(body.currentPassword ?? ''),
+      String(body.newPassword ?? ''),
+    );
     if (!result.ok) return res.status(400).json(result);
     await writeAudit(actor, 'user.password.change', 'user', String(actor.id));
     return res.json({ ok: true, message: 'Password changed. Please sign in again.' });
@@ -177,12 +340,20 @@ async function handleUsers(req: VercelRequest, res: VercelResponse, actor: Admin
   if (req.method === 'POST' && action === 'change-own-username') {
     const result = await changeOwnUsername(actor.id, String(body.currentPassword ?? ''), String(body.username ?? ''));
     if (!result.ok) return res.status(400).json(result);
-    await writeAudit(actor, 'user.username.change', 'user', String(actor.id), { from: result.oldUsername, to: text(body.username, 40) });
+    await writeAudit(actor, 'user.username.change', 'user', String(actor.id), {
+      from: result.oldUsername,
+      to: text(body.username, 40),
+    });
     return res.json({ ok: true, message: 'Username changed. Please sign in again.' });
   }
   if (req.method === 'GET') {
     if (!hasPermission(actor, 'user.read')) return res.status(403).json({ ok: false, error: 'Forbidden' });
-    return res.json({ ok: true, users: await listUsers(actor), roles: await listRoles(), permissions: ALL_PERMISSIONS });
+    return res.json({
+      ok: true,
+      users: await listUsers(actor),
+      roles: await listRoles(),
+      permissions: ALL_PERMISSIONS,
+    });
   }
   if (action === 'create') {
     if (!hasPermission(actor, 'user.create')) return res.status(403).json({ ok: false, error: 'Forbidden' });
@@ -190,27 +361,38 @@ async function handleUsers(req: VercelRequest, res: VercelResponse, actor: Admin
     const displayName = text(body.displayName, 80) || username;
     const password = String(body.password ?? '');
     const roleId = text(body.roleId, 80);
-    if (!/^[A-Za-z0-9._-]{3,40}$/.test(username)) return res.status(400).json({ ok: false, field: 'username', error: '用户名需为 3-40 位字母、数字、点、横线或下划线' });
+    if (!/^[A-Za-z0-9._-]{3,40}$/.test(username))
+      return res
+        .status(400)
+        .json({ ok: false, field: 'username', error: '用户名需为 3-40 位字母、数字、点、横线或下划线' });
     if (!displayName) return res.status(400).json({ ok: false, field: 'displayName', error: '请输入显示名称' });
-    if (password.length < 8) return res.status(400).json({ ok: false, field: 'password', error: '初始密码至少需要 8 位' });
+    if (password.length < 8)
+      return res.status(400).json({ ok: false, field: 'password', error: '初始密码至少需要 8 位' });
     const role = await delegatedRole(actor, roleId);
     if (!role) return res.status(403).json({ ok: false, field: 'roleId', error: '不能授予超出当前账号的角色权限' });
-    const nextScopes = roleId === 'super_admin' ? [{ type: 'all' as const, gradeId: '', classId: '' }] : scopes(body.scopes);
+    const nextScopes =
+      roleId === 'super_admin' ? [{ type: 'all' as const, gradeId: '', classId: '' }] : scopes(body.scopes);
     const scopeError = roleScopeError(roleId, nextScopes);
     if (scopeError) return res.status(400).json({ ok: false, field: 'scopes', error: scopeError });
     const allScopeOnlyError = allScopeOnlyPermissionError(role.permissions, nextScopes);
     if (allScopeOnlyError) return res.status(400).json({ ok: false, field: 'scopes', error: allScopeOnlyError });
-    if (!canDelegateScopes(actor, nextScopes)) return res.status(403).json({ ok: false, field: 'scopes', error: '不能授予超出当前账号的数据范围' });
+    if (!canDelegateScopes(actor, nextScopes))
+      return res.status(403).json({ ok: false, field: 'scopes', error: '不能授予超出当前账号的数据范围' });
     const { hash, salt } = await makePasswordHash(password);
     const at = Date.now();
     try {
-      const inserted = await sql`INSERT INTO app_users (username, display_name, password_hash, password_salt, role_id, status, must_change_password, token_version, created_at, updated_at)
-        VALUES (${username}, ${displayName}, ${hash}, ${salt}, ${roleId}, 'active', TRUE, 1, ${at}, ${at}) RETURNING id` as unknown as Array<{ id: number }>;
+      const inserted = assertRows(
+        await sql`INSERT INTO app_users (username, display_name, password_hash, password_salt, role_id, status, must_change_password, token_version, created_at, updated_at)
+        VALUES (${username}, ${displayName}, ${hash}, ${salt}, ${roleId}, 'active', TRUE, 1, ${at}, ${at}) RETURNING id`,
+        isIdRow,
+        'app_users',
+      );
       await replaceScopes(Number(inserted[0].id), nextScopes);
       await writeAudit(actor, 'user.create', 'user', String(inserted[0].id), { username, roleId });
       return res.json({ ok: true, users: await listUsers(actor) });
     } catch (error) {
-      if (/unique/i.test(error instanceof Error ? error.message : String(error))) return res.status(409).json({ ok: false, field: 'username', error: '用户名已存在' });
+      if (/unique/i.test(error instanceof Error ? error.message : String(error)))
+        return res.status(409).json({ ok: false, field: 'username', error: '用户名已存在' });
       throw error;
     }
   }
@@ -221,40 +403,60 @@ async function handleUsers(req: VercelRequest, res: VercelResponse, actor: Admin
     const roleId = text(body.roleId, 80);
     const status = body.status === 'disabled' ? 'disabled' : 'active';
     if (!Number.isFinite(id) || !displayName) return res.status(400).json({ ok: false, error: '用户信息不完整' });
-    if (!await canManageTarget(actor, id)) return res.status(403).json({ ok: false, error: '不能修改超出当前账号管理范围的用户' });
-    const existing = await sql`SELECT role_id, status FROM app_users WHERE id=${id}` as unknown as Array<{ role_id: string; status: string }>;
+    if (!(await canManageTarget(actor, id)))
+      return res.status(403).json({ ok: false, error: '不能修改超出当前账号管理范围的用户' });
+    const existing = assertRows(
+      await sql`SELECT role_id, status FROM app_users WHERE id=${id}`,
+      isUserRoleStatusRow,
+      'app_users',
+    );
     if (!existing[0]) return res.status(404).json({ ok: false, error: '用户不存在' });
-    if (id === actor.id && (status !== 'active' || roleId !== actor.roleId)) return res.status(400).json({ ok: false, error: '不能停用自己或修改自己的角色' });
-    if (status !== existing[0].status && !hasPermission(actor, 'user.disable')) return res.status(403).json({ ok: false, error: '无权启用或停用用户' });
+    if (id === actor.id && (status !== 'active' || roleId !== actor.roleId))
+      return res.status(400).json({ ok: false, error: '不能停用自己或修改自己的角色' });
+    if (status !== existing[0].status && !hasPermission(actor, 'user.disable'))
+      return res.status(403).json({ ok: false, error: '无权启用或停用用户' });
     const role = await delegatedRole(actor, roleId);
     if (!role) return res.status(403).json({ ok: false, error: '不能授予超出当前账号的角色权限' });
-    const nextScopes = roleId === 'super_admin' ? [{ type: 'all' as const, gradeId: '', classId: '' }] : scopes(body.scopes);
+    const nextScopes =
+      roleId === 'super_admin' ? [{ type: 'all' as const, gradeId: '', classId: '' }] : scopes(body.scopes);
     const scopeError = roleScopeError(roleId, nextScopes);
     if (scopeError) return res.status(400).json({ ok: false, field: 'scopes', error: scopeError });
     const allScopeOnlyError = allScopeOnlyPermissionError(role.permissions, nextScopes);
     if (allScopeOnlyError) return res.status(400).json({ ok: false, field: 'scopes', error: allScopeOnlyError });
-    if (!canDelegateScopes(actor, nextScopes)) return res.status(403).json({ ok: false, error: '不能授予超出当前账号的数据范围' });
-    if (!await ensureNotLastSuperAdmin(id, roleId, status)) return res.status(400).json({ ok: false, error: '必须至少保留一个启用的超级管理员' });
+    if (!canDelegateScopes(actor, nextScopes))
+      return res.status(403).json({ ok: false, error: '不能授予超出当前账号的数据范围' });
+    if (!(await ensureNotLastSuperAdmin(id, roleId, status)))
+      return res.status(400).json({ ok: false, error: '必须至少保留一个启用的超级管理员' });
     await invalidateLegacySharedToken();
-    const transactionResults = await sql.transaction(transaction => [
+    const transactionResults = await sql.transaction((transaction) => [
       transaction`UPDATE app_users SET display_name=${displayName}, role_id=${roleId}, status=${status}, token_version=token_version+1, updated_at=${Date.now()} WHERE id=${id} RETURNING id`,
       transaction`DELETE FROM app_user_scopes WHERE user_id=${id}`,
-      ...nextScopes.map(scope => transaction`INSERT INTO app_user_scopes (user_id, scope_type, grade_id, class_id)
-        VALUES (${id}, ${scope.type}, ${scope.gradeId}, ${scope.classId}) ON CONFLICT DO NOTHING`),
-    ]) as unknown as Array<Array<{ id: number }>>;
-    const updated = transactionResults[0] ?? [];
+      ...nextScopes.map(
+        (scope) => transaction`INSERT INTO app_user_scopes (user_id, scope_type, grade_id, class_id)
+        VALUES (${id}, ${scope.type}, ${scope.gradeId}, ${scope.classId}) ON CONFLICT DO NOTHING`,
+      ),
+    ]);
+    const updated = assertRows(transactionResults[0] ?? [], isIdRow, 'app_users');
     if (!updated.length) return res.status(404).json({ ok: false, error: '用户不存在' });
     await writeAudit(actor, 'user.update', 'user', String(id), { roleId, status });
     return res.json({ ok: true, users: await listUsers(actor) });
   }
   if (action === 'reset-password') {
     if (!hasPermission(actor, 'user.reset_password')) return res.status(403).json({ ok: false, error: 'Forbidden' });
-    const id = Number(body.id); const password = String(body.password ?? '');
-    if (!Number.isFinite(id) || password.length < 8) return res.status(400).json({ ok: false, error: '新密码至少需要 8 位' });
-    if (!await canManageTarget(actor, id)) return res.status(403).json({ ok: false, error: '不能重置超出当前账号管理范围的用户密码' });
-    const target = await sql`SELECT r.permissions FROM app_users u JOIN app_roles r ON r.id=u.role_id WHERE u.id=${id}` as unknown as Array<{ permissions: unknown }>;
+    const id = Number(body.id);
+    const password = String(body.password ?? '');
+    if (!Number.isFinite(id) || password.length < 8)
+      return res.status(400).json({ ok: false, error: '新密码至少需要 8 位' });
+    if (!(await canManageTarget(actor, id)))
+      return res.status(403).json({ ok: false, error: '不能重置超出当前账号管理范围的用户密码' });
+    const target = assertRows(
+      await sql`SELECT r.permissions FROM app_users u JOIN app_roles r ON r.id=u.role_id WHERE u.id=${id}`,
+      isPermissionsRow,
+      'app_users',
+    );
     if (!target[0]) return res.status(404).json({ ok: false, error: '用户不存在' });
-    if (!canDelegatePermissions(actor, jsonPermissions(target[0].permissions))) return res.status(403).json({ ok: false, error: '不能重置权限高于当前账号的用户密码' });
+    if (!canDelegatePermissions(actor, jsonPermissions(target[0].permissions)))
+      return res.status(403).json({ ok: false, error: '不能重置权限高于当前账号的用户密码' });
     const { hash, salt } = await makePasswordHash(password);
     await invalidateLegacySharedToken();
     await sql`UPDATE app_users SET password_hash=${hash}, password_salt=${salt}, must_change_password=TRUE, token_version=token_version+1, updated_at=${Date.now()} WHERE id=${id}`;
@@ -266,14 +468,27 @@ async function handleUsers(req: VercelRequest, res: VercelResponse, actor: Admin
     const id = Number(body.id);
     if (!Number.isFinite(id)) return res.status(400).json({ ok: false, error: '用户信息不完整' });
     if (id === actor.id) return res.status(400).json({ ok: false, error: '不能删除当前登录账号' });
-    if (!await canManageTarget(actor, id)) return res.status(403).json({ ok: false, error: '不能删除超出当前账号管理范围的用户' });
-    const target = await sql`SELECT username, role_id, status FROM app_users WHERE id=${id}` as unknown as Array<{ username: string; role_id: string; status: string }>;
+    if (!(await canManageTarget(actor, id)))
+      return res.status(403).json({ ok: false, error: '不能删除超出当前账号管理范围的用户' });
+    const target = assertRows(
+      await sql`SELECT username, role_id, status FROM app_users WHERE id=${id}`,
+      isTargetInfoRow,
+      'app_users',
+    );
     if (!target[0]) return res.status(404).json({ ok: false, error: '用户不存在' });
     if (target[0].role_id === 'super_admin' && target[0].status === 'active') {
-      const count = await sql`SELECT COUNT(*)::int AS count FROM app_users WHERE role_id='super_admin' AND status='active'` as unknown as Array<{ count: number }>;
-      if (Number(count[0]?.count) <= 1) return res.status(400).json({ ok: false, error: '必须至少保留一个启用的超级管理员' });
+      const count = assertRows(
+        await sql`SELECT COUNT(*)::int AS count FROM app_users WHERE role_id='super_admin' AND status='active'`,
+        isCountRow,
+        'app_users',
+      );
+      if (Number(count[0]?.count) <= 1)
+        return res.status(400).json({ ok: false, error: '必须至少保留一个启用的超级管理员' });
     }
-    await writeAudit(actor, 'user.delete', 'user', String(id), { username: target[0].username, roleId: target[0].role_id });
+    await writeAudit(actor, 'user.delete', 'user', String(id), {
+      username: target[0].username,
+      roleId: target[0].role_id,
+    });
     await sql`DELETE FROM app_users WHERE id=${id}`;
     return res.json({ ok: true, users: await listUsers(actor) });
   }
@@ -282,22 +497,34 @@ async function handleUsers(req: VercelRequest, res: VercelResponse, actor: Admin
 
 async function handleRoles(req: VercelRequest, res: VercelResponse, actor: AdminActor) {
   if (!hasPermission(actor, 'role.manage')) return res.status(403).json({ ok: false, error: 'Forbidden' });
-  const sql = authSql(); const body = req.body ?? {};
+  const sql = authSql();
+  const body = req.body ?? {};
   if (req.method === 'GET') return res.json({ ok: true, roles: await listRoles(), permissions: ALL_PERMISSIONS });
   const action = text(body.action, 40);
   if (action === 'save') {
-    const rawId = text(body.id, 80); const name = text(body.name, 80); const permissions = jsonPermissions(body.permissions);
+    const rawId = text(body.id, 80);
+    const name = text(body.name, 80);
+    const permissions = jsonPermissions(body.permissions);
     if (!name || !permissions.length) return res.status(400).json({ ok: false, error: '角色名称和权限不能为空' });
-    if (!canDelegatePermissions(actor, permissions)) return res.status(403).json({ ok: false, error: '不能创建权限高于当前账号的角色' });
+    if (!canDelegatePermissions(actor, permissions))
+      return res.status(403).json({ ok: false, error: '不能创建权限高于当前账号的角色' });
     const id = rawId || `role_${randomBytes(6).toString('hex')}`;
-    const existing = await sql`SELECT built_in FROM app_roles WHERE id=${id}` as unknown as Array<{ built_in: boolean }>;
+    const existing = assertRows(await sql`SELECT built_in FROM app_roles WHERE id=${id}`, isBuiltInRow, 'app_roles');
     if (existing[0]?.built_in) return res.status(400).json({ ok: false, error: '内置角色不可修改，请创建自定义角色' });
-    const builtinRoleNames = new Set(['\u8d85\u7ea7\u7ba1\u7406\u5458', '\u5e74\u7ea7\u7ba1\u7406\u5458', '\u73ed\u7ea7\u7ba1\u7406\u5458', '\u53ea\u8bfb\u7528\u6237']);
+    const builtinRoleNames = new Set([
+      '\u8d85\u7ea7\u7ba1\u7406\u5458',
+      '\u5e74\u7ea7\u7ba1\u7406\u5458',
+      '\u73ed\u7ea7\u7ba1\u7406\u5458',
+      '\u53ea\u8bfb\u7528\u6237',
+    ]);
     const normalizedName = name.trim();
     if (builtinRoleNames.has(normalizedName)) {
       return res.status(400).json({
         ok: false,
-        error: '\u201c' + normalizedName + '\u201d\u4e3a\u7cfb\u7edf\u5185\u7f6e\u89d2\u8272\u540d\u79f0\uff0c\u8bf7\u4e3a\u81ea\u5b9a\u4e49\u89d2\u8272\u4f7f\u7528\u5176\u4ed6\u540d\u79f0\uff0c\u907f\u514d\u4e0e\u771f\u5b9e\u7ba1\u7406\u5458\u8eab\u4efd\u6df7\u6dc6',
+        error:
+          '\u201c' +
+          normalizedName +
+          '\u201d\u4e3a\u7cfb\u7edf\u5185\u7f6e\u89d2\u8272\u540d\u79f0\uff0c\u8bf7\u4e3a\u81ea\u5b9a\u4e49\u89d2\u8272\u4f7f\u7528\u5176\u4ed6\u540d\u79f0\uff0c\u907f\u514d\u4e0e\u771f\u5b9e\u7ba1\u7406\u5458\u8eab\u4efd\u6df7\u6dc6',
       });
     }
     const at = Date.now();
@@ -309,10 +536,14 @@ async function handleRoles(req: VercelRequest, res: VercelResponse, actor: Admin
   }
   if (action === 'delete') {
     const id = text(body.id, 80);
-    const role = await sql`SELECT built_in FROM app_roles WHERE id=${id}` as unknown as Array<{ built_in: boolean }>;
+    const role = assertRows(await sql`SELECT built_in FROM app_roles WHERE id=${id}`, isBuiltInRow, 'app_roles');
     if (!role.length) return res.status(404).json({ ok: false, error: '角色不存在' });
     if (role[0].built_in) return res.status(400).json({ ok: false, error: '内置角色不可删除' });
-    const used = await sql`SELECT COUNT(*)::int AS count FROM app_users WHERE role_id=${id}` as unknown as Array<{ count: number }>;
+    const used = assertRows(
+      await sql`SELECT COUNT(*)::int AS count FROM app_users WHERE role_id=${id}`,
+      isCountRow,
+      'app_users',
+    );
     if (Number(used[0]?.count) > 0) return res.status(409).json({ ok: false, error: '该角色仍有用户，不能删除' });
     await sql`DELETE FROM app_roles WHERE id=${id}`;
     await writeAudit(actor, 'role.delete', 'role', id);
@@ -325,16 +556,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   requestId(req, res);
   res.setHeader('Cache-Control', 'no-store');
   if (!applyCors(req, res, { methods: ['GET', 'POST'] })) return;
-  if (req.method !== 'GET' && req.method !== 'POST') { res.status(405).json({ ok: false, error: 'Method not allowed' }); return; }
+  if (req.method !== 'GET' && req.method !== 'POST') {
+    res.status(405).json({ ok: false, error: 'Method not allowed' });
+    return;
+  }
   try {
     await ensureAuthTables();
-    const ownAccountChange = req.method === 'POST' && text(req.body?.resource, 30) === 'users' && ['change-own-password', 'change-own-username', 'change-own-credentials'].includes(text(req.body?.action, 40));
+    const ownAccountChange =
+      req.method === 'POST' &&
+      text(req.body?.resource, 30) === 'users' &&
+      ['change-own-password', 'change-own-username', 'change-own-credentials'].includes(text(req.body?.action, 40));
     const actor = await requireActor(req, res, undefined, ownAccountChange);
     if (!actor) return;
     const resource = text(req.method === 'GET' ? req.query?.resource : req.body?.resource, 30) || 'users';
     if (resource === 'roles') return await handleRoles(req, res, actor);
     if (resource === 'audit') {
-      if (!hasPermission(actor, 'audit.read') || !canReadAuditLog(actor)) return res.status(403).json({ ok: false, error: 'Forbidden' });
+      if (!hasPermission(actor, 'audit.read') || !canReadAuditLog(actor))
+        return res.status(403).json({ ok: false, error: 'Forbidden' });
       const [logs, loginFailureAlerts] = await Promise.all([
         authSql()`SELECT id, user_id AS "userId", username, action, resource_type AS "resourceType", resource_id AS "resourceId", grade_id AS "gradeId", class_id AS "classId", detail, created_at AS "createdAt" FROM app_audit_logs ORDER BY created_at DESC LIMIT 300`,
         getRecentLoginFailureAlerts(),

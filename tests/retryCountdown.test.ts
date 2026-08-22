@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { computeLockedUntil, computeRemainingSeconds, formatRetryMessage, loginLockoutRetryAfterMs } from '../src/utils/retryCountdown.js';
+import {
+  computeLockedUntil,
+  computeRemainingSeconds,
+  formatRetryMessage,
+  loginLockoutRetryAfterMs,
+} from '../src/utils/retryCountdown.js';
 
 const NOW = 1_700_000_000_000;
 

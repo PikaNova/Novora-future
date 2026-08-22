@@ -1,5 +1,5 @@
 export type QuickMajorLike = {
-  source?: "regular" | "quick";
+  source?: 'regular' | 'quick';
   temporary?: boolean;
   createdBy?: number;
   targetClassIds?: string[];
@@ -18,7 +18,7 @@ export function isQuickTemporaryMajorFullyInScope(
   canAccessClassId: (classId: string) => boolean,
   canAccessGradeId: (gradeId: string) => boolean,
 ): boolean {
-  if (!major || major.source !== "quick" || major.temporary !== true) return false;
+  if (!major || major.source !== 'quick' || major.temporary !== true) return false;
   const classIds = major.targetClassIds ?? [];
   if (classIds.length) return classIds.every(canAccessClassId);
   const gradeIds = major.targetGradeIds ?? [];
@@ -30,6 +30,6 @@ export function isOwnQuickTemporaryMajor(
   adminUserId: number | null | undefined,
 ): boolean {
   if (!major || adminUserId == null) return false;
-  if (major.source !== "quick" || major.temporary !== true) return false;
+  if (major.source !== 'quick' || major.temporary !== true) return false;
   return major.createdBy === adminUserId;
 }

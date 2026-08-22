@@ -1,6 +1,6 @@
 // 核心考试数据读写路由：初始化引导信息、带 ETag 的读取、乐观并发写入。
 // 从 api/exams.ts 拆分而来，逻辑与对外行为保持不变。
-import type { VercelRequest, VercelResponse } from "@vercel/node";
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 import {
   acquireWriteSlotOrReject,
   database,
@@ -8,15 +8,11 @@ import {
   ensureUpdatedAtBigIntOnce,
   missingRelation,
   updatedAtIntegerOverflow,
-} from "../db.js";
-import { examPayload } from "../payload.js";
-import {
-  isolateQuickMajorCreate,
-  sanitizeStaleSnapshot,
-  validateMutation,
-} from "../permissions.js";
-import { computeRemovedScopeIds } from "../scopeCleanup.js";
-import type { ExamRow, UpdatedRow } from "../types.js";
+} from '../db.js';
+import { examPayload } from '../payload.js';
+import { isolateQuickMajorCreate, sanitizeStaleSnapshot, validateMutation } from '../permissions.js';
+import { computeRemovedScopeIds } from '../scopeCleanup.js';
+import type { ExamRow, UpdatedRow } from '../types.js';
 import {
   type AdminActor,
   authSql,
@@ -24,20 +20,20 @@ import {
   isPasswordRequired,
   requireActor,
   writeAudit,
-} from "../../_auth.js";
+} from '../../_auth.js';
 
 export async function handleBootstrap(req: VercelRequest, res: VercelResponse, startedAt: number): Promise<void> {
   const sql = database();
-  res.setHeader("Cache-Control", "private, no-store");
-  if (req.method !== "GET") {
-    res.status(405).json({ ok: false, error: "Method not allowed" });
+  res.setHeader('Cache-Control', 'private, no-store');
+  if (req.method !== 'GET') {
+    res.status(405).json({ ok: false, error: 'Method not allowed' });
     return;
   }
-  const instanceId = String(req.query?.instanceId ?? "")
+  const instanceId = String(req.query?.instanceId ?? '')
     .trim()
     .slice(0, 128);
   if (!instanceId) {
-    res.status(400).json({ ok: false, error: "instanceId is required" });
+    res.status(400).json({ ok: false, error: 'instanceId is required' });
     return;
   }
   const selectBootstrap = async (): Promise<ExamRow[]> =>
@@ -60,22 +56,19 @@ export async function handleBootstrap(req: VercelRequest, res: VercelResponse, s
     rows = await selectBootstrap();
   }
   const row = rows[0] ?? {};
-  res.setHeader("Server-Timing", `app;dur=${Date.now() - startedAt}`);
-  const hasDeviceBinding =
-    row.bound_class_id != null || row.binding_is_management === true;
-  res
-    .status(200)
-    .json({
-      ...examPayload(row),
-      binding: hasDeviceBinding
-        ? {
-            gradeId: row.bound_grade_id ?? "",
-            classId: row.bound_class_id ?? "",
-            revoked: row.binding_revoked === true,
-            isManagement: row.binding_is_management === true,
-          }
-        : null,
-    });
+  res.setHeader('Server-Timing', `app;dur=${Date.now() - startedAt}`);
+  const hasDeviceBinding = row.bound_class_id != null || row.binding_is_management === true;
+  res.status(200).json({
+    ...examPayload(row),
+    binding: hasDeviceBinding
+      ? {
+          gradeId: row.bound_grade_id ?? '',
+          classId: row.bound_class_id ?? '',
+          revoked: row.binding_revoked === true,
+          isManagement: row.binding_is_management === true,
+        }
+      : null,
+  });
   return;
 }
 
@@ -100,27 +93,27 @@ export async function handleExamDataGet(req: VercelRequest, res: VercelResponse,
   }
   const row = rows[0] ?? {
     items: [],
-    title: "",
+    title: '',
     majors: [],
-    active_major_id: "",
+    active_major_id: '',
     alerts: null,
     weekly_plans: [],
-    schedule_mode: "major-only",
-    active_weekly_plan_id: "",
+    schedule_mode: 'major-only',
+    active_weekly_plan_id: '',
     active_weekly_plan_by_class: {},
     weekly_conflict_policy: null,
     updated_at: 0,
   };
   const payload = examPayload(row);
   const body = JSON.stringify(payload);
-  const etag = `\"exam-${payload.updatedAt}\"`;
-  res.setHeader("ETag", etag);
-  if (req.headers["if-none-match"] === etag) {
+  const etag = `"exam-${payload.updatedAt}"`;
+  res.setHeader('ETag', etag);
+  if (req.headers['if-none-match'] === etag) {
     res.status(304).end();
     return;
   }
-  res.setHeader("Server-Timing", `app;dur=${Date.now() - startedAt}`);
-  res.setHeader("Content-Type", "application/json");
+  res.setHeader('Server-Timing', `app;dur=${Date.now() - startedAt}`);
+  res.setHeader('Content-Type', 'application/json');
   res.status(200).send(body);
   return;
 }
@@ -134,10 +127,10 @@ export async function handleExamDataPost(req: VercelRequest, res: VercelResponse
   }
   const { action } = req.body ?? {};
   if (!Array.isArray(req.body?.items)) {
-    res.status(400).json({ ok: false, error: "items must be an array" });
+    res.status(400).json({ ok: false, error: 'items must be an array' });
     return;
   }
-  if (actor || action === "initialize") {
+  if (actor || action === 'initialize') {
     let currentRows: ExamRow[];
     try {
       currentRows =
@@ -149,33 +142,27 @@ export async function handleExamDataPost(req: VercelRequest, res: VercelResponse
         (await sql`SELECT items, title, majors, active_major_id, alerts, weekly_plans, schedule_mode, active_weekly_plan_id, active_weekly_plan_by_class, weekly_conflict_policy, grades, classes, initialization, design_policy, major_batch_presets, updated_at FROM exam_data WHERE id=1`) as unknown as ExamRow[];
     }
     const currentPayload = examPayload(currentRows[0] ?? {});
-    if (action === "initialize") {
+    if (action === 'initialize') {
       const alreadyInitialized =
-        Number((currentPayload.initialization as any)?.completedAt ?? 0) >
-          0 ||
+        Number((currentPayload.initialization as { completedAt?: unknown } | null)?.completedAt ?? 0) > 0 ||
         currentPayload.grades.length > 0 ||
         currentPayload.classes.length > 0;
       if (alreadyInitialized) {
-        res
-          .status(409)
-          .json({
-            ok: false,
-            code: "ALREADY_INITIALIZED",
-            error:
-              "云端已经存在学校结构，请在年级与班级页面调整，或先从数据维护中重置学校数据",
-            requestId: res.getHeader("X-Request-Id"),
-          });
+        res.status(409).json({
+          ok: false,
+          code: 'ALREADY_INITIALIZED',
+          error: '云端已经存在学校结构，请在年级与班级页面调整，或先从数据维护中重置学校数据',
+          requestId: res.getHeader('X-Request-Id'),
+        });
         return;
       }
-      if (actor && !actor.permissions.includes("*")) {
-        res
-          .status(403)
-          .json({
-            ok: false,
-            code: "PERMISSION_DENIED",
-            error: "只有超级管理员可以执行首次初始化",
-            requestId: res.getHeader("X-Request-Id"),
-          });
+      if (actor && !actor.permissions.includes('*')) {
+        res.status(403).json({
+          ok: false,
+          code: 'PERMISSION_DENIED',
+          error: '只有超级管理员可以执行首次初始化',
+          requestId: res.getHeader('X-Request-Id'),
+        });
         return;
       }
     }
@@ -185,19 +172,13 @@ export async function handleExamDataPost(req: VercelRequest, res: VercelResponse
         currentPayload,
         isolateQuickMajorCreate(actor, currentPayload, req.body ?? {}),
       );
-      const permission = validateMutation(
-        actor,
-        currentPayload,
-        req.body ?? {},
-      );
+      const permission = validateMutation(actor, currentPayload, req.body ?? {});
       if (!permission.ok) {
-        res
-          .status(403)
-          .json({
-            ...permission,
-            code: "PERMISSION_DENIED",
-            requestId: res.getHeader("X-Request-Id"),
-          });
+        res.status(403).json({
+          ...permission,
+          code: 'PERMISSION_DENIED',
+          requestId: res.getHeader('X-Request-Id'),
+        });
         return;
       }
     }
@@ -233,31 +214,26 @@ export async function handleExamDataPost(req: VercelRequest, res: VercelResponse
     const priorClasses = Array.isArray(priorRows[0]?.classes)
       ? (priorRows[0].classes as Array<Record<string, unknown>>)
       : [];
-    ({ removedGradeIds, removedClassIds } = computeRemovedScopeIds(
-      priorGrades,
-      priorClasses,
-      grades,
-      classes,
-    ));
+    ({ removedGradeIds, removedClassIds } = computeRemovedScopeIds(priorGrades, priorClasses, grades, classes));
   }
   if (!(await acquireWriteSlotOrReject(req, res))) return;
   const runUpdate = async (): Promise<UpdatedRow[]> =>
     (await sql`
       UPDATE exam_data
       SET items = ${JSON.stringify(items)}::jsonb,
-          title = ${typeof title === "string" ? title : ""},
+          title = ${typeof title === 'string' ? title : ''},
           majors = ${JSON.stringify(Array.isArray(majors) ? majors : [])}::jsonb,
-          active_major_id = ${typeof activeMajorId === "string" ? activeMajorId : ""},
-          alerts = ${alerts && typeof alerts === "object" ? JSON.stringify(alerts) : null}::jsonb,
+          active_major_id = ${typeof activeMajorId === 'string' ? activeMajorId : ''},
+          alerts = ${alerts && typeof alerts === 'object' ? JSON.stringify(alerts) : null}::jsonb,
           -- 周测字段：仅当请求显式携带时才覆写，否则 COALESCE 保留既有值（后台保存不带周测→不丢失）。
           weekly_plans = COALESCE(${weeklyPlans !== undefined ? JSON.stringify(Array.isArray(weeklyPlans) ? weeklyPlans : []) : null}::jsonb, weekly_plans),
-          schedule_mode = COALESCE(${typeof scheduleMode === "string" ? scheduleMode : null}, schedule_mode),
-          active_weekly_plan_id = COALESCE(${typeof activeWeeklyPlanId === "string" ? activeWeeklyPlanId : null}, active_weekly_plan_id),
-          active_weekly_plan_by_class = COALESCE(${activeWeeklyPlanIdByClassId && typeof activeWeeklyPlanIdByClassId === "object" ? JSON.stringify(activeWeeklyPlanIdByClassId) : null}::jsonb, active_weekly_plan_by_class),
+          schedule_mode = COALESCE(${typeof scheduleMode === 'string' ? scheduleMode : null}, schedule_mode),
+          active_weekly_plan_id = COALESCE(${typeof activeWeeklyPlanId === 'string' ? activeWeeklyPlanId : null}, active_weekly_plan_id),
+          active_weekly_plan_by_class = COALESCE(${activeWeeklyPlanIdByClassId && typeof activeWeeklyPlanIdByClassId === 'object' ? JSON.stringify(activeWeeklyPlanIdByClassId) : null}::jsonb, active_weekly_plan_by_class),
           grades = COALESCE(${Array.isArray(grades) ? JSON.stringify(grades) : null}::jsonb, grades),
           classes = COALESCE(${Array.isArray(classes) ? JSON.stringify(classes) : null}::jsonb, classes),
-          initialization = COALESCE(${initialization && typeof initialization === "object" ? JSON.stringify(initialization) : null}::jsonb, initialization),
-          weekly_conflict_policy = COALESCE(${weeklyConflictPolicy && typeof weeklyConflictPolicy === "object" ? JSON.stringify(weeklyConflictPolicy) : null}::jsonb, weekly_conflict_policy),
+          initialization = COALESCE(${initialization && typeof initialization === 'object' ? JSON.stringify(initialization) : null}::jsonb, initialization),
+          weekly_conflict_policy = COALESCE(${weeklyConflictPolicy && typeof weeklyConflictPolicy === 'object' ? JSON.stringify(weeklyConflictPolicy) : null}::jsonb, weekly_conflict_policy),
           updated_at = ${updatedAt}
       -- 显式 BIGINT：毫秒级 baseUpdatedAt 不能在与字面量 0 比较时被 PostgreSQL 推断为 INTEGER。
       WHERE id = 1 AND (${expectedVersion}::BIGINT <= 0 OR updated_at = ${expectedVersion}::BIGINT)
@@ -283,39 +259,32 @@ export async function handleExamDataPost(req: VercelRequest, res: VercelResponse
       (await sql`SELECT items, title, majors, active_major_id, alerts, weekly_plans, schedule_mode, active_weekly_plan_id, active_weekly_plan_by_class, weekly_conflict_policy, grades, classes, initialization, design_policy, major_batch_presets, updated_at FROM exam_data WHERE id = 1`) as unknown as ExamRow[];
     const row = rows[0] ?? {};
     const { ok: _ok, ...remote } = examPayload(row);
-    res
-      .status(409)
-      .json({
-        ok: false,
-        code: "DATA_CONFLICT",
-        error: "云端数据已发生变化",
-        remote,
-        requestId: res.getHeader("X-Request-Id"),
-      });
+    res.status(409).json({
+      ok: false,
+      code: 'DATA_CONFLICT',
+      error: '云端数据已发生变化',
+      remote,
+      requestId: res.getHeader('X-Request-Id'),
+    });
     return;
   }
   if (removedGradeIds.length || removedClassIds.length) {
     const authDb = authSql();
     await Promise.all([
       ...removedClassIds.map(
-        (classId) =>
-          authDb`DELETE FROM app_user_scopes WHERE scope_type = 'class' AND class_id = ${classId}`,
+        (classId) => authDb`DELETE FROM app_user_scopes WHERE scope_type = 'class' AND class_id = ${classId}`,
       ),
       ...removedGradeIds.map(
-        (gradeId) =>
-          authDb`DELETE FROM app_user_scopes WHERE scope_type = 'grade' AND grade_id = ${gradeId}`,
+        (gradeId) => authDb`DELETE FROM app_user_scopes WHERE scope_type = 'grade' AND grade_id = ${gradeId}`,
       ),
     ]);
   }
-  const recoveryKey =
-    action === "initialize" ? await ensureGeneratedRecoveryKey() : null;
+  const recoveryKey = action === 'initialize' ? await ensureGeneratedRecoveryKey() : null;
   if (actor)
-    await writeAudit(actor, "exam-data.update", "exam_data", "1", {
+    await writeAudit(actor, 'exam-data.update', 'exam_data', '1', {
       updatedAt,
     });
-  res.setHeader("Server-Timing", `app;dur=${Date.now() - startedAt}`);
-  res
-    .status(200)
-    .json({ ok: true, updatedAt, ...(recoveryKey ? { recoveryKey } : {}) });
+  res.setHeader('Server-Timing', `app;dur=${Date.now() - startedAt}`);
+  res.status(200).json({ ok: true, updatedAt, ...(recoveryKey ? { recoveryKey } : {}) });
   return;
 }

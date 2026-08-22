@@ -24,7 +24,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const body = req.body && typeof req.body === 'object' ? req.body as Record<string, unknown> : {};
+    const body = req.body && typeof req.body === 'object' ? (req.body as Record<string, unknown>) : {};
     const instanceId = str(body.instanceId, 128);
     const message = str(body.message, 2000);
     if (!instanceId || !message) {
@@ -48,7 +48,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const level = str(body.level, 16);
-    const context = body.context && typeof body.context === 'object' && !Array.isArray(body.context) ? body.context : null;
+    const context =
+      body.context && typeof body.context === 'object' && !Array.isArray(body.context) ? body.context : null;
     const payload = {
       instanceId,
       message,

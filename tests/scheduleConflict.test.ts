@@ -145,8 +145,18 @@ test('resolveMajorWeeklyConflicts: time-overlap scope only flags occurrences who
     items: [examItem({ startTime: '2025-01-15T09:00:00', endTime: '2025-01-15T10:00:00' })],
     policy: policy({ scope: 'time-overlap' }),
   });
-  const overlapping = occurrence({ id: 'occ-a', occurrenceId: 'occ-a', startTime: '2025-01-15T09:30:00', endTime: '2025-01-15T10:30:00' });
-  const nonOverlapping = occurrence({ id: 'occ-b', occurrenceId: 'occ-b', startTime: '2025-01-15T14:00:00', endTime: '2025-01-15T14:30:00' });
+  const overlapping = occurrence({
+    id: 'occ-a',
+    occurrenceId: 'occ-a',
+    startTime: '2025-01-15T09:30:00',
+    endTime: '2025-01-15T10:30:00',
+  });
+  const nonOverlapping = occurrence({
+    id: 'occ-b',
+    occurrenceId: 'occ-b',
+    startTime: '2025-01-15T14:00:00',
+    endTime: '2025-01-15T14:30:00',
+  });
   const result = resolveMajorWeeklyConflicts([block], [overlapping, nonOverlapping]);
   assert.equal(result.suppressedWeekly.length, 1);
   assert.equal(result.suppressedWeekly[0].occurrenceId, 'occ-a');

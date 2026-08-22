@@ -81,18 +81,10 @@ export type FlushResult =
 
 function readPendingExamSync(key: string): PendingExamSync | null {
   try {
-    const value = JSON.parse(
-      localStorage.getItem(key) || 'null',
-    ) as PendingExamSync | null;
-    if (
-      !value ||
-      !value.payload ||
-      !Array.isArray(value.payload.items) ||
-      !Array.isArray(value.payload.majors)
-    )
+    const value = JSON.parse(localStorage.getItem(key) || 'null') as PendingExamSync | null;
+    if (!value || !value.payload || !Array.isArray(value.payload.items) || !Array.isArray(value.payload.majors))
       return null;
-    if (value.ownerId !== undefined && (!Number.isSafeInteger(value.ownerId) || value.ownerId <= 0))
-      return null;
+    if (value.ownerId !== undefined && (!Number.isSafeInteger(value.ownerId) || value.ownerId <= 0)) return null;
     return value;
   } catch {
     return null;
@@ -110,10 +102,7 @@ export function queuePendingExamSync(pending: PendingExamSync): void {
   try {
     const ownerId = currentOwnerId();
     if (ownerId) {
-      localStorage.setItem(
-        ownerOutboxKey(ownerId),
-        JSON.stringify({ ...pending, ownerId }),
-      );
+      localStorage.setItem(ownerOutboxKey(ownerId), JSON.stringify({ ...pending, ownerId }));
     } else {
       // Do not overwrite the pre-owner legacy key. Anonymous drafts are retained but never auto-flushed.
       localStorage.setItem(ANONYMOUS_OUTBOX_KEY, JSON.stringify(pending));
@@ -145,17 +134,11 @@ export function clearPendingExamSync(savedAt?: number): void {
  * - 服务器错误：5s*2^(n-1)，上限 60s
  * - 超过 MAX_AUTO_RETRIES：设为 Infinity。
  */
-function markPendingFailure(
-  pending: PendingExamSync,
-  error: ApiError | string,
-): void {
+function markPendingFailure(pending: PendingExamSync, error: ApiError | string): void {
   const message = error instanceof ApiError ? error.message : error;
-  const isRetryable =
-    error instanceof ApiError ? error.retryable : true;
-  const isNetwork =
-    error instanceof ApiError && isNetworkError(error);
-  const isRateLimited =
-    error instanceof ApiError && isRateLimitedError(error);
+  const isRetryable = error instanceof ApiError ? error.retryable : true;
+  const isNetwork = error instanceof ApiError && isNetworkError(error);
+  const isRateLimited = error instanceof ApiError && isRateLimitedError(error);
   const retryCount = (pending.retryCount ?? 0) + 1;
 
   // 不可重试错误直接进入 max-retries 状态
@@ -184,11 +167,7 @@ function markPendingFailure(
   // 限流错误：1s*2^(n-1)，上限 8s（服务端窗口很短）
   // 网络错误：3s*2^(n-1)，上限 30s（恢复后快速重试）
   // 服务器错误：5s*2^(n-1)，上限 60s
-  const base = isRateLimited
-    ? RATE_LIMIT_RETRY_BASE_MS
-    : isNetwork
-      ? NETWORK_RETRY_BASE_MS
-      : 5_000;
+  const base = isRateLimited ? RATE_LIMIT_RETRY_BASE_MS : isNetwork ? NETWORK_RETRY_BASE_MS : 5_000;
   const cap = isRateLimited ? RATE_LIMIT_RETRY_CAP_MS : isNetwork ? 30_000 : 60_000;
   const waitMs = Math.min(cap, base * Math.pow(2, retryCount - 1));
   queuePendingExamSync({
@@ -213,11 +192,7 @@ function markPendingFailure(
  * 只比较本次待同步 payload 明确携带的字段：
  * 周测、班级等字段可能与大型考试 items/title 独立变化，不能只用大型考试镜像字段判断成功。
  */
-function detectGhostSave(
-  pending: PendingExamSync,
-  remote: ExamPayload,
-  now = nowMs(),
-): boolean {
+function detectGhostSave(pending: PendingExamSync, remote: ExamPayload, now = nowMs()): boolean {
   const base = pending.baseSnapshot?.updatedAt ?? 0;
   // remote 的 updatedAt 必须大于 base
   if (remote.updatedAt <= base) return false;
@@ -235,51 +210,26 @@ function detectGhostSave(
   if (pending.payload.weeklyPlans !== undefined)
     sameRequired.push(sameJson(pending.payload.weeklyPlans, remote.weeklyPlans));
   if (pending.payload.activeWeeklyPlanId !== undefined)
-    sameRequired.push(
-      pending.payload.activeWeeklyPlanId === remote.activeWeeklyPlanId,
-    );
+    sameRequired.push(pending.payload.activeWeeklyPlanId === remote.activeWeeklyPlanId);
   if (pending.payload.activeWeeklyPlanIdByClassId !== undefined)
-    sameRequired.push(
-      sameJson(
-        pending.payload.activeWeeklyPlanIdByClassId,
-        remote.activeWeeklyPlanIdByClassId,
-      ),
-    );
-  if (pending.payload.grades !== undefined)
-    sameRequired.push(sameJson(pending.payload.grades, remote.grades));
-  if (pending.payload.classes !== undefined)
-    sameRequired.push(sameJson(pending.payload.classes, remote.classes));
+    sameRequired.push(sameJson(pending.payload.activeWeeklyPlanIdByClassId, remote.activeWeeklyPlanIdByClassId));
+  if (pending.payload.grades !== undefined) sameRequired.push(sameJson(pending.payload.grades, remote.grades));
+  if (pending.payload.classes !== undefined) sameRequired.push(sameJson(pending.payload.classes, remote.classes));
   if (pending.payload.initialization !== undefined)
-    sameRequired.push(
-      sameJson(pending.payload.initialization, remote.initialization),
-    );
+    sameRequired.push(sameJson(pending.payload.initialization, remote.initialization));
   if (pending.payload.weeklyConflictPolicy !== undefined)
-    sameRequired.push(
-      sameJson(
-        pending.payload.weeklyConflictPolicy,
-        remote.weeklyConflictPolicy,
-      ),
-    );
+    sameRequired.push(sameJson(pending.payload.weeklyConflictPolicy, remote.weeklyConflictPolicy));
   return sameRequired.every(Boolean);
 }
 
 /** 恢复网络后冲刷本地离线编辑；若云端也变更则自动三方合并并重试。 */
-export async function flushPendingExamSync(
-  force = false,
-): Promise<FlushResult> {
+export async function flushPendingExamSync(force = false): Promise<FlushResult> {
   const pending = getPendingExamSync();
   if (!pending) return { kind: 'none' };
-  if (typeof navigator !== 'undefined' && !navigator.onLine)
-    return { kind: 'offline' };
+  if (typeof navigator !== 'undefined' && !navigator.onLine) return { kind: 'offline' };
 
-  if (!force && pending.nextRetryAt === Infinity)
-    return { kind: 'max-retries' };
-  if (
-    !force &&
-    pending.nextRetryAt &&
-    pending.nextRetryAt > Date.now()
-  )
-    return { kind: 'deferred' };
+  if (!force && pending.nextRetryAt === Infinity) return { kind: 'max-retries' };
+  if (!force && pending.nextRetryAt && pending.nextRetryAt > Date.now()) return { kind: 'deferred' };
 
   const first = await saveExamsToServer({
     ...pending.payload,
@@ -296,16 +246,10 @@ export async function flushPendingExamSync(
   if (first === 'unauthorized') return { kind: 'unauthorized' };
 
   // ── 冲突：可能是幽灵保存，也可能是真实冲突 ──────────────────────────────────────────
-  if (
-    first &&
-    typeof first === 'object' &&
-    first.kind === 'conflict'
-  ) {
+  if (first && typeof first === 'object' && first.kind === 'conflict') {
     if (first.remote && detectGhostSave(pending, first.remote)) {
       // 服务端数据与本地一致，上次 POST 已成功但响应未到达（幽灵保存）
-      console.info(
-        '[examOutbox] ghost save detected: remote matches local, accepting remote updatedAt',
-      );
+      console.info('[examOutbox] ghost save detected: remote matches local, accepting remote updatedAt');
       clearPendingExamSync(pending.savedAt);
       return {
         kind: 'saved',
@@ -316,10 +260,7 @@ export async function flushPendingExamSync(
     // 真实冲突：继续到三方合并流程
   } else {
     // null 或 { kind: 'error' }
-    const apiError =
-      first && typeof first === 'object' && first.kind === 'error'
-        ? first.error
-        : null;
+    const apiError = first && typeof first === 'object' && first.kind === 'error' ? first.error : null;
     markPendingFailure(
       pending,
       apiError ??
@@ -359,29 +300,19 @@ export async function flushPendingExamSync(
     return { kind: 'error' };
   }
 
-  if (merged.conflictCount)
-    void recordSyncConflict(merged.conflictCount, pending.payload, remote);
+  if (merged.conflictCount) void recordSyncConflict(merged.conflictCount, pending.payload, remote);
 
   const mergedPayload: PendingExamSync['payload'] = {
     ...merged.payload,
-    scheduleMode:
-      pending.payload.scheduleMode ?? remote.scheduleMode,
-    weeklyPlans:
-      pending.payload.weeklyPlans ?? remote.weeklyPlans,
+    scheduleMode: pending.payload.scheduleMode ?? remote.scheduleMode,
+    weeklyPlans: pending.payload.weeklyPlans ?? remote.weeklyPlans,
     activeWeeklyPlanId:
-      pending.payload.activeWeeklyPlanId !== undefined
-        ? pending.payload.activeWeeklyPlanId
-        : remote.activeWeeklyPlanId,
-    activeWeeklyPlanIdByClassId:
-      pending.payload.activeWeeklyPlanIdByClassId ??
-      remote.activeWeeklyPlanIdByClassId,
+      pending.payload.activeWeeklyPlanId !== undefined ? pending.payload.activeWeeklyPlanId : remote.activeWeeklyPlanId,
+    activeWeeklyPlanIdByClassId: pending.payload.activeWeeklyPlanIdByClassId ?? remote.activeWeeklyPlanIdByClassId,
     grades: pending.payload.grades ?? remote.grades,
     classes: pending.payload.classes ?? remote.classes,
-    initialization:
-      pending.payload.initialization ?? remote.initialization,
-    weeklyConflictPolicy:
-      pending.payload.weeklyConflictPolicy ??
-      remote.weeklyConflictPolicy,
+    initialization: pending.payload.initialization ?? remote.initialization,
+    weeklyConflictPolicy: pending.payload.weeklyConflictPolicy ?? remote.weeklyConflictPolicy,
   };
 
   const mergedPending: PendingExamSync = {
@@ -397,10 +328,7 @@ export async function flushPendingExamSync(
   });
   if (typeof retry !== 'number') {
     if (retry === 'unauthorized') return { kind: 'unauthorized' };
-    const retryError =
-      retry && typeof retry === 'object' && retry.kind === 'error'
-        ? retry.error
-        : null;
+    const retryError = retry && typeof retry === 'object' && retry.kind === 'error' ? retry.error : null;
     markPendingFailure(
       mergedPending,
       retryError ??

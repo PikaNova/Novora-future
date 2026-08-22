@@ -17,7 +17,54 @@ const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const PreferencesPage = lazy(() => import('./pages/PreferencesPage'));
 const LocalSettingsPage = lazy(() => import('./pages/LocalSettingsPage'));
 const PluginConnectPage = lazy(() => import('./pages/PluginConnectPage'));
-function BodyScrollLock(){const {pathname}=useLocation();useEffect(()=>{document.body.classList.toggle('lock-scroll',pathname==='/'||pathname==='/exam');return()=>document.body.classList.remove('lock-scroll')},[pathname]);return null}
-function Loading(){return <LoadingState kind="loading" />}
-function AppContent(){const location=useLocation();const {pathname}=location;React.useEffect(()=>{applyPageSeo(pathname);},[pathname]);const content=<><Suspense fallback={<Loading/>}><div key={pathname} className="app-route-transition"><Routes location={location}><Route path="/" element={<WelcomePage/>}/><Route path="/exam" element={<ExamPage/>}/><Route path="/login" element={<LoginPage/>}/><Route path="/admin" element={<AdminPage/>}/><Route path="/settings" element={<SettingsPage/>}/><Route path="/preferences" element={<PreferencesPage/>}/><Route path="/local-settings" element={<LocalSettingsPage/>}/><Route path="/plugin/connect" element={<PluginConnectPage/>}/><Route path="*" element={<Navigate to="/" replace/>}/></Routes></div></Suspense><PwaUpdateNotice/></>;return pathname==='/plugin/connect'?content:<ConsentGate>{content}</ConsentGate>}
-export default function App(){return <BrowserRouter><BodyScrollLock/><DeviceHeartbeat/><NoticeHost/><SyncQueueIndicator/><AppDialogHost/><AppContent/></BrowserRouter>}
+function BodyScrollLock() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    document.body.classList.toggle('lock-scroll', pathname === '/' || pathname === '/exam');
+    return () => document.body.classList.remove('lock-scroll');
+  }, [pathname]);
+  return null;
+}
+function Loading() {
+  return <LoadingState kind="loading" />;
+}
+function AppContent() {
+  const location = useLocation();
+  const { pathname } = location;
+  React.useEffect(() => {
+    applyPageSeo(pathname);
+  }, [pathname]);
+  const content = (
+    <>
+      <Suspense fallback={<Loading />}>
+        <div key={pathname} className="app-route-transition">
+          <Routes location={location}>
+            <Route path="/" element={<WelcomePage />} />
+            <Route path="/exam" element={<ExamPage />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/admin" element={<AdminPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/preferences" element={<PreferencesPage />} />
+            <Route path="/local-settings" element={<LocalSettingsPage />} />
+            <Route path="/plugin/connect" element={<PluginConnectPage />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </div>
+      </Suspense>
+      <PwaUpdateNotice />
+    </>
+  );
+  return pathname === '/plugin/connect' ? content : <ConsentGate>{content}</ConsentGate>;
+}
+export default function App() {
+  return (
+    <BrowserRouter>
+      <BodyScrollLock />
+      <DeviceHeartbeat />
+      <NoticeHost />
+      <SyncQueueIndicator />
+      <AppDialogHost />
+      <AppContent />
+    </BrowserRouter>
+  );
+}

@@ -1,11 +1,11 @@
-import React from "react";
-import { CalendarDays } from "lucide-react";
-import Mascot from "../Mascot";
-import SubjectIcon from "../SubjectIcon";
-import type { IsoWeekday, WeeklyExamItem, WeeklyPlan } from "../../types/exam";
-import type { ItemEdit } from "../../hooks/weekly/useWeeklyItemModal";
-import type { LastDeleted } from "../../hooks/weekly/useWeeklyPlanModal";
-import { WEEKDAY_LABEL, WEEK_TYPE_LABEL } from "./weeklyShared";
+import React from 'react';
+import { CalendarDays } from 'lucide-react';
+import Mascot from '../Mascot';
+import SubjectIcon from '../SubjectIcon';
+import type { IsoWeekday, WeeklyExamItem, WeeklyPlan } from '../../types/exam';
+import type { ItemEdit } from '../../hooks/weekly/useWeeklyItemModal';
+import type { LastDeleted } from '../../hooks/weekly/useWeeklyPlanModal';
+import { WEEKDAY_LABEL, WEEK_TYPE_LABEL } from './weeklyShared';
 
 interface WeeklyItemsListProps {
   activePlan: WeeklyPlan;
@@ -48,10 +48,7 @@ export default function WeeklyItemsList({
         <h2 className="admin-list-title">{activePlan.name} · 周测</h2>
         <span className="admin-list-count">{items.length} 项</span>
         <div className="weekly-list-actions">
-          <button
-            className="admin-btn"
-            onClick={openImport}
-          >
+          <button className="admin-btn" onClick={openImport}>
             AI智能导入周测
           </button>
           <button className="admin-btn" onClick={exportJson}>
@@ -73,15 +70,15 @@ export default function WeeklyItemsList({
             onClick={() => {
               setCustomWeeklySubjectActive(false);
               setEditing({
-                name: "",
+                name: '',
                 weekday: 1,
-                startTime: "19:00",
-                endTime: "20:00",
+                startTime: '19:00',
+                endTime: '20:00',
                 endNextDay: false,
                 enabled: true,
-                weekType: "all",
+                weekType: 'all',
               });
-              setEditError("");
+              setEditError('');
             }}
           >
             + 添加周测
@@ -92,14 +89,11 @@ export default function WeeklyItemsList({
       {lastDeleted && (
         <div className="admin-undo">
           <span>
-            {lastDeleted.kind === "plans"
+            {lastDeleted.kind === 'plans'
               ? `已批量删除 ${lastDeleted.plans.length} 个周测计划`
-              : `已删除「${lastDeleted.kind === "plan" ? lastDeleted.plan.name : lastDeleted.kind === "item" ? lastDeleted.item.name : lastDeleted.name}」`}
+              : `已删除「${lastDeleted.kind === 'plan' ? lastDeleted.plan.name : lastDeleted.kind === 'item' ? lastDeleted.item.name : lastDeleted.name}」`}
           </span>
-          <button
-            className="admin-btn admin-btn--ghost"
-            onClick={restoreLastDeleted}
-          >
+          <button className="admin-btn admin-btn--ghost" onClick={restoreLastDeleted}>
             撤销删除
           </button>
         </div>
@@ -120,19 +114,11 @@ export default function WeeklyItemsList({
             .map((g) => (
               <div className="weekly-group" key={g.wd}>
                 <h3 className="weekly-group__title">{WEEKDAY_LABEL[g.wd]}</h3>
-                <ul
-                  className="admin-list"
-                  style={{ listStyle: "none", padding: 0, margin: 0 }}
-                >
+                <ul className="admin-list" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
                   {g.list.map((item) => (
-                    <li
-                      className={`admin-item${!item.enabled ? " admin-item--disabled" : ""}`}
-                      key={item.id}
-                    >
+                    <li className={`admin-item${!item.enabled ? ' admin-item--disabled' : ''}`} key={item.id}>
                       <div className="admin-item__order">
-                        <span className="admin-item__order-num">
-                          {WEEKDAY_LABEL[item.weekday]}
-                        </span>
+                        <span className="admin-item__order-num">{WEEKDAY_LABEL[item.weekday]}</span>
                       </div>
                       <div className="admin-item__info">
                         <div className="admin-item__name-row">
@@ -140,17 +126,17 @@ export default function WeeklyItemsList({
                             <SubjectIcon subject={item.name} size={16} />
                             {item.name}
                           </span>
-                          {activePlan.weekMode === "ab" && (
+                          {activePlan.weekMode === 'ab' && (
                             <span className="admin-item__status weekly-week-badge">
-                              {WEEK_TYPE_LABEL[item.weekType ?? "all"]}
+                              {WEEK_TYPE_LABEL[item.weekType ?? 'all']}
                             </span>
                           )}
                           {!item.enabled && (
                             <span
                               className="admin-item__status"
                               style={{
-                                color: "#6c757d",
-                                background: "rgba(108,117,125,.1)",
+                                color: '#6c757d',
+                                background: 'rgba(108,117,125,.1)',
                               }}
                             >
                               已停用
@@ -162,37 +148,30 @@ export default function WeeklyItemsList({
                           <span className="admin-item__times-sep">–</span>
                           <span>
                             {item.endTime}
-                            {item.endNextDay ? "（次日）" : ""}
+                            {item.endNextDay ? '（次日）' : ''}
                           </span>
-                          {item.location && (
-                            <span className="admin-item__duration">
-                              {item.location}
-                            </span>
-                          )}
+                          {item.location && <span className="admin-item__duration">{item.location}</span>}
                         </div>
                       </div>
                       <div className="admin-item__actions">
                         <button
                           type="button"
-                          className={`admin-item-btn admin-item-btn--toggle ${item.enabled ? "admin-item-btn--disable" : "admin-item-btn--enable"}`}
+                          className={`admin-item-btn admin-item-btn--toggle ${item.enabled ? 'admin-item-btn--disable' : 'admin-item-btn--enable'}`}
                           onClick={() => toggleItemEnabled(item)}
                         >
-                          {item.enabled ? "停用" : "启用"}
+                          {item.enabled ? '停用' : '启用'}
                         </button>
                         <button
                           className="admin-item-btn"
                           onClick={() => {
                             setCustomWeeklySubjectActive(false);
                             setEditing({ ...item });
-                            setEditError("");
+                            setEditError('');
                           }}
                         >
                           编辑
                         </button>
-                        <button
-                          className="admin-item-btn admin-item-btn--delete"
-                          onClick={() => setDeleteTarget(item)}
-                        >
+                        <button className="admin-item-btn admin-item-btn--delete" onClick={() => setDeleteTarget(item)}>
                           删除
                         </button>
                       </div>

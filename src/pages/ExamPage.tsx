@@ -4,7 +4,12 @@ import type { ExamItem, AlertsSettings } from '../types';
 import { getAppSettings } from '../utils/appSettings';
 import { getResolvedExamItems } from '../utils/appSchedule';
 import {
-  nowMs, formatClockInZone, getZonedParts, parseZonedTime, DISPLAY_TIME_ZONE, isTimeSyncReady,
+  nowMs,
+  formatClockInZone,
+  getZonedParts,
+  parseZonedTime,
+  DISPLAY_TIME_ZONE,
+  isTimeSyncReady,
 } from '../utils/timeSource';
 import { useExamNotify } from '../hooks/useExamNotify';
 import { useExamSync } from '../hooks/useExamSync';
@@ -51,17 +56,25 @@ const pad2 = (n: number) => String(n).padStart(2, '0');
 
 function announcementVersion(list: Announcement[]): string {
   // updated_at 随编辑/置顶状态变更而更新；仅保存版本标识，不保存公告正文。
-  return list.map(item => `${item.id}:${item.updated_at}:${item.pinned ? 1 : 0}`).join('|');
+  return list.map((item) => `${item.id}:${item.updated_at}:${item.pinned ? 1 : 0}`).join('|');
 }
 
 function getActiveExams(items: ExamItem[]): ExamItem[] {
-  return sortExamItemsByTime(items.filter(x => x.enabled));
+  return sortExamItemsByTime(items.filter((x) => x.enabled));
 }
 
 function computeRawState(items: ExamItem[], nowTs: number): RawState {
   const active = getActiveExams(items);
   if (active.length === 0) {
-    return { currentExam: null, phase: 'empty', remainingMs: 0, elapsedMs: 0, durationMs: 0, startToNowMs: 0, nextExam: null };
+    return {
+      currentExam: null,
+      phase: 'empty',
+      remainingMs: 0,
+      elapsedMs: 0,
+      durationMs: 0,
+      startToNowMs: 0,
+      nextExam: null,
+    };
   }
   for (let i = 0; i < active.length; i++) {
     const exam = active[i];
@@ -69,14 +82,38 @@ function computeRawState(items: ExamItem[], nowTs: number): RawState {
     const end = parseZonedTime(exam.endTime);
     if (!Number.isFinite(start) || !Number.isFinite(end)) continue;
     if (nowTs < start) {
-      return { currentExam: exam, phase: 'before', remainingMs: 0, elapsedMs: 0, durationMs: end - start, startToNowMs: start - nowTs, nextExam: active[i + 1] ?? null };
+      return {
+        currentExam: exam,
+        phase: 'before',
+        remainingMs: 0,
+        elapsedMs: 0,
+        durationMs: end - start,
+        startToNowMs: start - nowTs,
+        nextExam: active[i + 1] ?? null,
+      };
     }
     if (nowTs >= start && nowTs <= end) {
-      return { currentExam: exam, phase: 'live', remainingMs: end - nowTs, elapsedMs: nowTs - start, durationMs: end - start, startToNowMs: 0, nextExam: active[i + 1] ?? null };
+      return {
+        currentExam: exam,
+        phase: 'live',
+        remainingMs: end - nowTs,
+        elapsedMs: nowTs - start,
+        durationMs: end - start,
+        startToNowMs: 0,
+        nextExam: active[i + 1] ?? null,
+      };
     }
   }
   const last = active[active.length - 1];
-  return { currentExam: last ?? null, phase: 'ended', remainingMs: 0, elapsedMs: 0, durationMs: 0, startToNowMs: 0, nextExam: null };
+  return {
+    currentExam: last ?? null,
+    phase: 'ended',
+    remainingMs: 0,
+    elapsedMs: 0,
+    durationMs: 0,
+    startToNowMs: 0,
+    nextExam: null,
+  };
 }
 
 function fmtHMS(ms: number): string {
@@ -119,9 +156,13 @@ function computeUrgency(phase: ExamPhaseVM, remainingMs: number): Urgency {
 
 export default function ExamPage() {
   const exam = getAppSettings().exam;
-  const selectedClass = exam.classes.find(item => item.id === exam.selectedClassId);
+  const selectedClass = exam.classes.find((item) => item.id === exam.selectedClassId);
   const bindingValid = Boolean(exam.selectedGradeId && selectedClass && selectedClass.gradeId === exam.selectedGradeId);
-  return bindingValid ? <BoundExamPage /> : <Navigate to={getCachedDeviceBinding()?.isManagement ? "/" : "/?selectClass=1"} replace />;
+  return bindingValid ? (
+    <BoundExamPage />
+  ) : (
+    <Navigate to={getCachedDeviceBinding()?.isManagement ? '/' : '/?selectClass=1'} replace />
+  );
 }
 
 function BoundExamPage() {
@@ -131,11 +172,25 @@ function BoundExamPage() {
   const [now, setNow] = useState<number>(() => nowMs());
   const [designId, setDesign] = useState<string>(() => {
     const current = getAppSettings().exam;
-    return resolveManagedDesign(current.designPolicy, current.selectedGradeId, current.selectedClassId, getClassBindingInstanceId()) || getDesignId();
+    return (
+      resolveManagedDesign(
+        current.designPolicy,
+        current.selectedGradeId,
+        current.selectedClassId,
+        getClassBindingInstanceId(),
+      ) || getDesignId()
+    );
   });
   const [managedDesign, setManagedDesign] = useState(() => {
     const current = getAppSettings().exam;
-    return Boolean(resolveManagedDesign(current.designPolicy, current.selectedGradeId, current.selectedClassId, getClassBindingInstanceId()));
+    return Boolean(
+      resolveManagedDesign(
+        current.designPolicy,
+        current.selectedGradeId,
+        current.selectedClassId,
+        getClassBindingInstanceId(),
+      ),
+    );
   });
   const [online, setOnline] = useState<boolean>(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [alerts, setAlerts] = useState<AlertsSettings>(() => getAppSettings().alerts);
@@ -143,7 +198,7 @@ function BoundExamPage() {
     const initialization = getAppSettings().exam.initialization;
     return initialization.schoolFullName || initialization.schoolName || '';
   });
-  const [schoolLogo, setSchoolLogo] = useState<string>(() => getAppSettings().exam.initialization.schoolLogo ?? "");
+  const [schoolLogo, setSchoolLogo] = useState<string>(() => getAppSettings().exam.initialization.schoolLogo ?? '');
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [announcementsOpen, setAnnouncementsOpen] = useState(false);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
@@ -153,17 +208,29 @@ function BoundExamPage() {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // 数据链接：考试前端保持快速同步，后台切换分科模式后无需手动刷新。
-  const { refresh: refreshExamData, syncState: examDataSyncState, lastSyncAt: examDataLastSyncAt, hasPendingSync, syncError } = useExamSync({
+  const {
+    refresh: refreshExamData,
+    syncState: examDataSyncState,
+    lastSyncAt: examDataLastSyncAt,
+    hasPendingSync,
+    syncError,
+  } = useExamSync({
     intervalMs: 5000,
     minRefreshMs: 3000,
     onUpdate: ({ items: newItems, title: newTitle, alerts: newAlerts }) => {
-      setItems(getResolvedExamItems()); if (newTitle) setTitle(newTitle);
+      setItems(getResolvedExamItems());
+      if (newTitle) setTitle(newTitle);
       if (newAlerts) setAlerts(newAlerts);
       const initialization = getAppSettings().exam.initialization;
       setSchoolName(initialization.schoolFullName || initialization.schoolName || '');
       setSchoolLogo(initialization.schoolLogo ?? '');
       const current = getAppSettings().exam;
-      const assigned = resolveManagedDesign(current.designPolicy, current.selectedGradeId, current.selectedClassId, getClassBindingInstanceId());
+      const assigned = resolveManagedDesign(
+        current.designPolicy,
+        current.selectedGradeId,
+        current.selectedClassId,
+        getClassBindingInstanceId(),
+      );
       setManagedDesign(Boolean(assigned));
       if (assigned) setDesign(assigned);
     },
@@ -172,7 +239,10 @@ function BoundExamPage() {
     const refresh = () => setItems(getResolvedExamItems());
     window.addEventListener(TEMPORARY_EXAM_EVENT, refresh);
     const interval = window.setInterval(refresh, 2000);
-    return () => { window.removeEventListener(TEMPORARY_EXAM_EVENT, refresh); window.clearInterval(interval); };
+    return () => {
+      window.removeEventListener(TEMPORARY_EXAM_EVENT, refresh);
+      window.clearInterval(interval);
+    };
   }, []);
 
   // 新实例首次进入自动展示公告；运行期间每分钟检查一次，作者端更新后自动再次展示。
@@ -197,8 +267,13 @@ function BoundExamPage() {
       }
     };
     void refreshAnnouncements();
-    const intervalId = window.setInterval(() => { void refreshAnnouncements(); }, ANNOUNCEMENT_POLL_MS);
-    return () => { alive = false; window.clearInterval(intervalId); };
+    const intervalId = window.setInterval(() => {
+      void refreshAnnouncements();
+    }, ANNOUNCEMENT_POLL_MS);
+    return () => {
+      alive = false;
+      window.clearInterval(intervalId);
+    };
   }, []);
 
   const openAnnouncements = useCallback(() => {
@@ -213,7 +288,9 @@ function BoundExamPage() {
   useEffect(() => {
     tick();
     timerRef.current = setInterval(tick, 500);
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
   }, [tick]);
 
   // 状态胶囊反映当下真实网络状态：监听 online/offline，断网立即变“离线”。
@@ -222,7 +299,10 @@ function BoundExamPage() {
     const goOffline = () => setOnline(false);
     window.addEventListener('online', goOnline);
     window.addEventListener('offline', goOffline);
-    return () => { window.removeEventListener('online', goOnline); window.removeEventListener('offline', goOffline); };
+    return () => {
+      window.removeEventListener('online', goOnline);
+      window.removeEventListener('offline', goOffline);
+    };
   }, []);
 
   // 将时间量化到整秒：大屏时钟与底部倒计时都基于同一 nowTick，
@@ -230,7 +310,12 @@ function BoundExamPage() {
   const nowTick = Math.floor(now / 1000) * 1000;
   const raw = useMemo(() => computeRawState(items, nowTick), [items, nowTick]);
   const currentKind = raw.currentExam && (raw.currentExam as { kind?: string }).kind;
-  const displayMasterTitle = currentKind === 'weekly' ? '周测' : currentKind === 'temporary' ? `${raw.currentExam?.name} - 临时考试` : raw.currentExam?.majorName || title || 'Novora';
+  const displayMasterTitle =
+    currentKind === 'weekly'
+      ? '周测'
+      : currentKind === 'temporary'
+        ? `${raw.currentExam?.name} - 临时考试`
+        : raw.currentExam?.majorName || title || 'Novora';
   examLiveRef.current = raw.phase === 'live';
   useEffect(() => {
     if (raw.phase === 'live') return;
@@ -254,9 +339,12 @@ function BoundExamPage() {
   // 浮层启用时，抑制设计内的轻量通知条，避免重复
   const inDesignNotification = alerts.enabled ? null : notification;
 
-  const progressPct = raw.durationMs > 0
-    ? Math.min(100, Math.max(0, (raw.elapsedMs / raw.durationMs) * 100))
-    : (raw.phase === 'ended' ? 100 : 0);
+  const progressPct =
+    raw.durationMs > 0
+      ? Math.min(100, Math.max(0, (raw.elapsedMs / raw.durationMs) * 100))
+      : raw.phase === 'ended'
+        ? 100
+        : 0;
 
   const vm: ExamViewModel = {
     masterTitle: displayMasterTitle,
@@ -280,10 +368,14 @@ function BoundExamPage() {
 
   const Design = getDesign(designId).component;
 
-  const chooseDesign = useCallback((id: string) => {
-    if (managedDesign) return;
-    setDesign(id); setDesignId(id);
-  }, [managedDesign]);
+  const chooseDesign = useCallback(
+    (id: string) => {
+      if (managedDesign) return;
+      setDesign(id);
+      setDesignId(id);
+    },
+    [managedDesign],
+  );
 
   // 全屏展示：顶栏按钮手动切换 + 无操作 1 分钟自动进入。
   const { isFullscreen, enter: enterFullscreen, exit: exitFullscreen } = useFullscreen();
@@ -301,13 +393,19 @@ function BoundExamPage() {
   // 自动全屏：进入全屏后停表；退出后重新计时。部分浏览器会因缺少用户手势而
   // 拒绝 requestFullscreen，此时回退到“轻触进入全屏”引导浮层，由用户点击完成手势授权。
   useEffect(() => {
-    if (isFullscreen) { setFsPromptOpen(false); return; }
+    if (isFullscreen) {
+      setFsPromptOpen(false);
+      return;
+    }
     if (raw.phase === 'ended') return; // 考试结束后不再自动进入全屏，便于监考离场操作
     let deadline = Date.now() + AUTO_FULLSCREEN_IDLE_MS;
     let armed = true;
-    const bump = () => { deadline = Date.now() + AUTO_FULLSCREEN_IDLE_MS; armed = true; };
+    const bump = () => {
+      deadline = Date.now() + AUTO_FULLSCREEN_IDLE_MS;
+      armed = true;
+    };
     const events: Array<keyof WindowEventMap> = ['pointerdown', 'pointermove', 'keydown', 'touchstart', 'wheel'];
-    events.forEach(e => window.addEventListener(e, bump, { passive: true }));
+    events.forEach((e) => window.addEventListener(e, bump, { passive: true }));
     const id = window.setInterval(() => {
       if (!armed || document.hidden) return;
       if (Date.now() >= deadline) {
@@ -317,7 +415,7 @@ function BoundExamPage() {
     }, 1000);
     return () => {
       window.clearInterval(id);
-      events.forEach(e => window.removeEventListener(e, bump));
+      events.forEach((e) => window.removeEventListener(e, bump));
     };
   }, [isFullscreen, enterFullscreen, raw.phase]);
 
@@ -326,14 +424,27 @@ function BoundExamPage() {
     let lock: { release?: () => Promise<void> } | null = null;
     const request = async () => {
       try {
-        const wl = (navigator as unknown as { wakeLock?: { request: (t: string) => Promise<{ release?: () => Promise<void> }> } }).wakeLock;
+        const wl = (
+          navigator as unknown as { wakeLock?: { request: (t: string) => Promise<{ release?: () => Promise<void> }> } }
+        ).wakeLock;
         if (wl && document.visibilityState === 'visible') lock = await wl.request('screen');
-      } catch { /* 不支持或被拒绝时静默降级 */ }
+      } catch {
+        /* 不支持或被拒绝时静默降级 */
+      }
     };
-    const onVis = () => { if (document.visibilityState === 'visible') void request(); };
+    const onVis = () => {
+      if (document.visibilityState === 'visible') void request();
+    };
     void request();
     document.addEventListener('visibilitychange', onVis);
-    return () => { document.removeEventListener('visibilitychange', onVis); try { void lock?.release?.(); } catch { /* noop */ } };
+    return () => {
+      document.removeEventListener('visibilitychange', onVis);
+      try {
+        void lock?.release?.();
+      } catch {
+        /* noop */
+      }
+    };
   }, []);
 
   const confirmFullscreen = useCallback(() => {
@@ -354,8 +465,7 @@ function BoundExamPage() {
     // A web page can leave only the Fullscreen API. Browser-level full screen
     // (such as Chrome F11/menu full screen) must still be dismissed by Chrome.
     setFullscreenExitHintOpen(true);
-    if (fullscreenExitHintTimer.current != null)
-      window.clearTimeout(fullscreenExitHintTimer.current);
+    if (fullscreenExitHintTimer.current != null) window.clearTimeout(fullscreenExitHintTimer.current);
     fullscreenExitHintTimer.current = window.setTimeout(() => {
       setFullscreenExitHintOpen(false);
       fullscreenExitHintTimer.current = null;
@@ -370,30 +480,48 @@ function BoundExamPage() {
     void enterFullscreen().catch(() => setFsPromptOpen(true));
   }, [enterFullscreen, exitFullscreenWithBrowserGuidance, isFullscreen]);
 
-  useEffect(() => () => {
-    if (fullscreenExitHintTimer.current != null)
-      window.clearTimeout(fullscreenExitHintTimer.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (fullscreenExitHintTimer.current != null) window.clearTimeout(fullscreenExitHintTimer.current);
+    },
+    [],
+  );
 
   return (
     <div className="exam-root">
-      <TemporaryExamLauncher formalItems={getResolvedSchedule(nowTick).activeItems} externalOpen={temporaryOpen} onExternalHandled={() => setTemporaryOpen(false)} />
-      <Suspense fallback={<LoadingState kind="design" />}><Design
-        vm={vm}
-        onDismissNotification={dismiss}
-        onBack={() => navigate('/')}
-        quickMenu={<ExamQuickMenu onTemporary={() => setTemporaryOpen(true)} onLocal={() => navigate('/local-settings')} onAdmin={() => navigate('/admin')} />}
-        onOpenAnnouncements={openAnnouncements}
-        onSwitchDesign={() => { if (!managedDesign) setSwitcherOpen(true); }}
-        isFullscreen={isFullscreen}
-        onToggleFullscreen={toggleFullscreenWithGuidance}
-      /></Suspense>
+      <TemporaryExamLauncher
+        formalItems={getResolvedSchedule(nowTick).activeItems}
+        externalOpen={temporaryOpen}
+        onExternalHandled={() => setTemporaryOpen(false)}
+      />
+      <Suspense fallback={<LoadingState kind="design" />}>
+        <Design
+          vm={vm}
+          onDismissNotification={dismiss}
+          onBack={() => navigate('/')}
+          quickMenu={
+            <ExamQuickMenu
+              onTemporary={() => setTemporaryOpen(true)}
+              onLocal={() => navigate('/local-settings')}
+              onAdmin={() => navigate('/admin')}
+            />
+          }
+          onOpenAnnouncements={openAnnouncements}
+          onSwitchDesign={() => {
+            if (!managedDesign) setSwitcherOpen(true);
+          }}
+          isFullscreen={isFullscreen}
+          onToggleFullscreen={toggleFullscreenWithGuidance}
+        />
+      </Suspense>
       <Watermark exam />
       {fullscreenExitHintOpen && (
         <div className="exam-fullscreen-exit-hint" role="status">
           <AlertTriangle aria-hidden="true" />
           <span>已退出看板全屏。若画面仍全屏，请按 F11 或使用浏览器菜单退出。</span>
-          <button type="button" aria-label="关闭提示" onClick={dismissFullscreenExitHint}><X aria-hidden="true" /></button>
+          <button type="button" aria-label="关闭提示" onClick={dismissFullscreenExitHint}>
+            <X aria-hidden="true" />
+          </button>
         </div>
       )}
       <div className="exam-context-bar" aria-label="看板信息">
@@ -411,13 +539,20 @@ function BoundExamPage() {
         </div>
         <BrandMark compact className="exam-brand-mark" />
         <div className="exam-context-bar__status">
-          {raw.currentExam && <div className="exam-subject-badge"><SubjectIcon subject={raw.currentExam.name} size={17} /><span>{raw.currentExam.name}</span></div>}
+          {raw.currentExam && (
+            <div className="exam-subject-badge">
+              <SubjectIcon subject={raw.currentExam.name} size={17} />
+              <span>{raw.currentExam.name}</span>
+            </div>
+          )}
           <ExamSyncAction
             state={examDataSyncState}
             lastSyncAt={examDataLastSyncAt}
             hasPendingSync={hasPendingSync}
             syncError={syncError}
-            onRefresh={() => { void refreshExamData(true); }}
+            onRefresh={() => {
+              void refreshExamData(true);
+            }}
           />
         </div>
       </div>
@@ -428,7 +563,13 @@ function BoundExamPage() {
         onClose={() => setAnnouncementsOpen(false)}
       />
       {/* 设计切换窗由各设计顶栏按钮触发，避免悬浮按钮遮挡大屏元素。 */}
-      <DesignSwitcher open={switcherOpen} onClose={() => setSwitcherOpen(false)} currentId={designId} onSelect={chooseDesign} managed={managedDesign} />
+      <DesignSwitcher
+        open={switcherOpen}
+        onClose={() => setSwitcherOpen(false)}
+        currentId={designId}
+        onSelect={chooseDesign}
+        managed={managedDesign}
+      />
       {/* 全屏提醒浮层：风格跟随当前展示设计自动切换 */}
       <ExamAlertOverlay
         item={overlayItem}
@@ -444,28 +585,48 @@ function BoundExamPage() {
           <button
             type="button"
             className="exam-ended-exit__btn"
-            onClick={() => { void exitFullscreenWithBrowserGuidance().catch(() => {}); }}
-          ><LogOut aria-hidden="true" />退出全屏</button>
+            onClick={() => {
+              void exitFullscreenWithBrowserGuidance().catch(() => {});
+            }}
+          >
+            <LogOut aria-hidden="true" />
+            退出全屏
+          </button>
         </div>
       )}
       {isMobile && !isMobileReadyDesign(designId) && !mobileNoticeDismissed && (
         <div className="exam-mobile-notice" role="alert">
           <span>当前设计未针对手机端优化，请到电脑端查看最优效果。</span>
           <div className="exam-mobile-notice__actions">
-            <button type="button" onClick={() => setSwitcherOpen(true)}>切换适配设计</button>
-            <button type="button" className="exam-mobile-notice__close" aria-label="关闭提示" onClick={() => setMobileNoticeDismissed(true)}>×</button>
+            <button type="button" onClick={() => setSwitcherOpen(true)}>
+              切换适配设计
+            </button>
+            <button
+              type="button"
+              className="exam-mobile-notice__close"
+              aria-label="关闭提示"
+              onClick={() => setMobileNoticeDismissed(true)}
+            >
+              ×
+            </button>
           </div>
         </div>
       )}
       {fsPromptOpen && !isFullscreen && (
         <div className="exam-fs-prompt" role="dialog" aria-label="进入全屏展示" onClick={confirmFullscreen}>
-          <div className="exam-fs-prompt__card" onClick={e => e.stopPropagation()}>
-            <div className="exam-fs-prompt__icon" aria-hidden="true"><Maximize /></div>
+          <div className="exam-fs-prompt__card" onClick={(e) => e.stopPropagation()}>
+            <div className="exam-fs-prompt__icon" aria-hidden="true">
+              <Maximize />
+            </div>
             <p className="exam-fs-prompt__title">轻触进入全屏展示</p>
             <p className="exam-fs-prompt__hint">大屏已静置 1 分钟，建议全屏投放以获得最佳布局</p>
             <div className="exam-fs-prompt__actions">
-              <button type="button" className="exam-fs-prompt__go" onClick={confirmFullscreen}>进入全屏</button>
-              <button type="button" className="exam-fs-prompt__later" onClick={() => setFsPromptOpen(false)}>暂不</button>
+              <button type="button" className="exam-fs-prompt__go" onClick={confirmFullscreen}>
+                进入全屏
+              </button>
+              <button type="button" className="exam-fs-prompt__later" onClick={() => setFsPromptOpen(false)}>
+                暂不
+              </button>
             </div>
           </div>
         </div>

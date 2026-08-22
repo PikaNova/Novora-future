@@ -17,16 +17,57 @@ export interface ExamNotification {
   id: string;
 }
 
-const NOTIFY_CONFIG: Record<NotifyPhase, {
-  title: string; level: NotifyLevel;
-  message: (name: string) => string;
-  color: string; icon: string; durationMs: number;
-}> = {
-  before15: { title: '开考提醒', level: 'warning', message: n => `「${n}」15分钟后开考，请提前准备`, color: '#ff9800', icon: '📣', durationMs: 15000 },
-  before5:  { title: '即将开考', level: 'critical', message: n => `「${n}」5分钟后开考，请立即就座`, color: '#ff5722', icon: '⏰', durationMs: 20000 },
-  started:  { title: '考试开始', level: 'critical', message: n => `「${n}」现在开始，请立即开始作答`, color: '#e53935', icon: '🚨', durationMs: 25000 },
-  ending15: { title: '结束提醒', level: 'critical', message: n => `「${n}」距结束还15分钟，请尽快检查答卷`, color: '#d32f2f', icon: '⚠️', durationMs: 25000 },
-  ended:    { title: '考试结束', level: 'success',  message: n => `「${n}」考试已结束，请立即停笔`, color: '#2e7d32', icon: '✅', durationMs: 25000 },
+const NOTIFY_CONFIG: Record<
+  NotifyPhase,
+  {
+    title: string;
+    level: NotifyLevel;
+    message: (name: string) => string;
+    color: string;
+    icon: string;
+    durationMs: number;
+  }
+> = {
+  before15: {
+    title: '开考提醒',
+    level: 'warning',
+    message: (n) => `「${n}」15分钟后开考，请提前准备`,
+    color: '#ff9800',
+    icon: '📣',
+    durationMs: 15000,
+  },
+  before5: {
+    title: '即将开考',
+    level: 'critical',
+    message: (n) => `「${n}」5分钟后开考，请立即就座`,
+    color: '#ff5722',
+    icon: '⏰',
+    durationMs: 20000,
+  },
+  started: {
+    title: '考试开始',
+    level: 'critical',
+    message: (n) => `「${n}」现在开始，请立即开始作答`,
+    color: '#e53935',
+    icon: '🚨',
+    durationMs: 25000,
+  },
+  ending15: {
+    title: '结束提醒',
+    level: 'critical',
+    message: (n) => `「${n}」距结束还15分钟，请尽快检查答卷`,
+    color: '#d32f2f',
+    icon: '⚠️',
+    durationMs: 25000,
+  },
+  ended: {
+    title: '考试结束',
+    level: 'success',
+    message: (n) => `「${n}」考试已结束，请立即停笔`,
+    color: '#2e7d32',
+    icon: '✅',
+    durationMs: 25000,
+  },
 };
 
 function getCheckpoints(exam: ExamItem) {
@@ -34,10 +75,10 @@ function getCheckpoints(exam: ExamItem) {
   const e = parseZonedTime(exam.endTime);
   return [
     { phase: 'before15' as NotifyPhase, triggerAt: s - 15 * 60000 },
-    { phase: 'before5'  as NotifyPhase, triggerAt: s - 5  * 60000 },
-    { phase: 'started'  as NotifyPhase, triggerAt: s },
+    { phase: 'before5' as NotifyPhase, triggerAt: s - 5 * 60000 },
+    { phase: 'started' as NotifyPhase, triggerAt: s },
     { phase: 'ending15' as NotifyPhase, triggerAt: e - 15 * 60000 },
-    { phase: 'ended'    as NotifyPhase, triggerAt: e },
+    { phase: 'ended' as NotifyPhase, triggerAt: e },
   ];
 }
 
@@ -47,7 +88,10 @@ export function useExamNotify(exam: ExamItem | null) {
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (!exam) { setNotification(null); return; }
+    if (!exam) {
+      setNotification(null);
+      return;
+    }
     const check = () => {
       if (!exam) return;
       const now = nowMs();
@@ -57,12 +101,23 @@ export function useExamNotify(exam: ExamItem | null) {
         const key = `${exam.id}_${phase}_${exam.startTime}_${exam.endTime}`;
         if (fired.current.has(key)) continue;
         if (now < triggerAt) continue;
-        if (now - triggerAt > 60000) { fired.current.add(key); continue; }
+        if (now - triggerAt > 60000) {
+          fired.current.add(key);
+          continue;
+        }
         fired.current.add(key);
         const cfg = NOTIFY_CONFIG[phase];
-        setNotification({ phase, level: cfg.level, title: cfg.title,
-          message: cfg.message(exam.name), color: cfg.color, icon: cfg.icon,
-          durationMs: cfg.durationMs, exam, id: key });
+        setNotification({
+          phase,
+          level: cfg.level,
+          title: cfg.title,
+          message: cfg.message(exam.name),
+          color: cfg.color,
+          icon: cfg.icon,
+          durationMs: cfg.durationMs,
+          exam,
+          id: key,
+        });
         if (timer.current) clearTimeout(timer.current);
         timer.current = setTimeout(() => setNotification(null), cfg.durationMs);
         break;
@@ -79,8 +134,14 @@ export function useExamNotify(exam: ExamItem | null) {
       // 考试数据改变时，不能继续展示按旧时间生成、且已失去自动关闭 timer 的通知。
       setNotification(null);
     };
-  // ID、名称或任一时间变化时都重跑：闭包始终使用最新考试数据生成提醒。
+    // ID、名称或任一时间变化时都重跑：闭包始终使用最新考试数据生成提醒。
   }, [exam?.id, exam?.name, exam?.startTime, exam?.endTime]);
 
-  return { notification, dismiss: () => { setNotification(null); if (timer.current) clearTimeout(timer.current); } };
+  return {
+    notification,
+    dismiss: () => {
+      setNotification(null);
+      if (timer.current) clearTimeout(timer.current);
+    },
+  };
 }

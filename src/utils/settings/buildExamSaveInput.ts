@@ -1,5 +1,5 @@
-import { getAppSettings } from "../appSettings";
-import { getCloudSnapshot } from "../../services/examService";
+import { getAppSettings } from '../appSettings';
+import { getCloudSnapshot } from '../../services/examService';
 
 // 将当前 exam 状态组装成 SaveExamsInput（少写重复套话）。
 export function buildExamSaveInput(overrides?: Record<string, unknown>) {

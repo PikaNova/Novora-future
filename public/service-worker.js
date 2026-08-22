@@ -1,8 +1,8 @@
-const SHELL_CACHE = "novora-shell-v2.7.2-pwa-20260810-1";
-const RUNTIME_CACHE = "novora-runtime-v2.7.2-pwa-20260810-1";
-const SHELL_ASSETS = ["/", "/index.html", "/manifest.webmanifest"];
+const SHELL_CACHE = 'novora-shell-v2.7.2-pwa-20260810-1';
+const RUNTIME_CACHE = 'novora-runtime-v2.7.2-pwa-20260810-1';
+const SHELL_ASSETS = ['/', '/index.html', '/manifest.webmanifest'];
 
-self.addEventListener("install", (event) => {
+self.addEventListener('install', (event) => {
   event.waitUntil(
     caches
       .open(SHELL_CACHE)
@@ -11,7 +11,7 @@ self.addEventListener("install", (event) => {
   );
 });
 
-self.addEventListener("activate", (event) => {
+self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches
       .keys()
@@ -31,24 +31,22 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-self.addEventListener("fetch", (event) => {
+self.addEventListener('fetch', (event) => {
   const { request } = event;
-  if (request.method !== "GET") return;
+  if (request.method !== 'GET') return;
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
   // API data must always come from the network. Cache Storage ignores HTTP
   // cache directives, so cache-first here could return stale grades/classes
   // even when the API responds with Cache-Control: private, no-cache.
-  if (url.pathname.startsWith("/api/")) {
+  if (url.pathname.startsWith('/api/')) {
     event.respondWith(fetch(request));
     return;
   }
 
-  if (request.mode === "navigate") {
-    event.respondWith(
-      fetch(request).catch(() => caches.match("/index.html")),
-    );
+  if (request.mode === 'navigate') {
+    event.respondWith(fetch(request).catch(() => caches.match('/index.html')));
     return;
   }
 

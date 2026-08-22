@@ -47,19 +47,33 @@ function normalizePolicy(value: unknown): EmailBindPolicy {
   return BIND_POLICIES.includes(value as EmailBindPolicy) ? (value as EmailBindPolicy) : 'optional';
 }
 
-async function request<T = Record<string, unknown>>(path: string, init: RequestInit = {}, bearerToken?: string): Promise<T> {
+async function request<T = Record<string, unknown>>(
+  path: string,
+  init: RequestInit = {},
+  bearerToken?: string,
+): Promise<T> {
   const authToken = bearerToken ?? token();
-  const response = await fetchWithTimeout(path, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-      ...(init.headers || {}),
+  const response = await fetchWithTimeout(
+    path,
+    {
+      ...init,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        ...(init.headers || {}),
+      },
     },
-  }, 20_000);
+    20_000,
+  );
   const data = await response.json().catch(() => null);
   if (!response.ok || !data?.ok) {
-    throw new AdminApiError(data?.error || `HTTP ${response.status}`, data?.field, data?.code, data?.requestId || response.headers.get('X-Request-Id') || undefined, data?.retryAfterMs);
+    throw new AdminApiError(
+      data?.error || `HTTP ${response.status}`,
+      data?.field,
+      data?.code,
+      data?.requestId || response.headers.get('X-Request-Id') || undefined,
+      data?.retryAfterMs,
+    );
   }
   return data as T;
 }
@@ -91,29 +105,51 @@ export async function fetchEmailConfigFull(bearerToken?: string): Promise<EmailC
   };
 }
 
-export async function sendEmailCode(email: string, purpose: 'login' | 'bind'): Promise<{ queued?: boolean; message?: string }> {
-  return request<{ queued?: boolean; message?: string }>(`${LOGIN_URL}`, { method: 'POST', body: JSON.stringify({ action: 'email-send-code', email, purpose }) });
+export async function sendEmailCode(
+  email: string,
+  purpose: 'login' | 'bind',
+): Promise<{ queued?: boolean; message?: string }> {
+  return request<{ queued?: boolean; message?: string }>(`${LOGIN_URL}`, {
+    method: 'POST',
+    body: JSON.stringify({ action: 'email-send-code', email, purpose }),
+  });
 }
 
 export type EmailSendStatus = { status: 'none' | 'pending' | 'sent' | 'failed'; lastError?: string | null };
 
 export async function fetchEmailSendStatus(email: string): Promise<EmailSendStatus> {
-  return request<EmailSendStatus>(`${LOGIN_URL}`, { method: 'POST', body: JSON.stringify({ action: 'email-send-status', email }) });
+  return request<EmailSendStatus>(`${LOGIN_URL}`, {
+    method: 'POST',
+    body: JSON.stringify({ action: 'email-send-status', email }),
+  });
 }
 
 export async function loginWithEmail(
   email: string,
   code: string,
-): Promise<{ token: string; expiresAt: number; user: { mustChangePassword?: boolean; username?: string } | null; firstLogin: boolean }> {
+): Promise<{
+  token: string;
+  expiresAt: number;
+  user: { mustChangePassword?: boolean; username?: string } | null;
+  firstLogin: boolean;
+}> {
   return request(`${LOGIN_URL}`, { method: 'POST', body: JSON.stringify({ action: 'email-login', email, code }) });
 }
 
 export async function bindEmailRequest(email: string, bearerToken?: string): Promise<void> {
-  await request(`${LOGIN_URL}`, { method: 'POST', body: JSON.stringify({ action: 'email-bind-request', email }) }, bearerToken);
+  await request(
+    `${LOGIN_URL}`,
+    { method: 'POST', body: JSON.stringify({ action: 'email-bind-request', email }) },
+    bearerToken,
+  );
 }
 
 export async function bindEmailConfirm(email: string, code: string, bearerToken?: string): Promise<void> {
-  await request(`${LOGIN_URL}`, { method: 'POST', body: JSON.stringify({ action: 'email-bind-confirm', email, code }) }, bearerToken);
+  await request(
+    `${LOGIN_URL}`,
+    { method: 'POST', body: JSON.stringify({ action: 'email-bind-confirm', email, code }) },
+    bearerToken,
+  );
 }
 
 export async function unbindEmail(bearerToken?: string): Promise<void> {
@@ -121,13 +157,28 @@ export async function unbindEmail(bearerToken?: string): Promise<void> {
 }
 
 export async function saveEmailConfig(input: EmailConfigInput, bearerToken?: string): Promise<void> {
-  await request(`${LOGIN_URL}`, { method: 'POST', body: JSON.stringify({ action: 'email-save-config', ...input }) }, bearerToken);
+  await request(
+    `${LOGIN_URL}`,
+    { method: 'POST', body: JSON.stringify({ action: 'email-save-config', ...input }) },
+    bearerToken,
+  );
 }
 
 export async function clearEmailConfig(bearerToken?: string): Promise<void> {
-  await request(`${LOGIN_URL}`, { method: 'POST', body: JSON.stringify({ action: 'email-clear-config' }) }, bearerToken);
+  await request(
+    `${LOGIN_URL}`,
+    { method: 'POST', body: JSON.stringify({ action: 'email-clear-config' }) },
+    bearerToken,
+  );
 }
 
-export async function testEmailConfig(input: Partial<EmailConfigInput> & { testEmail: string }, bearerToken?: string): Promise<void> {
-  await request(`${LOGIN_URL}`, { method: 'POST', body: JSON.stringify({ action: 'email-test-config', ...input }) }, bearerToken);
+export async function testEmailConfig(
+  input: Partial<EmailConfigInput> & { testEmail: string },
+  bearerToken?: string,
+): Promise<void> {
+  await request(
+    `${LOGIN_URL}`,
+    { method: 'POST', body: JSON.stringify({ action: 'email-test-config', ...input }) },
+    bearerToken,
+  );
 }

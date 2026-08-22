@@ -47,19 +47,19 @@ export async function checkForUpdate(current: string): Promise<UpdateInfo> {
 
 export interface DeployStatus {
   configured: boolean;
-  deployTarget: "vercel" | "local";
+  deployTarget: 'vercel' | 'local';
 }
 
 export async function getDeployStatus(): Promise<DeployStatus> {
   try {
-    const res = await fetch(REDEPLOY_URL, { headers: { "Cache-Control": "no-store" } });
+    const res = await fetch(REDEPLOY_URL, { headers: { 'Cache-Control': 'no-store' } });
     const data = await res.json().catch(() => null);
     return {
       configured: !!data?.configured,
-      deployTarget: data?.deployTarget === "vercel" ? "vercel" : "local",
+      deployTarget: data?.deployTarget === 'vercel' ? 'vercel' : 'local',
     };
   } catch {
-    return { configured: false, deployTarget: "local" };
+    return { configured: false, deployTarget: 'local' };
   }
 }
 

@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash } from 'node:crypto';
 
 type WindowEntry = { count: number; windowStart: number };
 
@@ -17,20 +17,17 @@ export type RateLimitDecision = {
 };
 
 export const WRITE_TIER_EXEMPT_POST_ACTIONS = new Set([
-  "plugin-pair-status",
-  "plugin-bootstrap",
-  "plugin-viewer-heartbeat",
-  "device-heartbeat",
+  'plugin-pair-status',
+  'plugin-bootstrap',
+  'plugin-viewer-heartbeat',
+  'device-heartbeat',
 ]);
 
 export function isWriteTierExemptAction(action: string): boolean {
   return WRITE_TIER_EXEMPT_POST_ACTIONS.has(action);
 }
 
-export function readRateLimitSetting(
-  raw: string | undefined,
-  fallback: number,
-): number {
+export function readRateLimitSetting(raw: string | undefined, fallback: number): number {
   const value = Number(raw);
   return Number.isFinite(value) && value > 0 ? Math.floor(value) : fallback;
 }
@@ -55,10 +52,7 @@ function evictOldestBucket(now: number, windowMs: number): void {
 }
 
 /** Consumes one request from a source-specific, in-process fixed window. */
-export function consumeRateLimit(
-  key: string,
-  options: RateLimitOptions,
-): RateLimitDecision {
+export function consumeRateLimit(key: string, options: RateLimitOptions): RateLimitDecision {
   const now = (options.now ?? Date.now)();
   const existing = buckets.get(key);
   if (existing) buckets.delete(key);
@@ -95,11 +89,11 @@ type RateLimitRequest = {
 };
 
 function boundedString(value: unknown): string {
-  return typeof value === "string" ? value.trim().slice(0, 128) : "";
+  return typeof value === 'string' ? value.trim().slice(0, 128) : '';
 }
 
 function tokenKey(token: string): string {
-  return `token:${createHash("sha256").update(token).digest("hex")}`;
+  return `token:${createHash('sha256').update(token).digest('hex')}`;
 }
 
 export function getRateLimitKey(req: RateLimitRequest): string {
@@ -111,13 +105,11 @@ export function getRateLimitKey(req: RateLimitRequest): string {
 
   const body = (req.body ?? {}) as Record<string, unknown>;
   const query = (req.query ?? {}) as Record<string, unknown>;
-  const instanceId = boundedString(
-    req.method === "GET" ? query.instanceId : body.instanceId,
-  );
+  const instanceId = boundedString(req.method === 'GET' ? query.instanceId : body.instanceId);
   if (instanceId) return `device:${instanceId}`;
 
-  const forwarded = req.headers["x-forwarded-for"];
+  const forwarded = req.headers['x-forwarded-for'];
   const header = Array.isArray(forwarded) ? forwarded[0] : forwarded;
-  const ip = boundedString(header?.split(",")[0]) || boundedString(req.socket?.remoteAddress) || "unknown";
+  const ip = boundedString(header?.split(',')[0]) || boundedString(req.socket?.remoteAddress) || 'unknown';
   return `ip:${ip}`;
 }

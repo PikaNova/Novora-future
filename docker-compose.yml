@@ -9,7 +9,7 @@
     volumes:
       - novora_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-novora} -d ${POSTGRES_DB:-novora}"]
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-novora} -d ${POSTGRES_DB:-novora}']
       interval: 5s
       timeout: 3s
       retries: 20
@@ -21,7 +21,7 @@
         NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
     restart: unless-stopped
     ports:
-      - "${PORT:-3000}:3000"
+      - '${PORT:-3000}:3000'
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-novora}:${POSTGRES_PASSWORD:-novora}@db:5432/${POSTGRES_DB:-novora}
     env_file:

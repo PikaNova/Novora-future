@@ -16,8 +16,14 @@ test('canonicalizeForCompare: sorts object keys recursively so key order does no
 });
 
 test('canonicalizeForCompare: recurses into arrays without reordering them', () => {
-  const result = canonicalizeForCompare([{ b: 1, a: 2 }, { d: 4, c: 3 }]);
-  assert.deepEqual(result, [{ a: 2, b: 1 }, { c: 3, d: 4 }]);
+  const result = canonicalizeForCompare([
+    { b: 1, a: 2 },
+    { d: 4, c: 3 },
+  ]);
+  assert.deepEqual(result, [
+    { a: 2, b: 1 },
+    { c: 3, d: 4 },
+  ]);
 });
 
 test('sameJson: treats key-order-different objects as equal, and null/undefined as equivalent', () => {
@@ -54,11 +60,22 @@ test('recordDiff: treats non-array inputs as empty', () => {
 });
 
 test('changedRecords: returns both the before and after version of every changed id', () => {
-  const before = [{ id: 'a', v: 1 }, { id: 'b', v: 1 }];
-  const after = [{ id: 'a', v: 1 }, { id: 'b', v: 2 }, { id: 'c', v: 1 }];
+  const before = [
+    { id: 'a', v: 1 },
+    { id: 'b', v: 1 },
+  ];
+  const after = [
+    { id: 'a', v: 1 },
+    { id: 'b', v: 2 },
+    { id: 'c', v: 1 },
+  ];
   const changed = changedRecords(before, after);
   // 'a' unchanged -> excluded. 'b' updated -> both versions included. 'c' added -> only the after version exists.
-  assert.deepEqual(changed, [{ id: 'b', v: 1 }, { id: 'b', v: 2 }, { id: 'c', v: 1 }]);
+  assert.deepEqual(changed, [
+    { id: 'b', v: 1 },
+    { id: 'b', v: 2 },
+    { id: 'c', v: 1 },
+  ]);
 });
 
 test('changedRecords: a pure removal only contributes the before version', () => {

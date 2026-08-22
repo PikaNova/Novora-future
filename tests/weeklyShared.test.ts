@@ -13,16 +13,17 @@ test('fmtDT: returns an em dash placeholder for empty/undefined input', () => {
 
 test('weeklyPlanDetailName: strips a leading "grade \u00b7 class" prefix', () => {
   assert.equal(
-    weeklyPlanDetailName('\u9ad8\u4e00 \u00b7 1\u73ed \u5468\u4e00\u5468\u4e8c\u65e9\u81ea\u4e60', '\u9ad8\u4e00', '1\u73ed'),
+    weeklyPlanDetailName(
+      '\u9ad8\u4e00 \u00b7 1\u73ed \u5468\u4e00\u5468\u4e8c\u65e9\u81ea\u4e60',
+      '\u9ad8\u4e00',
+      '1\u73ed',
+    ),
     '\u5468\u4e00\u5468\u4e8c\u65e9\u81ea\u4e60',
   );
 });
 
 test('weeklyPlanDetailName: strips a bare class-name prefix when grade+class prefix is absent', () => {
-  assert.equal(
-    weeklyPlanDetailName('1\u73ed - \u665a\u81ea\u4e60', '\u9ad8\u4e00', '1\u73ed'),
-    '\u665a\u81ea\u4e60',
-  );
+  assert.equal(weeklyPlanDetailName('1\u73ed - \u665a\u81ea\u4e60', '\u9ad8\u4e00', '1\u73ed'), '\u665a\u81ea\u4e60');
 });
 
 test('weeklyPlanDetailName: strips repeated/duplicated prefixes (copied plans)', () => {

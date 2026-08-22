@@ -33,11 +33,17 @@ test('updatedAtIntegerOverflow requires the Postgres code and matching text', ()
 });
 
 test('updatedAtIntegerOverflow rejects a matching code with unrelated text', () => {
-  assert.equal(updatedAtIntegerOverflow(Object.assign(new Error('some other numeric error'), { code: '22003' })), false);
+  assert.equal(
+    updatedAtIntegerOverflow(Object.assign(new Error('some other numeric error'), { code: '22003' })),
+    false,
+  );
 });
 
 test('updatedAtIntegerOverflow rejects a matching text with another code', () => {
-  assert.equal(updatedAtIntegerOverflow(Object.assign(new Error('value is out of range for type integer'), { code: '42601' })), false);
+  assert.equal(
+    updatedAtIntegerOverflow(Object.assign(new Error('value is out of range for type integer'), { code: '42601' })),
+    false,
+  );
 });
 
 test('updatedAtIntegerOverflow rejects errors without a code', () => {

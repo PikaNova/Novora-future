@@ -34,7 +34,10 @@ interface LatestInfo {
 let cache: { at: number; repo: string; data: LatestInfo } | null = null;
 
 function normalizeRepository(value: string): string {
-  const input = value.trim().replace(/\/$/, '').replace(/\.git$/i, '');
+  const input = value
+    .trim()
+    .replace(/\/$/, '')
+    .replace(/\.git$/i, '');
   let repo = input;
 
   try {
@@ -53,7 +56,7 @@ function normalizeRepository(value: string): string {
 
 function parseSemver(v: string): [number, number, number] {
   const core = String(v).trim().replace(/^v/i, '').split('-')[0].split('+')[0];
-  const parts = core.split('.').map(n => parseInt(n, 10));
+  const parts = core.split('.').map((n) => parseInt(n, 10));
   return [parts[0] || 0, parts[1] || 0, parts[2] || 0];
 }
 
@@ -69,7 +72,7 @@ function cmpSemver(a: string, b: string): number {
 
 function ghHeaders(): Record<string, string> {
   const h: Record<string, string> = {
-    'Accept': 'application/vnd.github+json',
+    Accept: 'application/vnd.github+json',
     'User-Agent': 'exam-board-update-check',
     'X-GitHub-Api-Version': '2022-11-28',
   };
@@ -80,7 +83,11 @@ function ghHeaders(): Record<string, string> {
 
 async function fetchLatest(repo: string): Promise<LatestInfo> {
   // 1) 优先 releases/latest
-  const relRes = await fetchWithTimeout(`https://api.github.com/repos/${repo}/releases/latest`, { headers: ghHeaders() }, 8000);
+  const relRes = await fetchWithTimeout(
+    `https://api.github.com/repos/${repo}/releases/latest`,
+    { headers: ghHeaders() },
+    8000,
+  );
   if (relRes.ok) {
     const r: any = await relRes.json();
     const tag = typeof r?.tag_name === 'string' ? r.tag_name : null;
@@ -95,7 +102,11 @@ async function fetchLatest(repo: string): Promise<LatestInfo> {
     }
   }
   // 2) 回退 tags（尚未发布 release 时）
-  const tagRes = await fetchWithTimeout(`https://api.github.com/repos/${repo}/tags?per_page=100`, { headers: ghHeaders() }, 8000);
+  const tagRes = await fetchWithTimeout(
+    `https://api.github.com/repos/${repo}/tags?per_page=100`,
+    { headers: ghHeaders() },
+    8000,
+  );
   if (tagRes.ok) {
     const tags: any = await tagRes.json();
     if (Array.isArray(tags) && tags.length > 0) {
@@ -123,7 +134,10 @@ async function fetchLatest(repo: string): Promise<LatestInfo> {
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Cache-Control', 'no-store');
   if (!applyCors(req, res, { methods: ['GET'], public: true })) return;
-  if (req.method !== 'GET') { res.status(405).json({ ok: false, error: 'Method not allowed' }); return; }
+  if (req.method !== 'GET') {
+    res.status(405).json({ ok: false, error: 'Method not allowed' });
+    return;
+  }
 
   const repositoryUrl = process.env.GITHUB_REPO || DEFAULT_REPOSITORY_URL;
   const currentRaw = Array.isArray(req.query.current) ? req.query.current[0] : req.query.current;
@@ -154,7 +168,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch (error: unknown) {
     try {
       const authorUrl = `${telemetryConfig.baseUrl}/api/update-check?current=${encodeURIComponent(current)}`;
-      const authorRes = await fetchWithTimeout(authorUrl, { headers: { 'Accept': 'application/json' } }, 8000);
+      const authorRes = await fetchWithTimeout(authorUrl, { headers: { Accept: 'application/json' } }, 8000);
       if (authorRes.ok) {
         const author = await authorRes.json().catch(() => null);
         const latest = author && typeof author.latest === 'string' ? author.latest : null;
@@ -165,7 +179,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             current,
             latest,
             hasUpdate: cmpSemver(current, latest) < 0,
-            releaseUrl: typeof author.releaseUrl === 'string' && author.releaseUrl ? author.releaseUrl : DOCS_UPDATE_URL,
+            releaseUrl:
+              typeof author.releaseUrl === 'string' && author.releaseUrl ? author.releaseUrl : DOCS_UPDATE_URL,
             notes: typeof author.notes === 'string' ? author.notes : null,
             publishedAt: typeof author.publishedAt === 'string' ? author.publishedAt : null,
             source: 'author',
@@ -173,7 +188,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return;
         }
       }
-    } catch { /* fall through to 502 */ }
+    } catch {
+      /* fall through to 502 */
+    }
     res.status(502).json({ ok: false, error: error instanceof Error ? error.message : '检查更新失败' });
   }
 }

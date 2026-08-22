@@ -41,7 +41,7 @@ export function resolveAnchoredOverlayPosition({
   overlay,
   viewport,
   boundary,
-  placement = "auto",
+  placement = 'auto',
   edge = 10,
   gap = 8,
 }: {
@@ -49,7 +49,7 @@ export function resolveAnchoredOverlayPosition({
   overlay: Pick<OverlayRect, 'width' | 'height'>;
   viewport: OverlayViewport;
   boundary?: OverlayRect;
-  placement?: "auto" | "right";
+  placement?: 'auto' | 'right';
   edge?: number;
   gap?: number;
 }): AnchoredOverlayPosition {
@@ -58,8 +58,7 @@ export function resolveAnchoredOverlayPosition({
   if (bounds.right <= bounds.left || bounds.bottom <= bounds.top) bounds = viewportBounds;
 
   const anchorRight = anchor.left + anchor.width;
-  const canPlaceRightInViewport =
-    placement === "right" && anchorRight + gap + overlay.width <= viewportBounds.right;
+  const canPlaceRightInViewport = placement === 'right' && anchorRight + gap + overlay.width <= viewportBounds.right;
   if (canPlaceRightInViewport) bounds = viewportBounds;
 
   const maxWidth = Math.max(1, bounds.right - bounds.left);
@@ -75,13 +74,13 @@ export function resolveAnchoredOverlayPosition({
   let left = anchorRight + gap;
   let top = anchor.top + anchor.height / 2 - height / 2;
 
-  if (placement === "right" && !canPlaceRightInViewport) {
+  if (placement === 'right' && !canPlaceRightInViewport) {
     left = anchor.left + anchor.width / 2 - width / 2;
     top = anchor.top - height - gap;
-  } else if (placement !== "right" && rightSpace < width + gap && leftSpace < width + gap) {
+  } else if (placement !== 'right' && rightSpace < width + gap && leftSpace < width + gap) {
     left = anchor.left + anchor.width / 2 - width / 2;
     top = belowSpace >= height || belowSpace >= aboveSpace ? anchorBottom + gap : anchor.top - height - gap;
-  } else if (placement !== "right" && rightSpace < width + gap) {
+  } else if (placement !== 'right' && rightSpace < width + gap) {
     left = anchor.left - width - gap;
   }
 

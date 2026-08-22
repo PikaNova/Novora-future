@@ -8,13 +8,13 @@ export function computeRemovedScopeIds(
 ): { removedGradeIds: string[]; removedClassIds: string[] } {
   const removedGradeIds = Array.isArray(nextGrades)
     ? priorGrades
-        .map((item) => String(item?.id ?? ""))
-        .filter((id) => id && !(nextGrades as MinimalIdRecord[]).some((item) => String(item?.id ?? "") === id))
+        .map((item) => String(item?.id ?? ''))
+        .filter((id) => id && !(nextGrades as MinimalIdRecord[]).some((item) => String(item?.id ?? '') === id))
     : [];
   const removedClassIds = Array.isArray(nextClasses)
     ? priorClasses
-        .map((item) => String(item?.id ?? ""))
-        .filter((id) => id && !(nextClasses as MinimalIdRecord[]).some((item) => String(item?.id ?? "") === id))
+        .map((item) => String(item?.id ?? ''))
+        .filter((id) => id && !(nextClasses as MinimalIdRecord[]).some((item) => String(item?.id ?? '') === id))
     : [];
   return { removedGradeIds, removedClassIds };
 }

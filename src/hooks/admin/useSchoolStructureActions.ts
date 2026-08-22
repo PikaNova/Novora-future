@@ -1,10 +1,10 @@
-import type { MutableRefObject } from "react";
-import type { MajorExam } from "../../types";
-import type { WeeklyState } from "./useWeeklyScheduleSync";
-import { genClassId, genGradeId } from "../../types/school";
-import { getAppSettings, updateExamSettings } from "../../utils/appSettings";
-import { notify } from "../../services/notify";
-import { recomputeMajorsTrackClassIds } from "../../utils/trackClassIds";
+import type { MutableRefObject } from 'react';
+import type { MajorExam } from '../../types';
+import type { WeeklyState } from './useWeeklyScheduleSync';
+import { genClassId, genGradeId } from '../../types/school';
+import { getAppSettings, updateExamSettings } from '../../utils/appSettings';
+import { notify } from '../../services/notify';
+import { recomputeMajorsTrackClassIds } from '../../utils/trackClassIds';
 
 // Owns grade/class roster CRUD (add/remove grade, add/remove class(es),
 // per-class track assignment). This is a thin forward-consumer of the
@@ -14,14 +14,10 @@ import { recomputeMajorsTrackClassIds } from "../../utils/trackClassIds";
 // both hooks' state and setters passed in.
 export function useSchoolStructureActions(params: {
   weeklyStateRef: MutableRefObject<WeeklyState>;
-  commitWeekly: (
-    weekly: Partial<WeeklyState>,
-    immediate?: boolean,
-    syncLabel?: string,
-  ) => void;
-  grades: WeeklyState["grades"];
-  classes: WeeklyState["classes"];
-  weeklyPlans: WeeklyState["weeklyPlans"];
+  commitWeekly: (weekly: Partial<WeeklyState>, immediate?: boolean, syncLabel?: string) => void;
+  grades: WeeklyState['grades'];
+  classes: WeeklyState['classes'];
+  weeklyPlans: WeeklyState['weeklyPlans'];
   selectedGradeId: string;
   selectedClassId: string;
   changeSelectedGrade: (gradeId: string) => void;
@@ -90,11 +86,8 @@ export function useSchoolStructureActions(params: {
       ...weeklyStateRef.current.activeWeeklyPlanIdByClassId,
       ...Object.fromEntries(created.map((item) => [item.id, null])),
     };
-    commitWeekly(
-      { classes: [...classes, ...created], activeWeeklyPlanIdByClassId: nextActive },
-      true,
-    );
-    notify("success", `已创建 ${created.length} 个班级。`);
+    commitWeekly({ classes: [...classes, ...created], activeWeeklyPlanIdByClassId: nextActive }, true);
+    notify('success', `已创建 ${created.length} 个班级。`);
   };
   const removeClass = (classId: string) => {
     const nextMap = { ...weeklyStateRef.current.activeWeeklyPlanIdByClassId };
@@ -104,15 +97,19 @@ export function useSchoolStructureActions(params: {
       ...major,
       targetClassIds: major.targetClassIds?.filter((id) => id !== classId),
     }));
-    if (selectedClassId === classId) changeSelectedClass("");
+    if (selectedClassId === classId) changeSelectedClass('');
     setMajors(nextMajors);
     stateRef.current = { majors: nextMajors, activeMajorId };
     updateExamSettings({ majors: nextMajors });
     const removedClass = classes.find((item) => item.id === classId);
     commitWeekly(
-      { classes: classes.filter((item) => item.id !== classId), weeklyPlans: nextPlans, activeWeeklyPlanIdByClassId: nextMap },
+      {
+        classes: classes.filter((item) => item.id !== classId),
+        weeklyPlans: nextPlans,
+        activeWeeklyPlanIdByClassId: nextMap,
+      },
       true,
-      removedClass ? `删除班级「${removedClass.name}」` : "删除班级",
+      removedClass ? `删除班级「${removedClass.name}」` : '删除班级',
     );
   };
   const removeClasses = (classIds: string[]) => {
@@ -123,7 +120,7 @@ export function useSchoolStructureActions(params: {
       ...major,
       targetClassIds: major.targetClassIds?.filter((id) => !removing.has(id)),
     }));
-    if (removing.has(selectedClassId)) changeSelectedClass("");
+    if (removing.has(selectedClassId)) changeSelectedClass('');
     setMajors(nextMajors);
     stateRef.current = { majors: nextMajors, activeMajorId };
     updateExamSettings({ majors: nextMajors });
@@ -135,14 +132,12 @@ export function useSchoolStructureActions(params: {
         activeWeeklyPlanIdByClassId: nextMap,
       },
       true,
-      `批量删除 ${removing.size} 个班级（${removedNames.slice(0, 5).join("、")}${removedNames.length > 5 ? "等" : ""}）`,
+      `批量删除 ${removing.size} 个班级（${removedNames.slice(0, 5).join('、')}${removedNames.length > 5 ? '等' : ''}）`,
     );
-    notify("success", `已删除 ${removing.size} 个班级及其关联计划。`);
+    notify('success', `已删除 ${removing.size} 个班级及其关联计划。`);
   };
   const removeGrade = (gradeId: string) => {
-    const classIds = new Set(
-      classes.filter((item) => item.gradeId === gradeId).map((item) => item.id),
-    );
+    const classIds = new Set(classes.filter((item) => item.gradeId === gradeId).map((item) => item.id));
     const nextMap = { ...weeklyStateRef.current.activeWeeklyPlanIdByClassId };
     classIds.forEach((id) => delete nextMap[id]);
     const nextMajors = majors.map((major) => ({
@@ -150,7 +145,7 @@ export function useSchoolStructureActions(params: {
       targetGradeIds: major.targetGradeIds?.filter((id) => id !== gradeId),
       targetClassIds: major.targetClassIds?.filter((id) => !classIds.has(id)),
     }));
-    if (selectedGradeId === gradeId) changeSelectedGrade("");
+    if (selectedGradeId === gradeId) changeSelectedGrade('');
     setMajors(nextMajors);
     stateRef.current = { majors: nextMajors, activeMajorId };
     updateExamSettings({ majors: nextMajors });
@@ -163,7 +158,7 @@ export function useSchoolStructureActions(params: {
         activeWeeklyPlanIdByClassId: nextMap,
       },
       true,
-      removedGrade ? `删除年级「${removedGrade.name}」` : "删除年级",
+      removedGrade ? `删除年级「${removedGrade.name}」` : '删除年级',
     );
   };
   const updateClassesTrack = (classIds: string[], track: string[]) => {
@@ -171,13 +166,8 @@ export function useSchoolStructureActions(params: {
     const nextClasses = classes.map((item) =>
       idSet.has(item.id) ? { ...item, track: track.length ? track : undefined } : item,
     );
-    const subjectTrackModeEnabled =
-      getAppSettings().exam.initialization.subjectTrackModeEnabled !== false;
-    const { majors: nextMajors, changes } = recomputeMajorsTrackClassIds(
-      majors,
-      nextClasses,
-      subjectTrackModeEnabled,
-    );
+    const subjectTrackModeEnabled = getAppSettings().exam.initialization.subjectTrackModeEnabled === true;
+    const { majors: nextMajors, changes } = recomputeMajorsTrackClassIds(majors, nextClasses, subjectTrackModeEnabled);
     if (changes.length) {
       setMajors(nextMajors);
       stateRef.current = { majors: nextMajors, activeMajorId };
@@ -186,10 +176,10 @@ export function useSchoolStructureActions(params: {
     commitWeekly(
       { classes: nextClasses },
       true,
-      classIds.length > 1 ? `设置 ${classIds.length} 个班级选科` : "设置班级选科",
+      classIds.length > 1 ? `设置 ${classIds.length} 个班级选科` : '设置班级选科',
     );
     if (changes.length) {
-      notify("success", `已按最新选科同步 ${changes.length} 个分考试范围。`, "选科变更同步");
+      notify('success', `已按最新选科同步 ${changes.length} 个分考试范围。`, '选科变更同步');
     }
   };
 

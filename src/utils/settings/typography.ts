@@ -3,12 +3,15 @@
 export type TypographyFontId = 'design' | 'alibaba' | 'sourceHan' | 'smiley' | 'wenkai' | 'general' | 'jbmono';
 
 export interface TypographySettings {
-	navigation: TypographyFontId;
-	display: TypographyFontId;
-	content: TypographyFontId;
-	numeric: TypographyFontId;
+  navigation: TypographyFontId;
+  display: TypographyFontId;
+  content: TypographyFontId;
+  numeric: TypographyFontId;
 }
 
 export const DEFAULT_TYPOGRAPHY: TypographySettings = {
-	navigation: 'sourceHan', display: 'design', content: 'sourceHan', numeric: 'jbmono',
+  navigation: 'sourceHan',
+  display: 'design',
+  content: 'sourceHan',
+  numeric: 'jbmono',
 };

@@ -1,31 +1,28 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { getAppSettings, updateExamSettings } from "../../utils/appSettings";
-import { saveExamsToServer } from "../../services/examService";
-import { buildExamSaveInput } from "../../utils/settings/buildExamSaveInput";
-import { formatApiError } from "../../services/apiError";
-import { notify } from "../../services/notify";
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { getAppSettings, updateExamSettings } from '../../utils/appSettings';
+import { saveExamsToServer } from '../../services/examService';
+import { buildExamSaveInput } from '../../utils/settings/buildExamSaveInput';
+import { formatApiError } from '../../services/apiError';
+import { notify } from '../../services/notify';
 
 export function useSubjectTrackModeSettings(canEditSettings: boolean) {
   const [subjectTrackModeEnabled, setSubjectTrackModeEnabled] = useState(
-    () =>
-      getAppSettings().exam.initialization.subjectTrackModeEnabled !== false,
+    () => getAppSettings().exam.initialization.subjectTrackModeEnabled === true,
   );
-  const [subjectTrackModeSave, setSubjectTrackModeSave] = useState("");
+  const [subjectTrackModeSave, setSubjectTrackModeSave] = useState('');
   const [subjectTrackModeSaving, setSubjectTrackModeSaving] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
     const syncSubjectTrackMode = () => {
-      setSubjectTrackModeEnabled(
-        getAppSettings().exam.initialization.subjectTrackModeEnabled !== false,
-      );
+      setSubjectTrackModeEnabled(getAppSettings().exam.initialization.subjectTrackModeEnabled === true);
     };
-    window.addEventListener("storage", syncSubjectTrackMode);
-    window.addEventListener("exam-board:settings-changed", syncSubjectTrackMode);
+    window.addEventListener('storage', syncSubjectTrackMode);
+    window.addEventListener('exam-board:settings-changed', syncSubjectTrackMode);
     return () => {
-      window.removeEventListener("storage", syncSubjectTrackMode);
-      window.removeEventListener("exam-board:settings-changed", syncSubjectTrackMode);
+      window.removeEventListener('storage', syncSubjectTrackMode);
+      window.removeEventListener('exam-board:settings-changed', syncSubjectTrackMode);
     };
   }, []);
 
@@ -38,33 +35,33 @@ export function useSubjectTrackModeSettings(canEditSettings: boolean) {
     };
     setSubjectTrackModeEnabled(enabled);
     setSubjectTrackModeSaving(true);
-    setSubjectTrackModeSave("正在保存到云端…");
+    setSubjectTrackModeSave('正在保存到云端…');
     updateExamSettings({ initialization, updatedAt: Date.now() });
     const result = await saveExamsToServer(
       buildExamSaveInput({
         initialization,
-        clientSyncLabel: enabled ? "开启分科模式" : "关闭分科模式",
-        clientQueueKey: "settings:subject-track-mode",
-      })
+        clientSyncLabel: enabled ? '开启分科模式' : '关闭分科模式',
+        clientQueueKey: 'settings:subject-track-mode',
+      }),
     );
-    if (result === "unauthorized") {
+    if (result === 'unauthorized') {
       setSubjectTrackModeSaving(false);
-      navigate("/login?next=/settings", { replace: true });
+      navigate('/login?next=/settings', { replace: true });
       return;
     }
-    if (typeof result === "number") {
+    if (typeof result === 'number') {
       updateExamSettings({ initialization, updatedAt: result });
-      setSubjectTrackModeSave("已保存到云端");
-      notify("success", enabled ? "分科模式已开启。" : "分科模式已关闭。");
+      setSubjectTrackModeSave('已保存到云端');
+      notify('success', enabled ? '分科模式已开启。' : '分科模式已关闭。');
     } else {
       const message =
-        result && typeof result === "object" && result.kind === "error"
-          ? formatApiError(result.error, "分科模式保存失败")
-          : "分科模式保存失败，请刷新后重试。";
-      setSubjectTrackModeEnabled(exam.initialization.subjectTrackModeEnabled !== false);
+        result && typeof result === 'object' && result.kind === 'error'
+          ? formatApiError(result.error, '分科模式保存失败')
+          : '分科模式保存失败，请刷新后重试。';
+      setSubjectTrackModeEnabled(exam.initialization.subjectTrackModeEnabled === true);
       updateExamSettings({ initialization: exam.initialization });
       setSubjectTrackModeSave(message);
-      notify("error", message, "保存失败");
+      notify('error', message, '保存失败');
     }
     setSubjectTrackModeSaving(false);
   };

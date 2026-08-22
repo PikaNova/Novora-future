@@ -46,8 +46,12 @@ let lastExamApiError: ApiError | null = null;
 let lastAuthApiError: ApiError | null = null;
 let generatedRecoveryKey: string | null = null;
 
-export function getLastExamApiError(): ApiError | null { return lastExamApiError; }
-export function getLastAuthApiError(): ApiError | null { return lastAuthApiError; }
+export function getLastExamApiError(): ApiError | null {
+  return lastExamApiError;
+}
+export function getLastAuthApiError(): ApiError | null {
+  return lastAuthApiError;
+}
 export function takeGeneratedRecoveryKey(): string | null {
   const value = generatedRecoveryKey;
   generatedRecoveryKey = null;
@@ -63,21 +67,25 @@ function toPayload(data: any): ExamPayload {
     alerts: data?.alerts && typeof data.alerts === 'object' ? data.alerts : null,
     scheduleMode: typeof data?.scheduleMode === 'string' ? (data.scheduleMode as ScheduleMode) : undefined,
     weeklyPlans: Array.isArray(data?.weeklyPlans) ? (data.weeklyPlans as WeeklyPlan[]) : undefined,
-    activeWeeklyPlanId: typeof data?.activeWeeklyPlanId === 'string'
-      ? data.activeWeeklyPlanId
-      : (data?.activeWeeklyPlanId === null ? null : undefined),
-    activeWeeklyPlanIdByClassId: data?.activeWeeklyPlanIdByClassId && typeof data.activeWeeklyPlanIdByClassId === 'object'
-      ? data.activeWeeklyPlanIdByClassId as Record<string, string | null>
-      : undefined,
+    activeWeeklyPlanId:
+      typeof data?.activeWeeklyPlanId === 'string'
+        ? data.activeWeeklyPlanId
+        : data?.activeWeeklyPlanId === null
+          ? null
+          : undefined,
+    activeWeeklyPlanIdByClassId:
+      data?.activeWeeklyPlanIdByClassId && typeof data.activeWeeklyPlanIdByClassId === 'object'
+        ? (data.activeWeeklyPlanIdByClassId as Record<string, string | null>)
+        : undefined,
     grades: Array.isArray(data?.grades) ? data.grades : undefined,
     classes: Array.isArray(data?.classes) ? data.classes : undefined,
     initialization: data?.initialization && typeof data.initialization === 'object' ? data.initialization : undefined,
-    weeklyConflictPolicy: data?.weeklyConflictPolicy && typeof data.weeklyConflictPolicy === 'object'
-      ? (data.weeklyConflictPolicy as WeeklyConflictPolicy)
-      : undefined,
-    designPolicy: data?.designPolicy && typeof data.designPolicy === 'object'
-      ? (data.designPolicy as DesignPolicy)
-      : undefined,
+    weeklyConflictPolicy:
+      data?.weeklyConflictPolicy && typeof data.weeklyConflictPolicy === 'object'
+        ? (data.weeklyConflictPolicy as WeeklyConflictPolicy)
+        : undefined,
+    designPolicy:
+      data?.designPolicy && typeof data.designPolicy === 'object' ? (data.designPolicy as DesignPolicy) : undefined,
     binding: data?.binding && typeof data.binding === 'object' ? data.binding : null,
     updatedAt: Number(data?.updatedAt ?? 0),
   };
@@ -87,7 +95,9 @@ function rememberCloudSnapshot(payload: ExamPayload): void {
   try {
     localStorage.setItem(CLOUD_VERSION_KEY, String(payload.updatedAt));
     localStorage.setItem(CLOUD_SNAPSHOT_KEY, JSON.stringify(payload));
-  } catch { /* 离线/隐私模式下仍可正常使用当前会话数据 */ }
+  } catch {
+    /* 离线/隐私模式下仍可正常使用当前会话数据 */
+  }
 }
 
 /** 最近一次成功读取或保存的云端完整快照，是三方合并的共同基线。 */
@@ -95,7 +105,9 @@ export function getCloudSnapshot(): ExamPayload | null {
   try {
     const parsed = JSON.parse(localStorage.getItem(CLOUD_SNAPSHOT_KEY) || 'null');
     return parsed && typeof parsed === 'object' ? toPayload(parsed) : null;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 // ── 统一的网络错误分类 ────────────────────────────────────────────────────────────
@@ -133,11 +145,20 @@ export async function fetchExamsFromServer(bootstrapInstanceId?: string): Promis
       const snap = getCloudSnapshot();
       if (snap) return snap;
       const full = await fetchWithTimeout(API_URL, { method: 'GET', cache: 'no-cache' }, 15_000);
-      if (!full.ok) { lastExamApiError = await apiErrorFromResponse(full, '读取考试与班级数据失败'); return null; }
-      const fullEtag = full.headers.get('ETag'); if (fullEtag) localStorage.setItem(CLOUD_ETAG_KEY, fullEtag);
+      if (!full.ok) {
+        lastExamApiError = await apiErrorFromResponse(full, '读取考试与班级数据失败');
+        return null;
+      }
+      const fullEtag = full.headers.get('ETag');
+      if (fullEtag) localStorage.setItem(CLOUD_ETAG_KEY, fullEtag);
       const fullData = await full.json();
       if (!fullData?.ok) {
-        lastExamApiError = new ApiError({ status: 500, code: 'INVALID_RESPONSE', message: '服务器返回了无效的数据，请刷新后重试。', retryable: true });
+        lastExamApiError = new ApiError({
+          status: 500,
+          code: 'INVALID_RESPONSE',
+          message: '服务器返回了无效的数据，请刷新后重试。',
+          retryable: true,
+        });
         return null;
       }
       const fullPayload = toPayload(fullData);
@@ -145,11 +166,20 @@ export async function fetchExamsFromServer(bootstrapInstanceId?: string): Promis
       return fullPayload;
     }
 
-    if (!res.ok) { lastExamApiError = await apiErrorFromResponse(res, '读取考试与班级数据失败'); return null; }
-    const freshEtag = res.headers.get('ETag'); if (freshEtag) localStorage.setItem(CLOUD_ETAG_KEY, freshEtag);
+    if (!res.ok) {
+      lastExamApiError = await apiErrorFromResponse(res, '读取考试与班级数据失败');
+      return null;
+    }
+    const freshEtag = res.headers.get('ETag');
+    if (freshEtag) localStorage.setItem(CLOUD_ETAG_KEY, freshEtag);
     const data = await res.json();
     if (!data?.ok) {
-      lastExamApiError = new ApiError({ status: 500, code: 'INVALID_RESPONSE', message: '服务器返回了无效的数据，请刷新后重试。', retryable: true });
+      lastExamApiError = new ApiError({
+        status: 500,
+        code: 'INVALID_RESPONSE',
+        message: '服务器返回了无效的数据，请刷新后重试。',
+        retryable: true,
+      });
       return null;
     }
     const payload = toPayload(data);
@@ -182,7 +212,12 @@ export interface SaveExamsInput {
   weeklyConflictPolicy?: WeeklyConflictPolicy | null;
 }
 
-export type SaveExamsResult = number | 'unauthorized' | { kind: 'conflict'; remote: ExamPayload | null } | { kind: 'error'; error: ApiError } | null;
+export type SaveExamsResult =
+  | number
+  | 'unauthorized'
+  | { kind: 'conflict'; remote: ExamPayload | null }
+  | { kind: 'error'; error: ApiError }
+  | null;
 
 async function saveExamsToServerNow(input: SaveExamsInput): Promise<SaveExamsResult> {
   try {
@@ -201,22 +236,24 @@ async function saveExamsToServerNow(input: SaveExamsInput): Promise<SaveExamsRes
     if (input.scheduleMode !== undefined) requestBody.scheduleMode = input.scheduleMode;
     if (input.weeklyPlans !== undefined) requestBody.weeklyPlans = input.weeklyPlans;
     if (input.activeWeeklyPlanId !== undefined) requestBody.activeWeeklyPlanId = input.activeWeeklyPlanId;
-    if (input.activeWeeklyPlanIdByClassId !== undefined) requestBody.activeWeeklyPlanIdByClassId = input.activeWeeklyPlanIdByClassId;
+    if (input.activeWeeklyPlanIdByClassId !== undefined)
+      requestBody.activeWeeklyPlanIdByClassId = input.activeWeeklyPlanIdByClassId;
     if (input.grades !== undefined) requestBody.grades = input.grades;
     if (input.classes !== undefined) requestBody.classes = input.classes;
     if (input.initialization !== undefined) requestBody.initialization = input.initialization;
     if (input.weeklyConflictPolicy !== undefined) requestBody.weeklyConflictPolicy = input.weeklyConflictPolicy;
 
-    const res = await fetchWithTimeout(
-      API_URL,
-      { method: 'POST', headers, body: JSON.stringify(requestBody) },
-      20_000,
-    );
+    const res = await fetchWithTimeout(API_URL, { method: 'POST', headers, body: JSON.stringify(requestBody) }, 20_000);
 
-    if (res.status === 401) { lastExamApiError = await apiErrorFromResponse(res, '登录状态已失效'); logoutAdmin(); return 'unauthorized'; }
+    if (res.status === 401) {
+      lastExamApiError = await apiErrorFromResponse(res, '登录状态已失效');
+      logoutAdmin();
+      return 'unauthorized';
+    }
     if (res.status === 409) {
       const data = await res.json().catch(() => null);
-      if (data?.code === 'DATA_CONFLICT' || data?.remote) return { kind: 'conflict', remote: data?.remote ? toPayload(data.remote) : null };
+      if (data?.code === 'DATA_CONFLICT' || data?.remote)
+        return { kind: 'conflict', remote: data?.remote ? toPayload(data.remote) : null };
       const replay = new Response(JSON.stringify(data), { status: res.status, headers: res.headers });
       const error = await apiErrorFromResponse(replay, '云端拒绝了本次保存');
       lastExamApiError = error;
@@ -255,9 +292,10 @@ async function saveExamsToServerNow(input: SaveExamsInput): Promise<SaveExamsRes
     return updatedAt;
   } catch (err) {
     const error = classifyFetchError(err);
-    const wrappedError = (error.code === 'NETWORK_UNAVAILABLE' || error.code === 'NETWORK_TIMEOUT')
-      ? new ApiError({ ...error, message: '无法连接服务器，本机修改已保留，联网后会自动重试。' })
-      : error;
+    const wrappedError =
+      error.code === 'NETWORK_UNAVAILABLE' || error.code === 'NETWORK_TIMEOUT'
+        ? new ApiError({ ...error, message: '无法连接服务器，本机修改已保留，联网后会自动重试。' })
+        : error;
     lastExamApiError = wrappedError;
     return { kind: 'error', error: wrappedError };
   }
@@ -277,15 +315,17 @@ export async function saveExamsToServer(input: SaveExamsInput): Promise<SaveExam
 export async function saveDesignPolicy(designPolicy: DesignPolicy): Promise<DesignPolicy> {
   const token = localStorage.getItem(TOKEN_KEY) ?? '';
   try {
-    const response = await runQueued(() => fetchWithTimeout(
-      API_URL,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ action: 'design-policy', designPolicy }),
-      },
-      20_000,
-    ));
+    const response = await runQueued(() =>
+      fetchWithTimeout(
+        API_URL,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          body: JSON.stringify({ action: 'design-policy', designPolicy }),
+        },
+        20_000,
+      ),
+    );
     if (!response.ok) {
       const error = await apiErrorFromResponse(response, '考试端设计规则保存失败');
       saveDesignPolicyDraft(designPolicy, error.message);
@@ -296,7 +336,8 @@ export async function saveDesignPolicy(designPolicy: DesignPolicy): Promise<Desi
     const saved = data.designPolicy as DesignPolicy;
     clearDesignPolicyDraft();
     const snapshot = getCloudSnapshot();
-    if (snapshot) rememberCloudSnapshot({ ...snapshot, designPolicy: saved, updatedAt: Number(data.updatedAt ?? saved.updatedAt) });
+    if (snapshot)
+      rememberCloudSnapshot({ ...snapshot, designPolicy: saved, updatedAt: Number(data.updatedAt ?? saved.updatedAt) });
     else localStorage.setItem(CLOUD_VERSION_KEY, String(data.updatedAt ?? saved.updatedAt));
     return saved;
   } catch (err) {
@@ -309,18 +350,22 @@ export async function saveDesignPolicy(designPolicy: DesignPolicy): Promise<Desi
   }
 }
 
-
-export async function saveMajorBatchPresets(presets: { subjectGroups: unknown[]; timeGroups: unknown[] }): Promise<{ subjectGroups: unknown[]; timeGroups: unknown[]; updatedAt: number }> {
+export async function saveMajorBatchPresets(presets: {
+  subjectGroups: unknown[];
+  timeGroups: unknown[];
+}): Promise<{ subjectGroups: unknown[]; timeGroups: unknown[]; updatedAt: number }> {
   const token = localStorage.getItem(TOKEN_KEY) ?? '';
-  const response = await runQueued(() => fetchWithTimeout(
-    API_URL,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-      body: JSON.stringify({ action: 'major-batch-presets', presets }),
-    },
-    20_000,
-  ));
+  const response = await runQueued(() =>
+    fetchWithTimeout(
+      API_URL,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ action: 'major-batch-presets', presets }),
+      },
+      20_000,
+    ),
+  );
   if (!response.ok) {
     const error = await apiErrorFromResponse(response, '批量预设保存失败');
     throw error;
@@ -329,7 +374,12 @@ export async function saveMajorBatchPresets(presets: { subjectGroups: unknown[];
   if (!data?.majorBatchPresets) throw new Error('服务器未返回批量预设');
   const saved = data.majorBatchPresets;
   const snapshot = getCloudSnapshot();
-  if (snapshot) rememberCloudSnapshot({ ...snapshot, majorBatchPresets: saved, updatedAt: Number(data.updatedAt ?? saved.updatedAt) });
+  if (snapshot)
+    rememberCloudSnapshot({
+      ...snapshot,
+      majorBatchPresets: saved,
+      updatedAt: Number(data.updatedAt ?? saved.updatedAt),
+    });
   else localStorage.setItem(CLOUD_VERSION_KEY, String(data.updatedAt ?? saved.updatedAt));
   return saved;
 }
@@ -337,7 +387,10 @@ export async function saveMajorBatchPresets(presets: { subjectGroups: unknown[];
 export async function isLoginRequired(): Promise<boolean> {
   try {
     const res = await fetchWithTimeout(LOGIN_URL, { method: 'GET', headers: { 'Cache-Control': 'no-store' } }, 10_000);
-    if (!res.ok) { lastAuthApiError = await apiErrorFromResponse(res, '无法读取登录配置'); return true; }
+    if (!res.ok) {
+      lastAuthApiError = await apiErrorFromResponse(res, '无法读取登录配置');
+      return true;
+    }
     const data = await res.json();
     lastAuthApiError = null;
     return !!data?.required;
@@ -358,11 +411,16 @@ export async function getAdminRecoveryStatus(): Promise<boolean> {
   return data?.configured === true;
 }
 
-export async function recoverSuperAdminAccount(username: string, recoveryKey: string, newPassword: string): Promise<void> {
+export async function recoverSuperAdminAccount(
+  username: string,
+  recoveryKey: string,
+  newPassword: string,
+): Promise<void> {
   const res = await fetchWithTimeout(
     LOGIN_URL,
     {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'recover-super-admin', username, recoveryKey, newPassword }),
     },
     15_000,
@@ -370,7 +428,11 @@ export async function recoverSuperAdminAccount(username: string, recoveryKey: st
   if (!res.ok) throw await apiErrorFromResponse(res, '超级管理员账户恢复失败');
 }
 
-export async function repairSuperAdminAccount(username: string, recoveryKey: string, newPassword: string): Promise<{ created: boolean }> {
+export async function repairSuperAdminAccount(
+  username: string,
+  recoveryKey: string,
+  newPassword: string,
+): Promise<{ created: boolean }> {
   const res = await fetchWithTimeout(
     LOGIN_URL,
     {
@@ -380,7 +442,10 @@ export async function repairSuperAdminAccount(username: string, recoveryKey: str
     },
     15_000,
   );
-  const data = await res.clone().json().catch(() => null);
+  const data = await res
+    .clone()
+    .json()
+    .catch(() => null);
   if (!res.ok || data?.ok !== true) throw await apiErrorFromResponse(res, '超级管理员账户修复失败');
   return { created: data.created === true };
 }
@@ -406,17 +471,27 @@ export type LoginSession = {
 export function getAdminUser(): AdminUserContext | null {
   try {
     const user = JSON.parse(localStorage.getItem(ADMIN_USER_KEY) || 'null');
-    return user && typeof user === 'object' && Array.isArray(user.permissions) ? user as AdminUserContext : null;
-  } catch { return null; }
+    return user && typeof user === 'object' && Array.isArray(user.permissions) ? (user as AdminUserContext) : null;
+  } catch {
+    return null;
+  }
 }
 
 export function shouldPromptGradeAdminSetup(user: AdminUserContext | null): boolean {
   if (!user || user.roleId !== 'grade_admin' || user.mustChangePassword) return false;
-  try { return localStorage.getItem(GRADE_ADMIN_FIRST_LOGIN_KEY) === String(user.id); } catch { return false; }
+  try {
+    return localStorage.getItem(GRADE_ADMIN_FIRST_LOGIN_KEY) === String(user.id);
+  } catch {
+    return false;
+  }
 }
 
 export function clearGradeAdminSetupPrompt(): void {
-  try { localStorage.removeItem(GRADE_ADMIN_FIRST_LOGIN_KEY); } catch { /* storage optional */ }
+  try {
+    localStorage.removeItem(GRADE_ADMIN_FIRST_LOGIN_KEY);
+  } catch {
+    /* storage optional */
+  }
 }
 
 // 以下三个函数现在委托给 src/shared/permissionRules.ts 的共享实现，与后端 api/_auth.ts 的
@@ -444,12 +519,17 @@ export async function refreshAdminUser(): Promise<AdminUserContext | null> {
       { headers: { Authorization: `Bearer ${token}`, 'Cache-Control': 'no-store' } },
       10_000,
     );
-    if (!res.ok) { if (res.status === 401) logoutAdmin(); return null; }
+    if (!res.ok) {
+      if (res.status === 401) logoutAdmin();
+      return null;
+    }
     const data = await res.json();
     if (!data?.user) return null;
     localStorage.setItem(ADMIN_USER_KEY, JSON.stringify(data.user));
     return data.user as AdminUserContext;
-  } catch { return getAdminUser(); }
+  } catch {
+    return getAdminUser();
+  }
 }
 
 export async function loginAdmin(username: string, password: string): Promise<LoginSession | null> {
@@ -465,18 +545,22 @@ export async function loginAdmin(username: string, password: string): Promise<Lo
     );
     const data = await res.json().catch(() => null);
     if (!res.ok || !data?.ok) {
-      lastAuthApiError = await apiErrorFromResponse(new Response(JSON.stringify(data), { status: res.status, headers: res.headers }), '登录失败');
+      lastAuthApiError = await apiErrorFromResponse(
+        new Response(JSON.stringify(data), { status: res.status, headers: res.headers }),
+        '登录失败',
+      );
       return null;
     }
     const token = typeof data.token === 'string' && data.token ? data.token : null;
-    const user = data.user && typeof data.user === 'object' ? data.user as AdminUserContext : null;
+    const user = data.user && typeof data.user === 'object' ? (data.user as AdminUserContext) : null;
     if (token) {
       localStorage.setItem(TOKEN_KEY, token);
       localStorage.setItem(TOKEN_EXPIRES_KEY, String(data.expiresAt ?? 0));
     }
     if (user) {
       localStorage.setItem(ADMIN_USER_KEY, JSON.stringify(user));
-      if (data.firstLogin === true && user.roleId === 'grade_admin') localStorage.setItem(GRADE_ADMIN_FIRST_LOGIN_KEY, String(user.id));
+      if (data.firstLogin === true && user.roleId === 'grade_admin')
+        localStorage.setItem(GRADE_ADMIN_FIRST_LOGIN_KEY, String(user.id));
     }
     lastAuthApiError = null;
     return { token, user };
@@ -486,9 +570,11 @@ export async function loginAdmin(username: string, password: string): Promise<Lo
   }
 }
 
-
-
-export async function guestLogin(instanceId: string, gradeId: string, classId: string): Promise<{ token: string; user: AdminUserContext | null } | null> {
+export async function guestLogin(
+  instanceId: string,
+  gradeId: string,
+  classId: string,
+): Promise<{ token: string; user: AdminUserContext | null } | null> {
   try {
     const res = await fetchWithTimeout(
       LOGIN_URL,
@@ -501,11 +587,14 @@ export async function guestLogin(instanceId: string, gradeId: string, classId: s
     );
     const data = await res.json().catch(() => null);
     if (!res.ok || !data?.ok) {
-      lastAuthApiError = await apiErrorFromResponse(new Response(JSON.stringify(data), { status: res.status, headers: res.headers }), '访客登录失败');
+      lastAuthApiError = await apiErrorFromResponse(
+        new Response(JSON.stringify(data), { status: res.status, headers: res.headers }),
+        '访客登录失败',
+      );
       return null;
     }
     const token = typeof data.token === 'string' && data.token ? data.token : null;
-    const user = data.user && typeof data.user === 'object' ? data.user as AdminUserContext : null;
+    const user = data.user && typeof data.user === 'object' ? (data.user as AdminUserContext) : null;
     storeAdminSession(token, Number(data.expiresAt ?? 0), user);
     lastAuthApiError = null;
     return { token: token ?? '', user };
@@ -515,14 +604,20 @@ export async function guestLogin(instanceId: string, gradeId: string, classId: s
   }
 }
 
-export function storeAdminSession(token: string | null, expiresAt: number, user: AdminUserContext | null, firstLogin = false): void {
+export function storeAdminSession(
+  token: string | null,
+  expiresAt: number,
+  user: AdminUserContext | null,
+  firstLogin = false,
+): void {
   if (token) {
     localStorage.setItem(TOKEN_KEY, token);
     localStorage.setItem(TOKEN_EXPIRES_KEY, String(expiresAt ?? 0));
   }
   if (user) {
     localStorage.setItem(ADMIN_USER_KEY, JSON.stringify(user));
-    if (firstLogin === true && user.roleId === 'grade_admin') localStorage.setItem(GRADE_ADMIN_FIRST_LOGIN_KEY, String(user.id));
+    if (firstLogin === true && user.roleId === 'grade_admin')
+      localStorage.setItem(GRADE_ADMIN_FIRST_LOGIN_KEY, String(user.id));
   }
 }
 
@@ -530,7 +625,10 @@ export function hasValidLocalToken(): boolean {
   const token = localStorage.getItem(TOKEN_KEY);
   const expires = Number(localStorage.getItem(TOKEN_EXPIRES_KEY) ?? 0);
   if (!token) return false;
-  if (expires && Date.now() > expires) { logoutAdmin(); return false; }
+  if (expires && Date.now() > expires) {
+    logoutAdmin();
+    return false;
+  }
   return true;
 }
 

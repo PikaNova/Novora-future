@@ -1,310 +1,168 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, Clock3 } from "lucide-react";
-import type { ExamItem, MajorExam } from "../types";
-import type { SchoolClass } from "../types/school";
-import { COMMON_EXAM_SUBJECTS, normalizeSubjectName } from "../data/subjects";
-import type { MajorBatchSubjectGroup, MajorBatchTimeGroup, MajorBatchTimeSlot } from "../utils/appSettings";
-import { APP_SETTINGS_CHANGED_EVENT, getAppSettings } from "../utils/appSettings";
-import { classesInMajorScope, computeAutoTrackClassIds } from "../utils/trackClassIds";
-import AdminModalPortal from "./AdminModalPortal";
-import AdminWizardSteps, { AdminWorkflowClose } from "./AdminWizardSteps";
-import HelpTip from "./HelpTip";
-import SubjectIcon from "./SubjectIcon";
-import TimeRangePickerModal from "./TimeRangePickerModal";
-import { DateTimeField } from "./touch-datetime-picker";
-import "../styles/major-batch-add-modal.css";
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Check, Clock3 } from 'lucide-react';
+import type { ExamItem, MajorExam } from '../types';
+import type { SchoolClass } from '../types/school';
+import { COMMON_EXAM_SUBJECTS, normalizeSubjectName } from '../data/subjects';
+import type { MajorBatchSubjectGroup, MajorBatchTimeGroup } from '../utils/appSettings';
+import { APP_SETTINGS_CHANGED_EVENT, getAppSettings } from '../utils/appSettings';
+import { classesInMajorScope, computeAutoTrackClassIds } from '../utils/trackClassIds';
+import AdminModalPortal from './AdminModalPortal';
+import {
+  GAOKAO_THREE_DAY_PATTERN_ID,
+  arrangedSubjectsForPattern,
+  buildDraftItems,
+  customTimeToPattern,
+  customSubjectToTemplate,
+  durationText,
+  fmtDate,
+  makeDraftId,
+  makeExamId,
+  patternDaySpan,
+  rangesOverlap,
+  toLocalIso,
+  todayKey,
+  type BatchDraftItem,
+  type DayPattern,
+  type SubjectTemplate,
+  type TemplateCategory,
+} from './major-batch/majorBatchAdd.helpers';
+import AdminWizardSteps, { AdminWorkflowClose } from './AdminWizardSteps';
+import HelpTip from './HelpTip';
+import SubjectIcon from './SubjectIcon';
+import TimeRangePickerModal from './TimeRangePickerModal';
+import { DateTimeField } from './touch-datetime-picker';
+import '../styles/major-batch-add-modal.css';
 
-type BatchDraftItem = {
-  id: string;
-  name: string;
-  date: string;
-  start: string;
-  end: string;
-  enabled: boolean;
-  allowCrossDay: boolean;
-  targetClassIds?: string[];
-};
-
-type TemplateCategory = "gaokao" | "school" | "custom";
-
-type SubjectTemplate = {
-  id: string;
-  name: string;
-  description: string;
-  subjects: string[];
-  custom?: boolean;
-  source?: 'school' | 'local';
-  category: TemplateCategory;
-  /** 该模板允许勾选的最大科目总数（例如 3+1+2 固定为 6 门）；不设置表示不限制。 */
-  maxTotal?: number;
-};
-
-type DayPattern = {
-  id: string;
-  name: string;
-  description: string;
-  slots: MajorBatchTimeSlot[];
-  custom?: boolean;
-  source?: 'school' | 'local';
-  category: TemplateCategory;
-};
-
-const GAOKAO_THREE_DAY_PATTERN_ID = "gaokao-three-day";
-const GAOKAO_THREE_DAY_SUBJECTS_ID = "gaokao-three-day-subjects";
-const CATEGORY_LABELS: Record<Exclude<TemplateCategory, "custom">, string> = {
-  gaokao: "高考常用",
-  school: "学校常规",
+const GAOKAO_THREE_DAY_SUBJECTS_ID = 'gaokao-three-day-subjects';
+const CATEGORY_LABELS: Record<Exclude<TemplateCategory, 'custom'>, string> = {
+  gaokao: '高考常用',
+  school: '学校常规',
 };
 
 const SUBJECT_TEMPLATES: SubjectTemplate[] = [
   {
     id: GAOKAO_THREE_DAY_SUBJECTS_ID,
-    name: "新高考三天常用（全科覆盖）",
-    description: "9 科覆盖；物理/历史同场生成，按福建 2026 新高考时间表排成 8 场",
-    subjects: ["语文", "数学", "物理", "历史", "外语", "化学", "地理", "思想政治", "生物"],
-    category: "gaokao",
+    name: '新高考三天常用（全科覆盖）',
+    description: '9 科覆盖；物理/历史同场生成，按福建 2026 新高考时间表排成 8 场',
+    subjects: ['语文', '数学', '物理', '历史', '外语', '化学', '地理', '思想政治', '生物'],
+    category: 'gaokao',
   },
   {
-    id: "gaokao-3-1-2-physics",
-    name: "3+1+2（物理方向）",
-    description: "已默认选中语文/数学/外语/物理/化学共 5 门，请再从生物、思想政治、地理中任选 1 门凑满 6 门",
-    subjects: ["语文", "数学", "外语", "物理", "化学"],
-    category: "gaokao",
+    id: 'gaokao-3-1-2-physics',
+    name: '3+1+2（物理方向）',
+    description: '已默认选中语文/数学/外语/物理/化学共 5 门，请再从生物、思想政治、地理中任选 1 门凑满 6 门',
+    subjects: ['语文', '数学', '外语', '物理', '化学'],
+    category: 'gaokao',
     maxTotal: 6,
   },
   {
-    id: "gaokao-3-1-2-history",
-    name: "3+1+2（历史方向）",
-    description: "已默认选中语文/数学/外语/历史/思想政治共 5 门，请再从地理、生物、化学中任选 1 门凑满 6 门",
-    subjects: ["语文", "数学", "外语", "历史", "思想政治"],
-    category: "gaokao",
+    id: 'gaokao-3-1-2-history',
+    name: '3+1+2（历史方向）',
+    description: '已默认选中语文/数学/外语/历史/思想政治共 5 门，请再从地理、生物、化学中任选 1 门凑满 6 门',
+    subjects: ['语文', '数学', '外语', '历史', '思想政治'],
+    category: 'gaokao',
     maxTotal: 6,
   },
   {
-    id: "gaokao-3-3-elective",
-    name: "3+3 自选",
-    description: "已默认选中语文/数学/外语共 3 门，请再从其余 6 门选考科目中任选 3 门凑满 6 门",
-    subjects: ["语文", "数学", "外语"],
-    category: "gaokao",
+    id: 'gaokao-3-3-elective',
+    name: '3+3 自选',
+    description: '已默认选中语文/数学/外语共 3 门，请再从其余 6 门选考科目中任选 3 门凑满 6 门',
+    subjects: ['语文', '数学', '外语'],
+    category: 'gaokao',
     maxTotal: 6,
   },
   {
-    id: "senior-nine",
-    name: "高中常规九科",
-    description: "语文、数学、外语与六门选考科目",
-    subjects: ["语文", "数学", "外语", "物理", "历史", "化学", "地理", "思想政治", "生物"],
-    category: "school",
+    id: 'senior-nine',
+    name: '高中常规九科',
+    description: '语文、数学、外语与六门选考科目',
+    subjects: ['语文', '数学', '外语', '物理', '历史', '化学', '地理', '思想政治', '生物'],
+    category: 'school',
   },
   {
-    id: "main-three",
-    name: "语数外三科",
-    description: "阶段练习和核心科目考试常用",
-    subjects: ["语文", "数学", "外语"],
-    category: "school",
+    id: 'main-three',
+    name: '语数外三科',
+    description: '阶段练习和核心科目考试常用',
+    subjects: ['语文', '数学', '外语'],
+    category: 'school',
   },
 ];
 
 const DAY_PATTERNS: DayPattern[] = [
   {
     id: GAOKAO_THREE_DAY_PATTERN_ID,
-    name: "新高考三天常用",
-    description: "福建 2026：语数、物理/历史、外语、化地政生；9 科覆盖，8 场约 3 天",
+    name: '新高考三天常用',
+    description: '福建 2026：语数、物理/历史、外语、化地政生；9 科覆盖，8 场约 3 天',
     slots: [
-      { start: "09:00", end: "11:30", dayOffset: 0 },
-      { start: "15:00", end: "17:00", dayOffset: 0 },
-      { start: "09:00", end: "10:15", dayOffset: 1 },
-      { start: "15:00", end: "17:00", dayOffset: 1 },
-      { start: "08:30", end: "09:45", dayOffset: 2 },
-      { start: "11:00", end: "12:15", dayOffset: 2 },
-      { start: "14:30", end: "15:45", dayOffset: 2 },
-      { start: "17:00", end: "18:15", dayOffset: 2 },
+      { start: '09:00', end: '11:30', dayOffset: 0 },
+      { start: '15:00', end: '17:00', dayOffset: 0 },
+      { start: '09:00', end: '10:15', dayOffset: 1 },
+      { start: '15:00', end: '17:00', dayOffset: 1 },
+      { start: '08:30', end: '09:45', dayOffset: 2 },
+      { start: '11:00', end: '12:15', dayOffset: 2 },
+      { start: '14:30', end: '15:45', dayOffset: 2 },
+      { start: '17:00', end: '18:15', dayOffset: 2 },
     ],
-    category: "gaokao",
+    category: 'gaokao',
   },
   {
-    id: "gaokao-old-two-day",
-    name: "老高考两天常用",
-    description: "第一天语文、数学，第二天综合、外语",
+    id: 'gaokao-old-two-day',
+    name: '老高考两天常用',
+    description: '第一天语文、数学，第二天综合、外语',
     slots: [
-      { start: "09:00", end: "11:30", dayOffset: 0 },
-      { start: "15:00", end: "17:00", dayOffset: 0 },
-      { start: "09:00", end: "11:30", dayOffset: 1 },
-      { start: "15:00", end: "17:00", dayOffset: 1 },
+      { start: '09:00', end: '11:30', dayOffset: 0 },
+      { start: '15:00', end: '17:00', dayOffset: 0 },
+      { start: '09:00', end: '11:30', dayOffset: 1 },
+      { start: '15:00', end: '17:00', dayOffset: 1 },
     ],
-    category: "gaokao",
+    category: 'gaokao',
   },
   {
-    id: "two-am-two-pm",
-    name: "上午 2 场 + 下午 2 场",
-    description: "适合一天安排四门短时考试",
+    id: 'two-am-two-pm',
+    name: '上午 2 场 + 下午 2 场',
+    description: '适合一天安排四门短时考试',
     slots: [
-      { start: "08:30", end: "09:45" },
-      { start: "10:15", end: "11:30" },
-      { start: "14:30", end: "15:45" },
-      { start: "16:15", end: "17:30" },
+      { start: '08:30', end: '09:45' },
+      { start: '10:15', end: '11:30' },
+      { start: '14:30', end: '15:45' },
+      { start: '16:15', end: '17:30' },
     ],
-    category: "school",
+    category: 'school',
   },
   {
-    id: "two-per-day",
-    name: "每天 2 场",
-    description: "上午一场，下午一场",
+    id: 'two-per-day',
+    name: '每天 2 场',
+    description: '上午一场，下午一场',
     slots: [
-      { start: "09:00", end: "11:00" },
-      { start: "15:00", end: "17:00" },
+      { start: '09:00', end: '11:00' },
+      { start: '15:00', end: '17:00' },
     ],
-    category: "school",
+    category: 'school',
   },
   {
-    id: "three-per-day",
-    name: "每天 3 场",
-    description: "上午两场，下午一场",
+    id: 'three-per-day',
+    name: '每天 3 场',
+    description: '上午两场，下午一场',
     slots: [
-      { start: "08:30", end: "09:45" },
-      { start: "10:15", end: "11:30" },
-      { start: "15:00", end: "17:00" },
+      { start: '08:30', end: '09:45' },
+      { start: '10:15', end: '11:30' },
+      { start: '15:00', end: '17:00' },
     ],
-    category: "school",
+    category: 'school',
   },
   {
-    id: "one-am-two-pm",
-    name: "上午 1 场 + 下午 2 场",
-    description: "适合首科较长的安排",
+    id: 'one-am-two-pm',
+    name: '上午 1 场 + 下午 2 场',
+    description: '适合首科较长的安排',
     slots: [
-      { start: "09:00", end: "11:30" },
-      { start: "14:30", end: "15:45" },
-      { start: "16:15", end: "17:30" },
+      { start: '09:00', end: '11:30' },
+      { start: '14:30', end: '15:45' },
+      { start: '16:15', end: '17:30' },
     ],
-    category: "school",
+    category: 'school',
   },
 ];
 
 const COMMON_SUBJECTS = COMMON_EXAM_SUBJECTS;
-
-function makeDraftId() {
-  return `batch_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-}
-
-function makeExamId() {
-  return `exam_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-}
-
-function todayKey() {
-  const date = new Date(Date.now() - new Date().getTimezoneOffset() * 60_000);
-  return date.toISOString().slice(0, 10);
-}
-
-function addDays(dateKey: string, days: number) {
-  const date = new Date(`${dateKey}T00:00:00`);
-  date.setDate(date.getDate() + days);
-  return date.toISOString().slice(0, 10);
-}
-
-function toLocalIso(date: string, time: string, nextDay = false) {
-  const targetDate = nextDay ? addDays(date, 1) : date;
-  return `${targetDate}T${time}`;
-}
-
-function fmtDate(dateKey: string) {
-  const date = new Date(`${dateKey}T00:00:00`);
-  return date.toLocaleDateString("zh-CN", {
-    month: "numeric",
-    day: "numeric",
-    weekday: "short",
-  });
-}
-
-function rangesOverlap(leftStart: string, leftEnd: string, rightStart: string, rightEnd: string) {
-  return new Date(leftStart) < new Date(rightEnd) && new Date(leftEnd) > new Date(rightStart);
-}
-
-function slotDayOffset(slot: MajorBatchTimeSlot) {
-  return Math.max(0, Math.round(Number(slot.dayOffset ?? 0)));
-}
-
-function patternDaySpan(pattern: DayPattern) {
-  const maxOffset = pattern.slots.reduce((max, slot) => Math.max(max, slotDayOffset(slot)), 0);
-  return maxOffset + 1;
-}
-
-function arrangedSubjectsForPattern(subjects: string[], pattern: DayPattern): string[] {
-  if (pattern.id !== GAOKAO_THREE_DAY_PATTERN_ID) return subjects;
-  const selected = new Set(subjects);
-  const arranged: string[] = [];
-  const pushIfSelected = (subject: string) => {
-    if (selected.has(subject)) arranged.push(subject);
-  };
-  pushIfSelected("语文");
-  pushIfSelected("数学");
-  if (selected.has("物理") && selected.has("历史")) arranged.push("物理/历史");
-  else if (selected.has("物理")) arranged.push("物理");
-  else if (selected.has("历史")) arranged.push("历史");
-  pushIfSelected("外语");
-  pushIfSelected("化学");
-  pushIfSelected("地理");
-  pushIfSelected("思想政治");
-  pushIfSelected("生物");
-  const covered = new Set(["语文", "数学", "物理", "历史", "外语", "化学", "地理", "思想政治", "生物"]);
-  for (const subject of subjects) {
-    if (!covered.has(subject) && !arranged.includes(subject)) arranged.push(subject);
-  }
-  return arranged;
-}
-
-function buildDraftItems(subjects: string[], startDate: string, pattern: DayPattern): BatchDraftItem[] {
-  const explicitDays = pattern.slots.some((slot) => slotDayOffset(slot) > 0);
-  const daySpan = explicitDays ? patternDaySpan(pattern) : 1;
-  const arrangedSubjects = arrangedSubjectsForPattern(subjects, pattern);
-  return arrangedSubjects.map((subject, index) => {
-    const slot = pattern.slots[index % pattern.slots.length];
-    const cycleOffset = Math.floor(index / pattern.slots.length) * daySpan;
-    const dayOffset = explicitDays ? cycleOffset + slotDayOffset(slot) : Math.floor(index / pattern.slots.length);
-    return {
-      id: makeDraftId(),
-      name: subject,
-      date: addDays(startDate, dayOffset),
-      start: slot.start,
-      end: slot.end,
-      enabled: true,
-      allowCrossDay: false,
-    };
-  });
-}
-
-function durationText(startIso: string, endIso: string) {
-  const minutes = Math.round((new Date(endIso).getTime() - new Date(startIso).getTime()) / 60000);
-  if (!Number.isFinite(minutes) || minutes <= 0) return "时间无效";
-  if (minutes >= 60) {
-    const hours = Math.floor(minutes / 60);
-    const rest = minutes % 60;
-    return rest ? `${hours}小时${rest}分钟` : `${hours}小时`;
-  }
-  return `${minutes}分钟`;
-}
-
-function customSubjectToTemplate(item: MajorBatchSubjectGroup): SubjectTemplate {
-  return {
-    id: item.id,
-    name: item.name,
-    description: `${item.subjects.length} 个科目，已保存为常用组`,
-    subjects: item.subjects,
-    custom: true,
-    source: "local",
-    category: "custom",
-  };
-}
-
-function customTimeToPattern(item: MajorBatchTimeGroup): DayPattern {
-  return {
-    id: item.id,
-    name: item.name,
-    description: `${item.slots.length} 个场次，已保存为常用时间组`,
-    slots: item.slots,
-    custom: true,
-    source: "local",
-    category: "custom",
-  };
-}
 
 export default function MajorBatchAddModal({
   major,
@@ -320,17 +178,23 @@ export default function MajorBatchAddModal({
   onCommit: (nextItems: ExamItem[]) => void;
 }) {
   const [step, setStep] = useState(0);
-  const [schoolSubjectGroups, setSchoolSubjectGroups] = useState<MajorBatchSubjectGroup[]>(() => getAppSettings().exam.majorBatchPresets.subjectGroups);
-  const [schoolTimeGroups, setSchoolTimeGroups] = useState<MajorBatchTimeGroup[]>(() => getAppSettings().exam.majorBatchPresets.timeGroups);
-  const [subjectTrackModeEnabled, setSubjectTrackModeEnabled] = useState(() => getAppSettings().exam.initialization.subjectTrackModeEnabled !== false);
+  const [schoolSubjectGroups, setSchoolSubjectGroups] = useState<MajorBatchSubjectGroup[]>(
+    () => getAppSettings().exam.majorBatchPresets.subjectGroups,
+  );
+  const [schoolTimeGroups, setSchoolTimeGroups] = useState<MajorBatchTimeGroup[]>(
+    () => getAppSettings().exam.majorBatchPresets.timeGroups,
+  );
+  const [subjectTrackModeEnabled, setSubjectTrackModeEnabled] = useState(
+    () => getAppSettings().exam.initialization.subjectTrackModeEnabled === true,
+  );
   const [templateId, setTemplateId] = useState(SUBJECT_TEMPLATES[0].id);
   const [subjects, setSubjects] = useState(SUBJECT_TEMPLATES[0].subjects);
   const [subjectCap, setSubjectCap] = useState<number | null>(SUBJECT_TEMPLATES[0].maxTotal ?? null);
-  const [customSubject, setCustomSubject] = useState("");
+  const [customSubject, setCustomSubject] = useState('');
   const [startDate, setStartDate] = useState(todayKey);
   const [patternId, setPatternId] = useState(DAY_PATTERNS[0].id);
   const [draftItems, setDraftItems] = useState<BatchDraftItem[]>([]);
-  const [error, setError] = useState("");
+  const [error, setError] = useState('');
   const [collapsedDates, setCollapsedDates] = useState<Set<string>>(new Set());
   const [timeEditItemId, setTimeEditItemId] = useState<string | null>(null);
   const timeEditAnchorRef = useRef<HTMLButtonElement | null>(null);
@@ -341,22 +205,28 @@ export default function MajorBatchAddModal({
       const settings = getAppSettings();
       setSchoolSubjectGroups(settings.exam.majorBatchPresets.subjectGroups);
       setSchoolTimeGroups(settings.exam.majorBatchPresets.timeGroups);
-      setSubjectTrackModeEnabled(settings.exam.initialization.subjectTrackModeEnabled !== false);
+      setSubjectTrackModeEnabled(settings.exam.initialization.subjectTrackModeEnabled === true);
     };
     window.addEventListener(APP_SETTINGS_CHANGED_EVENT, sync);
-    window.addEventListener("storage", sync);
+    window.addEventListener('storage', sync);
     return () => {
       window.removeEventListener(APP_SETTINGS_CHANGED_EVENT, sync);
-      window.removeEventListener("storage", sync);
+      window.removeEventListener('storage', sync);
     };
   }, []);
 
   const subjectTemplates = useMemo(
-    () => [...SUBJECT_TEMPLATES, ...schoolSubjectGroups.map((group) => ({ ...customSubjectToTemplate(group), source: "school" as const }))],
+    () => [
+      ...SUBJECT_TEMPLATES,
+      ...schoolSubjectGroups.map((group) => ({ ...customSubjectToTemplate(group), source: 'school' as const })),
+    ],
     [schoolSubjectGroups],
   );
   const dayPatterns = useMemo(
-    () => [...DAY_PATTERNS, ...schoolTimeGroups.map((group) => ({ ...customTimeToPattern(group), source: "school" as const }))],
+    () => [
+      ...DAY_PATTERNS,
+      ...schoolTimeGroups.map((group) => ({ ...customTimeToPattern(group), source: 'school' as const })),
+    ],
     [schoolTimeGroups],
   );
   const template = subjectTemplates.find((item) => item.id === templateId) ?? subjectTemplates[0];
@@ -364,10 +234,7 @@ export default function MajorBatchAddModal({
   const designDays = patternDaySpan(pattern);
   const arrangedSubjects = useMemo(() => arrangedSubjectsForPattern(subjects, pattern), [subjects, pattern]);
   const needsMoreSlots = arrangedSubjects.length > pattern.slots.length;
-  const scopedClasses = useMemo(
-    () => classesInMajorScope(major, classes),
-    [classes, major],
-  );
+  const scopedClasses = useMemo(() => classesInMajorScope(major, classes), [classes, major]);
   const unsetTrackClassCount = scopedClasses.filter((item) => !item.track?.length).length;
   const autoTargetClassIdsForSubject = (subject: string) =>
     computeAutoTrackClassIds(major, subject, classes, subjectTrackModeEnabled);
@@ -383,16 +250,13 @@ export default function MajorBatchAddModal({
 
     normalized.forEach(({ item, startIso, endIso }, index) => {
       const messages: string[] = [];
-      if (!item.name.trim()) messages.push("科目名为空");
-      if (!item.date || !item.start || !item.end) messages.push("时间未填完整");
-      if (new Date(startIso) >= new Date(endIso)) messages.push("结束时间必须晚于开始时间");
+      if (!item.name.trim()) messages.push('科目名为空');
+      if (!item.date || !item.start || !item.end) messages.push('时间未填完整');
+      if (new Date(startIso) >= new Date(endIso)) messages.push('结束时间必须晚于开始时间');
       const existingOverlap = existingItems.some(
-        (target) =>
-          target.enabled &&
-          item.enabled &&
-          rangesOverlap(startIso, endIso, target.startTime, target.endTime),
+        (target) => target.enabled && item.enabled && rangesOverlap(startIso, endIso, target.startTime, target.endTime),
       );
-      if (existingOverlap) messages.push("与已有分考试重叠");
+      if (existingOverlap) messages.push('与已有分考试重叠');
       const draftOverlap = normalized.some(
         (target, targetIndex) =>
           targetIndex !== index &&
@@ -400,7 +264,7 @@ export default function MajorBatchAddModal({
           item.enabled &&
           rangesOverlap(startIso, endIso, target.startIso, target.endIso),
       );
-      if (draftOverlap) messages.push("与本次新增项目重叠");
+      if (draftOverlap) messages.push('与本次新增项目重叠');
       if (messages.length) errors.set(item.id, messages);
     });
 
@@ -424,7 +288,7 @@ export default function MajorBatchAddModal({
 
   const previewRange = useMemo(() => {
     const dates = [...new Set(draftItems.map((item) => item.date))].sort();
-    if (!dates.length) return "未生成";
+    if (!dates.length) return '未生成';
     if (dates.length === 1) return fmtDate(dates[0]);
     return `${fmtDate(dates[0])} - ${fmtDate(dates[dates.length - 1])}`;
   }, [draftItems]);
@@ -437,7 +301,7 @@ export default function MajorBatchAddModal({
     setTemplateId(next.id);
     setSubjects(next.subjects);
     setSubjectCap(next.maxTotal ?? null);
-    setError("");
+    setError('');
   };
 
   const addCustomSubject = () => {
@@ -448,9 +312,9 @@ export default function MajorBatchAddModal({
       return;
     }
     setSubjects((items) => [...items, value]);
-    setTemplateId("manual-subjects");
-    setCustomSubject("");
-    setError("");
+    setTemplateId('manual-subjects');
+    setCustomSubject('');
+    setError('');
   };
 
   const toggleSubject = (subject: string) => {
@@ -460,8 +324,8 @@ export default function MajorBatchAddModal({
         setError(`当前科目组最多选择 ${subjectCap} 门科目，请先取消一门再选择。`);
         return items;
       }
-      setTemplateId("manual-subjects");
-      setError("");
+      setTemplateId('manual-subjects');
+      setError('');
       return selected ? items.filter((item) => item !== subject) : [...items, subject];
     });
   };
@@ -479,11 +343,11 @@ export default function MajorBatchAddModal({
     <button
       key={item.id}
       type="button"
-      className={`quick-major-choice major-batch-template${selected ? " is-selected" : ""}`}
+      className={`quick-major-choice major-batch-template${selected ? ' is-selected' : ''}`}
       onClick={onSelect}
     >
       <strong>{item.name}</strong>
-      <span>{item.id === GAOKAO_THREE_DAY_SUBJECTS_ID ? "9 科" : `${item.subjects.length} 个`}</span>
+      <span>{item.id === GAOKAO_THREE_DAY_SUBJECTS_ID ? '9 科' : `${item.subjects.length} 个`}</span>
       {item.source === 'school' ? <em className="is-school">学校</em> : item.custom ? <em>自定义</em> : null}
       <small>{item.description}</small>
     </button>
@@ -493,12 +357,12 @@ export default function MajorBatchAddModal({
     <button
       key={item.id}
       type="button"
-      className={`quick-major-choice${selected ? " is-selected" : ""}`}
+      className={`quick-major-choice${selected ? ' is-selected' : ''}`}
       onClick={onSelect}
     >
       <strong>{item.name}</strong>
       <span>
-        {item.id === GAOKAO_THREE_DAY_PATTERN_ID ? "9 科 · " : ""}
+        {item.id === GAOKAO_THREE_DAY_PATTERN_ID ? '9 科 · ' : ''}
         {item.slots.length} 场 · 约 {patternDaySpan(item)} 天
       </span>
       {item.source === 'school' ? <em className="is-school">学校</em> : item.custom ? <em>自定义</em> : null}
@@ -508,14 +372,14 @@ export default function MajorBatchAddModal({
 
   const generatePreview = () => {
     if (!subjects.length) {
-      setError("请至少选择一个科目。");
+      setError('请至少选择一个科目。');
       return;
     }
     if (!startDate) {
-      setError("请先选择起始日期。");
+      setError('请先选择起始日期。');
       return;
     }
-    setError("");
+    setError('');
     setOverflowAck(false);
     setDraftItems(
       buildDraftItems(subjects, startDate, pattern).map((item) => ({
@@ -541,10 +405,10 @@ export default function MajorBatchAddModal({
       ...items,
       {
         id: makeDraftId(),
-        name: "",
+        name: '',
         date: base?.date ?? startDate,
-        start: base?.start ?? "08:30",
-        end: base?.end ?? "09:30",
+        start: base?.start ?? '08:30',
+        end: base?.end ?? '09:30',
         enabled: true,
         allowCrossDay: false,
       },
@@ -553,11 +417,11 @@ export default function MajorBatchAddModal({
 
   const commit = () => {
     if (!validation.ok) {
-      setError("请先处理预览中标红的项目。");
+      setError('请先处理预览中标红的项目。');
       return;
     }
     if (overflowsDesign && !overflowAck) {
-      setError("请先确认下方的场次顺延提醒后再添加。");
+      setError('请先确认下方的场次顺延提醒后再添加。');
       return;
     }
     const maxOrder = existingItems.length ? Math.max(...existingItems.map((item) => item.order)) : -1;
@@ -599,14 +463,14 @@ export default function MajorBatchAddModal({
             <AdminWizardSteps
               active={step}
               steps={[
-                { label: "选择模板", hint: "确定科目组" },
-                { label: "自动排布", hint: "选择日期和场次" },
-                { label: "预览确认", hint: "检查后写入" },
+                { label: '选择模板', hint: '确定科目组' },
+                { label: '自动排布', hint: '选择日期和场次' },
+                { label: '预览确认', hint: '检查后写入' },
               ]}
               summary={
                 <>
                   <span>当前模板</span>
-                  <strong>{template?.name ?? "手动科目组"}</strong>
+                  <strong>{template?.name ?? '手动科目组'}</strong>
                   <span>{subjects.length} 个科目</span>
                 </>
               }
@@ -618,14 +482,23 @@ export default function MajorBatchAddModal({
                   <div className="admin-warning-banner admin-warning-banner--structured">
                     {subjectTrackModeEnabled ? (
                       <>
-                        <span><strong>规则</strong>语数外全班下发，选考科目按班级选科分发。</span>
-                        <span><strong>示例</strong>物化地班级只收到物理、化学、地理。</span>
+                        <span>
+                          <strong>规则</strong>语数外全班下发，选考科目按班级选科分发。
+                        </span>
+                        <span>
+                          <strong>示例</strong>物化地班级只收到物理、化学、地理。
+                        </span>
                         {unsetTrackClassCount > 0 && (
-                          <span><strong>未分科</strong>{unsetTrackClassCount} 个班级读取全部 9 门。</span>
+                          <span>
+                            <strong>未分科</strong>
+                            {unsetTrackClassCount} 个班级读取全部 9 门。
+                          </span>
                         )}
                       </>
                     ) : (
-                      <span><strong>分科关闭</strong>所有科目按考试范围直接下发。</span>
+                      <span>
+                        <strong>分科关闭</strong>所有科目按考试范围直接下发。
+                      </span>
                     )}
                   </div>
                   <div className="major-batch-template-groups">
@@ -633,7 +506,7 @@ export default function MajorBatchAddModal({
                       <div className="major-batch-group-title">{CATEGORY_LABELS.gaokao}</div>
                       <div className="major-batch-template-grid">
                         {subjectTemplates
-                          .filter((item) => item.category === "gaokao")
+                          .filter((item) => item.category === 'gaokao')
                           .map((item) => renderTemplateCard(item, templateId === item.id, () => selectTemplate(item)))}
                       </div>
                     </div>
@@ -641,7 +514,7 @@ export default function MajorBatchAddModal({
                       <div className="major-batch-group-title">{CATEGORY_LABELS.school}</div>
                       <div className="major-batch-template-grid">
                         {subjectTemplates
-                          .filter((item) => item.category === "school")
+                          .filter((item) => item.category === 'school')
                           .map((item) => renderTemplateCard(item, templateId === item.id, () => selectTemplate(item)))}
                       </div>
                     </div>
@@ -657,7 +530,7 @@ export default function MajorBatchAddModal({
                       <span>可在模板基础上增删，顺序即生成顺序</span>
                     </div>
                     {subjectCap && (
-                      <p className={`major-batch-subject-hint${subjects.length >= subjectCap ? " is-ok" : ""}`}>
+                      <p className={`major-batch-subject-hint${subjects.length >= subjectCap ? ' is-ok' : ''}`}>
                         {subjects.length >= subjectCap
                           ? `已选满 ${subjectCap} 门科目`
                           : `还可选择 ${subjectCap - subjects.length} 门科目（本模板共需 ${subjectCap} 门）`}
@@ -672,7 +545,7 @@ export default function MajorBatchAddModal({
                           <button
                             key={subject}
                             type="button"
-                            className={`${selected ? "is-selected" : ""}${capReached ? " is-disabled" : ""}`.trim()}
+                            className={`${selected ? 'is-selected' : ''}${capReached ? ' is-disabled' : ''}`.trim()}
                             disabled={capReached}
                             aria-disabled={capReached}
                             onClick={() => toggleSubject(subject)}
@@ -721,7 +594,7 @@ export default function MajorBatchAddModal({
                       <div className="major-batch-group-title">{CATEGORY_LABELS.gaokao}</div>
                       <div className="quick-major-choice-grid major-batch-pattern-grid">
                         {dayPatterns
-                          .filter((item) => item.category === "gaokao")
+                          .filter((item) => item.category === 'gaokao')
                           .map((item) => renderPatternCard(item, patternId === item.id, () => setPatternId(item.id)))}
                       </div>
                     </div>
@@ -729,7 +602,7 @@ export default function MajorBatchAddModal({
                       <div className="major-batch-group-title">{CATEGORY_LABELS.school}</div>
                       <div className="quick-major-choice-grid major-batch-pattern-grid">
                         {dayPatterns
-                          .filter((item) => item.category === "school")
+                          .filter((item) => item.category === 'school')
                           .map((item) => renderPatternCard(item, patternId === item.id, () => setPatternId(item.id)))}
                       </div>
                     </div>
@@ -739,8 +612,10 @@ export default function MajorBatchAddModal({
                   </section>
                   {needsMoreSlots && (
                     <div className="admin-warning-banner">
-                      生成场次数（{arrangedSubjects.length}）超过「{pattern.name}」单轮场次数（{pattern.slots.length}），排布将顺延到第{" "}
-                      {Math.ceil(arrangedSubjects.length / pattern.slots.length) * designDays} 天（模板设计为 {designDays} 天）。如需避免顺延，可选择场次更多的时间模板，或前往系统设置新增自定义时间组。
+                      生成场次数（{arrangedSubjects.length}）超过「{pattern.name}」单轮场次数（{pattern.slots.length}
+                      ），排布将顺延到第 {Math.ceil(arrangedSubjects.length / pattern.slots.length) * designDays}{' '}
+                      天（模板设计为 {designDays}{' '}
+                      天）。如需避免顺延，可选择场次更多的时间模板，或前往系统设置新增自定义时间组。
                     </div>
                   )}
                   <div className="admin-workflow-review">
@@ -750,12 +625,16 @@ export default function MajorBatchAddModal({
                     </span>
                     <span>
                       科目覆盖
-                      <strong>{subjects.length} 科{arrangedSubjects.length !== subjects.length ? ` · 合并为 ${arrangedSubjects.length} 场` : ""}</strong>
+                      <strong>
+                        {subjects.length} 科
+                        {arrangedSubjects.length !== subjects.length ? ` · 合并为 ${arrangedSubjects.length} 场` : ''}
+                      </strong>
                     </span>
                     <span>
                       预计日期
                       <strong>
-                        {fmtDate(startDate)} 起，约 {Math.ceil(arrangedSubjects.length / pattern.slots.length) * designDays} 天
+                        {fmtDate(startDate)} 起，约{' '}
+                        {Math.ceil(arrangedSubjects.length / pattern.slots.length) * designDays} 天
                       </strong>
                     </span>
                     <span>
@@ -771,7 +650,8 @@ export default function MajorBatchAddModal({
                     <div>
                       <strong>预览结果</strong>
                       <span>
-                        {validation.count} 场，{validation.errors.size ? `${validation.errors.size} 项需处理` : "校验通过"}
+                        {validation.count} 场，
+                        {validation.errors.size ? `${validation.errors.size} 项需处理` : '校验通过'}
                       </span>
                     </div>
                     <button className="admin-btn" type="button" onClick={appendDraft}>
@@ -782,11 +662,12 @@ export default function MajorBatchAddModal({
                     <div className="admin-warning-banner admin-warning-banner--callout">
                       <strong>⚠ 场次顺延提醒</strong>
                       <p>
-                        科目数量超过「{pattern.name}」设计的 {designDays} 天场次容量，本次实际排布到了 {scheduledDays} 天。请确认日期安排符合预期后再添加。
+                        科目数量超过「{pattern.name}」设计的 {designDays} 天场次容量，本次实际排布到了 {scheduledDays}{' '}
+                        天。请确认日期安排符合预期后再添加。
                       </p>
                       <button
                         type="button"
-                        className={`major-batch-preview__check major-batch-preview__check--ack${overflowAck ? " is-selected" : ""}`}
+                        className={`major-batch-preview__check major-batch-preview__check--ack${overflowAck ? ' is-selected' : ''}`}
                         aria-pressed={overflowAck}
                         onClick={() => setOverflowAck((value) => !value)}
                       >
@@ -810,8 +691,8 @@ export default function MajorBatchAddModal({
                     <span>
                       覆盖日期<strong>{previewRange}</strong>
                     </span>
-                    <span className={validation.errors.size ? "is-danger" : "is-ok"}>
-                      状态<strong>{validation.errors.size ? `${validation.errors.size} 项冲突` : "可添加"}</strong>
+                    <span className={validation.errors.size ? 'is-danger' : 'is-ok'}>
+                      状态<strong>{validation.errors.size ? `${validation.errors.size} 项冲突` : '可添加'}</strong>
                     </span>
                   </div>
                   <div className="major-batch-preview major-batch-preview--cards">
@@ -819,7 +700,10 @@ export default function MajorBatchAddModal({
                       const dateHasError = group.items.some((item) => validation.errors.has(item.id));
                       const isCollapsed = collapsedDates.has(group.date) && !dateHasError;
                       return (
-                        <section key={group.date} className={`major-batch-preview-card${isCollapsed ? " is-collapsed" : ""}`}>
+                        <section
+                          key={group.date}
+                          className={`major-batch-preview-card${isCollapsed ? ' is-collapsed' : ''}`}
+                        >
                           <button
                             type="button"
                             className="major-batch-preview-card__head"
@@ -831,19 +715,26 @@ export default function MajorBatchAddModal({
                             <span className="major-batch-preview-card__count">{group.items.length} 场</span>
                             {dateHasError && <span className="major-batch-preview-card__flag is-danger">需处理</span>}
                             <span className="major-batch-preview-card__chevron" aria-hidden="true">
-                              {isCollapsed ? "▸" : "▾"}
+                              {isCollapsed ? '▸' : '▾'}
                             </span>
                           </button>
                           {!isCollapsed && (
                             <div className="major-batch-preview-list major-batch-preview-list--cards">
                               {group.items.map((item) => {
                                 const startIso = toLocalIso(item.date, item.start);
-                                const endIso = toLocalIso(item.date, item.end, item.allowCrossDay && item.end <= item.start);
+                                const endIso = toLocalIso(
+                                  item.date,
+                                  item.end,
+                                  item.allowCrossDay && item.end <= item.start,
+                                );
                                 const messages = validation.errors.get(item.id) ?? [];
                                 return (
-                                  <article key={item.id} className={`major-batch-preview-item${messages.length ? " has-error" : ""}`}>
+                                  <article
+                                    key={item.id}
+                                    className={`major-batch-preview-item${messages.length ? ' has-error' : ''}`}
+                                  >
                                     <div className="major-batch-preview-item__subject">
-                                      <SubjectIcon subject={item.name || "科目"} size={18} />
+                                      <SubjectIcon subject={item.name || '科目'} size={18} />
                                       <input
                                         className="admin-input major-batch-preview-item__name"
                                         value={item.name}
@@ -872,16 +763,18 @@ export default function MajorBatchAddModal({
                                       >
                                         <Clock3 size={14} aria-hidden="true" />
                                         {item.start} – {item.end}
-                                        {item.allowCrossDay && item.end <= item.start ? "（次日）" : ""}
+                                        {item.allowCrossDay && item.end <= item.start ? '（次日）' : ''}
                                       </button>
-                                      <span className={`major-batch-preview-item__duration${messages.length ? " is-danger" : ""}`}>
-                                        {messages.length ? "需处理" : durationText(startIso, endIso)}
+                                      <span
+                                        className={`major-batch-preview-item__duration${messages.length ? ' is-danger' : ''}`}
+                                      >
+                                        {messages.length ? '需处理' : durationText(startIso, endIso)}
                                       </span>
                                     </div>
                                     <div className="major-batch-preview-item__flags">
                                       <button
                                         type="button"
-                                        className={`major-batch-preview__check${item.enabled ? " is-selected" : ""}`}
+                                        className={`major-batch-preview__check${item.enabled ? ' is-selected' : ''}`}
                                         aria-pressed={item.enabled}
                                         onClick={() => updateDraft(item.id, { enabled: !item.enabled })}
                                       >
@@ -890,11 +783,17 @@ export default function MajorBatchAddModal({
                                         </span>
                                         启用
                                       </button>
-                                      <button className="admin-item-btn admin-item-btn--delete" type="button" onClick={() => removeDraft(item.id)}>
+                                      <button
+                                        className="admin-item-btn admin-item-btn--delete"
+                                        type="button"
+                                        onClick={() => removeDraft(item.id)}
+                                      >
                                         删除
                                       </button>
                                     </div>
-                                    {messages.length > 0 && <p className="major-batch-preview-item__errors">{messages.join("；")}</p>}
+                                    {messages.length > 0 && (
+                                      <p className="major-batch-preview-item__errors">{messages.join('；')}</p>
+                                    )}
                                   </article>
                                 );
                               })}
@@ -911,7 +810,7 @@ export default function MajorBatchAddModal({
                       title="设置考试时间"
                       startValue={timeEditItem.start}
                       endValue={timeEditItem.end}
-                      subject={timeEditItem.name || "科目"}
+                      subject={timeEditItem.name || '科目'}
                       allowCrossDay
                       initialCrossDay={timeEditItem.allowCrossDay}
                       anchorRef={timeEditAnchorRef}
@@ -935,7 +834,7 @@ export default function MajorBatchAddModal({
                 else setStep((value) => value - 1);
               }}
             >
-              {step === 0 ? "取消" : "上一步"}
+              {step === 0 ? '取消' : '上一步'}
             </button>
             {step < 1 && (
               <button
@@ -943,14 +842,14 @@ export default function MajorBatchAddModal({
                 type="button"
                 onClick={() => {
                   if (!subjects.length) {
-                    setError("请至少选择一个科目。");
+                    setError('请至少选择一个科目。');
                     return;
                   }
                   if (!startDate) {
-                    setError("请先选择起始日期。");
+                    setError('请先选择起始日期。');
                     return;
                   }
-                  setError("");
+                  setError('');
                   setStep(1);
                 }}
               >
@@ -958,7 +857,11 @@ export default function MajorBatchAddModal({
               </button>
             )}
             {step === 1 && (
-              <button className="admin-btn admin-btn--primary admin-workflow-actions-spacer" type="button" onClick={generatePreview}>
+              <button
+                className="admin-btn admin-btn--primary admin-workflow-actions-spacer"
+                type="button"
+                onClick={generatePreview}
+              >
                 生成预览
               </button>
             )}

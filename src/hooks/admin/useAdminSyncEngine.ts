@@ -1,6 +1,6 @@
-import { useEffect } from "react";
-import type { MutableRefObject } from "react";
-import type { NavigateFunction, Location } from "react-router-dom";
+import { useEffect } from 'react';
+import type { MutableRefObject } from 'react';
+import type { NavigateFunction, Location } from 'react-router-dom';
 import {
   adminCan,
   fetchExamsFromServer,
@@ -9,23 +9,23 @@ import {
   isLoginRequired,
   refreshAdminUser,
   type AdminUserContext,
-} from "../../services/examService";
-import { getAppSettings, updateExamSettings, updateAlertsSettings } from "../../utils/appSettings";
-import { getPendingExamSync } from "../../services/examOutbox";
-import type { AlertsSettings, MajorExam } from "../../types";
-import type { AdminTab } from "../../types/exam";
-import type { WeeklyState } from "./useWeeklyScheduleSync";
-import type { SyncState } from "./adminPageUtils";
-import { syncMajorStateRef } from "./adminPageUtils";
+} from '../../services/examService';
+import { getAppSettings, updateExamSettings, updateAlertsSettings } from '../../utils/appSettings';
+import { getPendingExamSync } from '../../services/examOutbox';
+import type { AlertsSettings, MajorExam } from '../../types';
+import type { AdminTab } from '../../types/exam';
+import type { WeeklyState } from './useWeeklyScheduleSync';
+import type { SyncState } from './adminPageUtils';
+import { syncMajorStateRef } from './adminPageUtils';
 
 export const OPEN_ADMIN: AdminUserContext = {
   id: 0,
-  username: "local-admin",
-  displayName: "本地管理员",
-  roleId: "super_admin",
-  roleName: "超级管理员",
-  permissions: ["*"],
-  scopes: [{ type: "all", gradeId: "", classId: "" }],
+  username: 'local-admin',
+  displayName: '本地管理员',
+  roleId: 'super_admin',
+  roleName: '超级管理员',
+  permissions: ['*'],
+  scopes: [{ type: 'all', gradeId: '', classId: '' }],
   mustChangePassword: false,
 };
 
@@ -38,7 +38,7 @@ export const OPEN_ADMIN: AdminUserContext = {
 // hook already exists.
 export function useAdminSyncEngine(params: {
   navigate: NavigateFunction;
-  location: Pick<Location, "search">;
+  location: Pick<Location, 'search'>;
   adminUser: AdminUserContext | null;
   setAdminUser: (user: AdminUserContext | null) => void;
   setReady: (ready: boolean) => void;
@@ -61,29 +61,20 @@ export function useAdminSyncEngine(params: {
   setWizardOpen: (open: boolean) => void;
   setAlerts: (alerts: AlertsSettings) => void;
   setInitialization: (value: unknown) => void;
-  pushToServer: (
-    ms: MajorExam[],
-    activeId: string,
-    syncLabel?: string,
-  ) => Promise<void>;
-  pushWeeklyToServer: (
-    weekly: WeeklyState,
-    syncLabel?: string,
-  ) => Promise<void>;
+  pushToServer: (ms: MajorExam[], activeId: string, syncLabel?: string) => Promise<void>;
+  pushWeeklyToServer: (weekly: WeeklyState, syncLabel?: string) => Promise<void>;
   setMajors: (ms: MajorExam[]) => void;
   setActiveMajorId: (id: string) => void;
   setEditingMajorId: (updater: (current: string) => string) => void;
-  setScheduleMode: (mode: WeeklyState["scheduleMode"]) => void;
-  setWeeklyPlans: (plans: WeeklyState["weeklyPlans"]) => void;
-  setActiveWeeklyPlanId: (id: WeeklyState["activeWeeklyPlanId"]) => void;
-  setActiveWeeklyPlanIdByClassId: (
-    value: WeeklyState["activeWeeklyPlanIdByClassId"],
-  ) => void;
-  setGrades: (grades: WeeklyState["grades"]) => void;
-  setClasses: (classes: WeeklyState["classes"]) => void;
+  setScheduleMode: (mode: WeeklyState['scheduleMode']) => void;
+  setWeeklyPlans: (plans: WeeklyState['weeklyPlans']) => void;
+  setActiveWeeklyPlanId: (id: WeeklyState['activeWeeklyPlanId']) => void;
+  setActiveWeeklyPlanIdByClassId: (value: WeeklyState['activeWeeklyPlanIdByClassId']) => void;
+  setGrades: (grades: WeeklyState['grades']) => void;
+  setClasses: (classes: WeeklyState['classes']) => void;
   setSelectedGradeId: (id: string) => void;
   setSelectedClassId: (id: string) => void;
-  setWeeklyConflictPolicy: (policy: WeeklyState["weeklyConflictPolicy"]) => void;
+  setWeeklyConflictPolicy: (policy: WeeklyState['weeklyConflictPolicy']) => void;
 }) {
   const {
     navigate,
@@ -102,7 +93,6 @@ export function useAdminSyncEngine(params: {
     initializationCompletedAt,
     gradesLength,
     classesLength,
-    adminTab,
     setAdminTab,
     setAlertsOpen,
     setDeniedModule,
@@ -129,53 +119,44 @@ export function useAdminSyncEngine(params: {
   // 从设置页「前往提醒管理」直达：URL 带 ?alerts=1 时自动打开提醒管理弹窗
   useEffect(() => {
     const search = new URLSearchParams(location.search);
-    const requestedTab = search.get("tab") as AdminTab | null;
+    const requestedTab = search.get('tab') as AdminTab | null;
     const ADMIN_NAV_PERMISSION: Record<AdminTab, string> = {
-      overview: "overview.read",
-      dashboard: "overview.read",
-      major: "major.read",
-      weekly: "weekly.read",
-      classes: "school.read",
-      devices: "device.read",
-      users: "user.read",
+      overview: 'overview.read',
+      dashboard: 'overview.read',
+      major: 'major.read',
+      weekly: 'weekly.read',
+      classes: 'school.read',
+      devices: 'device.read',
+      users: 'user.read',
     };
     const ADMIN_NAV_LABEL: Record<AdminTab, string> = {
-      overview: "仪表盘",
-      dashboard: "数据大屏",
-      major: "大型考试",
-      weekly: "周测计划",
-      classes: "年级与班级",
-      devices: "设备管理",
-      users: "用户与权限",
+      overview: '仪表盘',
+      dashboard: '数据大屏',
+      major: '大型考试',
+      weekly: '周测计划',
+      classes: '年级与班级',
+      devices: '设备管理',
+      users: '用户与权限',
     };
     if (requestedTab && ADMIN_NAV_PERMISSION[requestedTab]) {
-      if (
-        requestedTab === "users" ||
-        adminCan(ADMIN_NAV_PERMISSION[requestedTab], adminUser)
-      ) {
+      if (requestedTab === 'users' || adminCan(ADMIN_NAV_PERMISSION[requestedTab], adminUser)) {
         setAdminTab(requestedTab);
-        setDeniedModule("");
+        setDeniedModule('');
       } else setDeniedModule(ADMIN_NAV_LABEL[requestedTab]);
     }
-    if (search.get("alerts") === "1" && adminCan("alerts.read", adminUser))
-      setAlertsOpen(true);
-    if (search.get("announce") === "1") setAnnounceOpen(true);
-    const setupRequired =
-      !initializationCompletedAt || gradesLength === 0 || classesLength === 0;
-    const allowIncomplete = search.get("allowIncomplete") === "1";
+    if (search.get('alerts') === '1' && adminCan('alerts.read', adminUser)) setAlertsOpen(true);
+    if (search.get('announce') === '1') setAnnounceOpen(true);
+    const setupRequired = !initializationCompletedAt || gradesLength === 0 || classesLength === 0;
+    const allowIncomplete = search.get('allowIncomplete') === '1';
     if (
-      search.get("initialize") === "1" &&
+      search.get('initialize') === '1' &&
       !allowIncomplete &&
       cloudReadConfirmed &&
       setupRequired &&
-      adminCan("initialization.run", adminUser)
+      adminCan('initialization.run', adminUser)
     )
       setWizardOpen(true);
-    if (
-      allowIncomplete &&
-      cloudReadConfirmed &&
-      adminCan("initialization.run", adminUser)
-    )
+    if (allowIncomplete && cloudReadConfirmed && adminCan('initialization.run', adminUser))
       void getAdminRecoveryStatus()
         .then(setRecoveryConfigured)
         .catch(() => setRecoveryConfigured(null));
@@ -186,6 +167,12 @@ export function useAdminSyncEngine(params: {
     initializationCompletedAt,
     gradesLength,
     classesLength,
+    setAdminTab,
+    setAlertsOpen,
+    setAnnounceOpen,
+    setDeniedModule,
+    setRecoveryConfigured,
+    setWizardOpen,
   ]);
 
   // 开机：鉴权 + 拉取服务器数据
@@ -200,21 +187,20 @@ export function useAdminSyncEngine(params: {
       const required = await requiredP;
       if (cancelled) return;
       if (required && !hasValidLocalToken()) {
-        navigate("/login?next=/admin", { replace: true });
+        navigate('/login?next=/admin', { replace: true });
         return;
       }
       const verifiedUser = await userP;
       if (cancelled) return;
       if (required && !verifiedUser) {
-        navigate("/login?next=/admin", { replace: true });
+        navigate('/login?next=/admin', { replace: true });
         return;
       }
       if (verifiedUser?.mustChangePassword) {
         setAdminUser(verifiedUser);
-        setAdminTab("users");
+        setAdminTab('users');
         setReady(true);
-        if (location.search !== "?tab=users&password=1")
-          navigate("/admin?tab=users&password=1", { replace: true });
+        if (location.search !== '?tab=users&password=1') navigate('/admin?tab=users&password=1', { replace: true });
         return;
       }
       setAdminUser(verifiedUser ?? OPEN_ADMIN);
@@ -241,15 +227,13 @@ export function useAdminSyncEngine(params: {
         };
         if (remote.scheduleMode !== undefined) remoteUpdates.scheduleMode = remote.scheduleMode;
         if (remote.weeklyPlans !== undefined) remoteUpdates.weeklyPlans = remote.weeklyPlans;
-        if (remote.activeWeeklyPlanId !== undefined)
-          remoteUpdates.activeWeeklyPlanId = remote.activeWeeklyPlanId;
+        if (remote.activeWeeklyPlanId !== undefined) remoteUpdates.activeWeeklyPlanId = remote.activeWeeklyPlanId;
         if (remote.activeWeeklyPlanIdByClassId !== undefined)
           remoteUpdates.activeWeeklyPlanIdByClassId = remote.activeWeeklyPlanIdByClassId;
         if (remote.grades !== undefined) remoteUpdates.grades = remote.grades;
         if (remote.classes !== undefined) remoteUpdates.classes = remote.classes;
         if (remote.initialization !== undefined) remoteUpdates.initialization = remote.initialization;
-        if (remote.weeklyConflictPolicy !== undefined)
-          remoteUpdates.weeklyConflictPolicy = remote.weeklyConflictPolicy;
+        if (remote.weeklyConflictPolicy !== undefined) remoteUpdates.weeklyConflictPolicy = remote.weeklyConflictPolicy;
         updateExamSettings(remoteUpdates as never);
         if (remote.alerts) {
           updateAlertsSettings(remote.alerts as never);
@@ -273,7 +257,7 @@ export function useAdminSyncEngine(params: {
         setWeeklyConflictPolicy(merged.weeklyConflictPolicy);
         setInitialization(merged.initialization);
         pendingRef.current = false;
-        setSync("saved");
+        setSync('saved');
       } else if (pendingSync && localAt > (remote?.updatedAt ?? 0)) {
         pendingRef.current = true;
         const localExam = getAppSettings().exam;
@@ -288,13 +272,14 @@ export function useAdminSyncEngine(params: {
           weeklyConflictPolicy: localExam.weeklyConflictPolicy,
         });
       } else {
-        setSync(remote ? "saved" : "offline");
+        setSync(remote ? 'saved' : 'offline');
       }
     };
     void boot();
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 开机流程设计为仅执行一次（含取消标记）；其余引用均为稳定 setter/ref，显式列出只会增加噪音。
   }, [location.search, navigate, pushToServer, pushWeeklyToServer]);
 
   // 网络状态：回线时自动回推未同步变更
@@ -308,13 +293,13 @@ export function useAdminSyncEngine(params: {
     };
     const goOffline = () => {
       setOnline(false);
-      setSync("offline");
+      setSync('offline');
     };
-    window.addEventListener("online", goOnline);
-    window.addEventListener("offline", goOffline);
+    window.addEventListener('online', goOnline);
+    window.addEventListener('offline', goOffline);
     return () => {
-      window.removeEventListener("online", goOnline);
-      window.removeEventListener("offline", goOffline);
+      window.removeEventListener('online', goOnline);
+      window.removeEventListener('offline', goOffline);
     };
-  }, [pushToServer, pushWeeklyToServer]);
+  }, [pushToServer, pushWeeklyToServer, setOnline, setSync, pendingRef, stateRef, weeklyStateRef]);
 }

@@ -1,19 +1,19 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
-import type { CSSProperties, ReactNode } from "react"
-import { createPortal } from "react-dom"
-import { TapButton } from "./TapButton"
-import { SelectionPreview } from "./SelectionPreview"
-import { resolveDensity } from "./useDensity"
-import { clampParts, daysInMonth, pad2, MON, SUN } from "./utils"
-import type { DateTimeParts, Field, DateTimePickerProps } from "./types"
-import WheelColumn from "../WheelColumn"
-import "./DateTimePicker.css"
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
+import { createPortal } from 'react-dom';
+import { TapButton } from './TapButton';
+import { SelectionPreview } from './SelectionPreview';
+import { resolveDensity } from './useDensity';
+import { clampParts, daysInMonth, pad2, MON, SUN } from './utils';
+import type { DateTimeParts, Field, DateTimePickerProps } from './types';
+import WheelColumn from '../WheelColumn';
+import './DateTimePicker.css';
 
-const NEXT: Partial<Record<Field, Field>> = { year: "month", month: "day" }
+const NEXT: Partial<Record<Field, Field>> = { year: 'month', month: 'day' };
 function segmentsFor(mode: string, weekdayEnabled: boolean): Field[] {
-  if (mode === "date") return ["year", "month", "day"]
-  if (mode === "time") return ((weekdayEnabled ? ["weekday"] : []) as Field[]).concat(["hour", "minute"])
-  return ["year", "month", "day", "hour", "minute"]
+  if (mode === 'date') return ['year', 'month', 'day'];
+  if (mode === 'time') return ((weekdayEnabled ? ['weekday'] : []) as Field[]).concat(['hour', 'minute']);
+  return ['year', 'month', 'day', 'hour', 'minute'];
 }
 
 export function DateTimePicker(props: DateTimePickerProps) {
@@ -22,7 +22,7 @@ export function DateTimePicker(props: DateTimePickerProps) {
     onConfirm,
     onCancel,
     onChange,
-    mode = "datetime",
+    mode = 'datetime',
     hourRange = [0, 23],
     yearRange,
     presets,
@@ -30,205 +30,210 @@ export function DateTimePicker(props: DateTimePickerProps) {
     title,
     validate,
     autoAdvance = true,
-    theme = "auto",
+    theme = 'auto',
     initialField,
     confirmLabel,
     cancelLabel,
     weekday,
     preview,
     anchorRect,
-    compactPlacement = "below",
-  } = props
+    compactPlacement = 'below',
+  } = props;
 
-  const density = resolveDensity(props.density)
-  const weekdayEnabled = mode === "time" && !!(weekday && weekday.enabled)
-  const segs = useMemo(() => segmentsFor(mode, weekdayEnabled), [mode, weekdayEnabled])
+  const density = resolveDensity(props.density);
+  const weekdayEnabled = mode === 'time' && !!(weekday && weekday.enabled);
+  const segs = useMemo(() => segmentsFor(mode, weekdayEnabled), [mode, weekdayEnabled]);
 
   const [draft, setDraft] = useState<DateTimeParts>(() => {
-    const d = clampParts(value)
-    if (weekdayEnabled && typeof d.weekday !== "number") d.weekday = weekday?.value ?? 0
-    return d
-  })
+    const d = clampParts(value);
+    if (weekdayEnabled && typeof d.weekday !== 'number') d.weekday = weekday?.value ?? 0;
+    return d;
+  });
   const [field, setField] = useState<Field>(
-    initialField && segs.indexOf(initialField) >= 0 ? initialField : mode === "date" ? "day" : segs[mode === "datetime" ? 2 : 0],
-  )
-  const [yearCenter, setYearCenter] = useState(draft.year)
-  const [error, setError] = useState<string | null>(null)
-  const panelRef = useRef<HTMLDivElement | null>(null)
+    initialField && segs.indexOf(initialField) >= 0
+      ? initialField
+      : mode === 'date'
+        ? 'day'
+        : segs[mode === 'datetime' ? 2 : 0],
+  );
+  const [yearCenter, setYearCenter] = useState(draft.year);
+  const [error, setError] = useState<string | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
   const hourValues = useMemo(
     () => Array.from({ length: 24 }, (_, hour) => hour).filter((hour) => hour >= hourRange[0] && hour <= hourRange[1]),
     [hourRange[0], hourRange[1]],
-  )
-  const minuteValues = useMemo(() => Array.from({ length: 60 }, (_, minute) => minute), [])
+  );
+  const minuteValues = useMemo(() => Array.from({ length: 60 }, (_, minute) => minute), []);
 
   useEffect(() => {
-    onChange?.(draft)
-  }, [draft, onChange])
+    onChange?.(draft);
+  }, [draft, onChange]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onCancel()
-    }
-    document.addEventListener("keydown", onKey)
-    return () => document.removeEventListener("keydown", onKey)
-  }, [onCancel])
+      if (e.key === 'Escape') onCancel();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onCancel]);
 
   useEffect(() => {
-    panelRef.current?.focus()
-  }, [])
+    panelRef.current?.focus();
+  }, []);
 
   function dismissAfterPointerAction(callback: () => void) {
     // Closing a portal during pointerup can retarget the browser's trailing
     // click to the control underneath it. Consume that one compatibility click.
     const blockTrailingClick = (event: MouseEvent) => {
-      event.preventDefault()
-      event.stopImmediatePropagation()
-      document.removeEventListener("click", blockTrailingClick, true)
-    }
-    document.addEventListener("click", blockTrailingClick, true)
-    window.setTimeout(() => document.removeEventListener("click", blockTrailingClick, true), 300)
-    callback()
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      document.removeEventListener('click', blockTrailingClick, true);
+    };
+    document.addEventListener('click', blockTrailingClick, true);
+    window.setTimeout(() => document.removeEventListener('click', blockTrailingClick, true), 300);
+    callback();
   }
 
   useEffect(() => {
-    if (density !== "compact") return
+    if (density !== 'compact') return;
     const closeOnOutsidePointer = (event: PointerEvent) => {
-      const panel = panelRef.current
-      const target = event.target
-      if (!panel || !(target instanceof Node)) return
-      const path = typeof event.composedPath === "function" ? event.composedPath() : []
-      if (path.includes(panel) || panel.contains(target)) return
-      if (target instanceof Element && target.closest(".tdp-field")) return
-      onCancel()
-    }
-    document.addEventListener("pointerdown", closeOnOutsidePointer, true)
-    return () => document.removeEventListener("pointerdown", closeOnOutsidePointer, true)
-  }, [density, onCancel])
+      const panel = panelRef.current;
+      const target = event.target;
+      if (!panel || !(target instanceof Node)) return;
+      const path = typeof event.composedPath === 'function' ? event.composedPath() : [];
+      if (path.includes(panel) || panel.contains(target)) return;
+      if (target instanceof Element && target.closest('.tdp-field')) return;
+      onCancel();
+    };
+    document.addEventListener('pointerdown', closeOnOutsidePointer, true);
+    return () => document.removeEventListener('pointerdown', closeOnOutsidePointer, true);
+  }, [density, onCancel]);
 
   // Keep compact popovers inside the viewport. A tall calendar can no longer
   // extend past the bottom of a modal or the browser window.
   useLayoutEffect(() => {
-    if (density !== "compact" || !anchorRect || !panelRef.current) return
+    if (density !== 'compact' || !anchorRect || !panelRef.current) return;
 
     const placePanel = () => {
-      const panel = panelRef.current
-      if (!panel) return
+      const panel = panelRef.current;
+      if (!panel) return;
 
-      const edge = 8
-      panel.style.maxHeight = `${Math.max(240, window.innerHeight - edge * 2)}px`
-      const { height: panelHeight, width: panelWidth } = panel.getBoundingClientRect()
-      const anchorRight = anchorRect.left + anchorRect.width
-      const anchorBottom = anchorRect.top + anchorRect.height
-      const rightSpace = window.innerWidth - anchorRight - edge
-      const leftSpace = anchorRect.left - edge
-      const belowSpace = window.innerHeight - anchorBottom - edge
-      const aboveSpace = anchorRect.top - edge
+      const edge = 8;
+      panel.style.maxHeight = `${Math.max(240, window.innerHeight - edge * 2)}px`;
+      const { height: panelHeight, width: panelWidth } = panel.getBoundingClientRect();
+      const anchorRight = anchorRect.left + anchorRect.width;
+      const anchorBottom = anchorRect.top + anchorRect.height;
+      const rightSpace = window.innerWidth - anchorRight - edge;
+      const leftSpace = anchorRect.left - edge;
+      const belowSpace = window.innerHeight - anchorBottom - edge;
+      const aboveSpace = anchorRect.top - edge;
 
-      let preferredLeft: number
-      let preferredTop: number
-      if (compactPlacement === "right") {
-        preferredLeft = rightSpace >= panelWidth || rightSpace >= leftSpace
-          ? anchorRight + edge
-          : anchorRect.left - panelWidth - edge
-        preferredTop = anchorRect.top + anchorRect.height / 2 - panelHeight / 2
+      let preferredLeft: number;
+      let preferredTop: number;
+      if (compactPlacement === 'right') {
+        preferredLeft =
+          rightSpace >= panelWidth || rightSpace >= leftSpace
+            ? anchorRight + edge
+            : anchorRect.left - panelWidth - edge;
+        preferredTop = anchorRect.top + anchorRect.height / 2 - panelHeight / 2;
       } else {
         // Match native browser popovers: open below the field, flip above when
         // that side cannot contain the panel, and align the far edge near the
         // right side of the viewport.
-        preferredLeft = anchorRect.left + panelWidth <= window.innerWidth - edge
-          ? anchorRect.left
-          : anchorRight - panelWidth
-        preferredTop = belowSpace >= panelHeight || belowSpace >= aboveSpace
-          ? anchorBottom + edge
-          : anchorRect.top - panelHeight - edge
+        preferredLeft =
+          anchorRect.left + panelWidth <= window.innerWidth - edge ? anchorRect.left : anchorRight - panelWidth;
+        preferredTop =
+          belowSpace >= panelHeight || belowSpace >= aboveSpace
+            ? anchorBottom + edge
+            : anchorRect.top - panelHeight - edge;
       }
-      const maxTop = Math.max(edge, window.innerHeight - panelHeight - edge)
-      const maxLeft = Math.max(edge, window.innerWidth - panelWidth - edge)
-      panel.style.left = `${Math.max(edge, Math.min(preferredLeft, maxLeft))}px`
-      panel.style.top = `${Math.max(edge, Math.min(preferredTop, maxTop))}px`
-    }
+      const maxTop = Math.max(edge, window.innerHeight - panelHeight - edge);
+      const maxLeft = Math.max(edge, window.innerWidth - panelWidth - edge);
+      panel.style.left = `${Math.max(edge, Math.min(preferredLeft, maxLeft))}px`;
+      panel.style.top = `${Math.max(edge, Math.min(preferredTop, maxTop))}px`;
+    };
 
-    placePanel()
-    const frame = window.requestAnimationFrame(placePanel)
-    window.addEventListener("resize", placePanel)
+    placePanel();
+    const frame = window.requestAnimationFrame(placePanel);
+    window.addEventListener('resize', placePanel);
     return () => {
-      window.cancelAnimationFrame(frame)
-      window.removeEventListener("resize", placePanel)
-    }
-  }, [anchorRect, compactPlacement, density, draft.month, draft.year, error, field])
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener('resize', placePanel);
+    };
+  }, [anchorRect, compactPlacement, density, draft.month, draft.year, error, field]);
 
   function apply(next: DateTimeParts, adv?: Field) {
-    const w = next.weekday
-    const c = clampParts(next)
-    if (typeof w === "number") c.weekday = w
-    setError(null)
-    if (autoAdvance && adv && NEXT[adv] && segs.indexOf(NEXT[adv] as Field) >= 0) setField(NEXT[adv] as Field)
-    setDraft(c)
+    const w = next.weekday;
+    const c = clampParts(next);
+    if (typeof w === 'number') c.weekday = w;
+    setError(null);
+    if (autoAdvance && adv && NEXT[adv] && segs.indexOf(NEXT[adv] as Field) >= 0) setField(NEXT[adv] as Field);
+    setDraft(c);
   }
-  const patch = (p: Partial<DateTimeParts>, adv?: Field) => apply({ ...draft, ...p }, adv)
+  const patch = (p: Partial<DateTimeParts>, adv?: Field) => apply({ ...draft, ...p }, adv);
 
   function shiftMonth(delta: number) {
-    const m0 = draft.month - 1 + delta
-    const y = draft.year + Math.floor(m0 / 12)
-    const m = ((m0 % 12) + 12) % 12 + 1
-    if (yearRange && (y < yearRange[0] || y > yearRange[1])) return
-    setYearCenter(y)
-    patch({ year: y, month: m })
+    const m0 = draft.month - 1 + delta;
+    const y = draft.year + Math.floor(m0 / 12);
+    const m = (((m0 % 12) + 12) % 12) + 1;
+    if (yearRange && (y < yearRange[0] || y > yearRange[1])) return;
+    setYearCenter(y);
+    patch({ year: y, month: m });
   }
 
-  const readoutDefs: { k: Field; t: string; u?: string; colon?: boolean }[] = []
+  const readoutDefs: { k: Field; t: string; u?: string; colon?: boolean }[] = [];
   if (weekdayEnabled)
-    readoutDefs.push({ k: "weekday", t: "周" + MON[typeof draft.weekday === "number" ? draft.weekday : 0] })
-  if (mode !== "time") {
-    readoutDefs.push({ k: "year", t: String(draft.year), u: "年" })
-    readoutDefs.push({ k: "month", t: pad2(draft.month), u: "月" })
-    readoutDefs.push({ k: "day", t: pad2(draft.day), u: "日" })
+    readoutDefs.push({ k: 'weekday', t: '周' + MON[typeof draft.weekday === 'number' ? draft.weekday : 0] });
+  if (mode !== 'time') {
+    readoutDefs.push({ k: 'year', t: String(draft.year), u: '年' });
+    readoutDefs.push({ k: 'month', t: pad2(draft.month), u: '月' });
+    readoutDefs.push({ k: 'day', t: pad2(draft.day), u: '日' });
   }
-  if (mode !== "date") {
-    readoutDefs.push({ k: "hour", t: pad2(draft.hour), colon: true })
-    readoutDefs.push({ k: "minute", t: pad2(draft.minute) })
+  if (mode !== 'date') {
+    readoutDefs.push({ k: 'hour', t: pad2(draft.hour), colon: true });
+    readoutDefs.push({ k: 'minute', t: pad2(draft.minute) });
   }
 
-  const isTimeSelection = field === "hour" || field === "minute"
+  const isTimeSelection = field === 'hour' || field === 'minute';
   const nextField = (() => {
-    if (isTimeSelection) return undefined
-    const index = segs.indexOf(field)
-    return index >= 0 ? segs[index + 1] : undefined
-  })()
+    if (isTimeSelection) return undefined;
+    const index = segs.indexOf(field);
+    return index >= 0 ? segs[index + 1] : undefined;
+  })();
 
   function advanceField() {
-    if (!nextField) return false
-    setField(nextField)
-    setError(null)
-    return true
+    if (!nextField) return false;
+    setField(nextField);
+    setError(null);
+    return true;
   }
 
   function renderBody(): ReactNode {
-    if (field === "weekday") {
-      const labels = weekStartsOn === 1 ? MON : SUN
+    if (field === 'weekday') {
+      const labels = weekStartsOn === 1 ? MON : SUN;
       return (
         <div className="tdp-grid cols-7">
           {labels.map((lbl, idx) => {
-            const canonical = weekStartsOn === 1 ? idx : (idx + 6) % 7
+            const canonical = weekStartsOn === 1 ? idx : (idx + 6) % 7;
             return (
               <TapButton key={idx} selected={draft.weekday === canonical} onTap={() => patch({ weekday: canonical })}>
-                {"周" + lbl}
+                {'周' + lbl}
               </TapButton>
-            )
+            );
           })}
         </div>
-      )
+      );
     }
-    if (field === "year") {
-      const years: number[] = []
+    if (field === 'year') {
+      const years: number[] = [];
       for (let y = yearCenter - 2; y <= yearCenter + 2; y++) {
-        if (yearRange && (y < yearRange[0] || y > yearRange[1])) continue
-        years.push(y)
+        if (yearRange && (y < yearRange[0] || y > yearRange[1])) continue;
+        years.push(y);
       }
       return (
         <div className="tdp-nav-row">
           <TapButton className="tdp-nav" ariaLabel="前5年" onTap={() => setYearCenter(yearCenter - 5)}>
-            {"‹"}
+            {'‹'}
           </TapButton>
           <div className="tdp-grid cols-5">
             {years.map((y) => (
@@ -236,8 +241,8 @@ export function DateTimePicker(props: DateTimePickerProps) {
                 key={y}
                 selected={y === draft.year}
                 onTap={() => {
-                  setYearCenter(y)
-                  patch({ year: y }, "year")
+                  setYearCenter(y);
+                  patch({ year: y }, 'year');
                 }}
               >
                 {y}
@@ -245,50 +250,50 @@ export function DateTimePicker(props: DateTimePickerProps) {
             ))}
           </div>
           <TapButton className="tdp-nav" ariaLabel="后5年" onTap={() => setYearCenter(yearCenter + 5)}>
-            {"›"}
+            {'›'}
           </TapButton>
         </div>
-      )
+      );
     }
-    if (field === "month") {
+    if (field === 'month') {
       return (
         <div className="tdp-grid cols-4">
           {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-            <TapButton key={m} selected={m === draft.month} onTap={() => patch({ month: m }, "month")}>
-              {m + " 月"}
+            <TapButton key={m} selected={m === draft.month} onTap={() => patch({ month: m }, 'month')}>
+              {m + ' 月'}
             </TapButton>
           ))}
         </div>
-      )
+      );
     }
-    if (field === "day") {
-      const total = daysInMonth(draft.year, draft.month)
-      const js = new Date(draft.year, draft.month - 1, 1).getDay()
-      const lead = weekStartsOn === 1 ? (js + 6) % 7 : js
-      const cells: ReactNode[] = []
-      for (let i = 0; i < lead; i++) cells.push(<span key={"b" + i} className="tdp-blank" />)
+    if (field === 'day') {
+      const total = daysInMonth(draft.year, draft.month);
+      const js = new Date(draft.year, draft.month - 1, 1).getDay();
+      const lead = weekStartsOn === 1 ? (js + 6) % 7 : js;
+      const cells: ReactNode[] = [];
+      for (let i = 0; i < lead; i++) cells.push(<span key={'b' + i} className="tdp-blank" />);
       for (let d = 1; d <= total; d++) {
-        const w = new Date(draft.year, draft.month - 1, d).getDay()
+        const w = new Date(draft.year, draft.month - 1, d).getDay();
         cells.push(
           <TapButton
             key={d}
             selected={d === draft.day}
-            className={w === 0 || w === 6 ? "is-weekend" : undefined}
+            className={w === 0 || w === 6 ? 'is-weekend' : undefined}
             onTap={() => patch({ day: d })}
           >
             {d}
           </TapButton>,
-        )
+        );
       }
       return (
         <>
           <div className="tdp-month-bar">
             <TapButton className="tdp-nav" ariaLabel="上个月" onTap={() => shiftMonth(-1)}>
-              {"‹"}
+              {'‹'}
             </TapButton>
-            <span className="tdp-month-label">{draft.year + " 年 " + draft.month + " 月"}</span>
+            <span className="tdp-month-label">{draft.year + ' 年 ' + draft.month + ' 月'}</span>
             <TapButton className="tdp-nav" ariaLabel="下个月" onTap={() => shiftMonth(1)}>
-              {"›"}
+              {'›'}
             </TapButton>
           </div>
           <div className="tdp-dow">
@@ -298,38 +303,66 @@ export function DateTimePicker(props: DateTimePickerProps) {
           </div>
           <div className="tdp-grid cols-7">{cells}</div>
         </>
-      )
+      );
     }
     if (isTimeSelection) {
       return (
         <div className="tdp-time-wheels" aria-label="选择小时和分钟">
-          <div className="tdp-time-wheel"><span className="tdp-time-wheel__label">选择时</span><WheelColumn className="tdp-time-wheel__list" ariaLabel="选择小时" values={hourValues} value={draft.hour} onChange={(hour) => { setField("hour"); patch({ hour }) }} /></div>
-          <span className="tdp-time-wheels__colon" aria-hidden="true">:</span>
-          <div className="tdp-time-wheel"><span className="tdp-time-wheel__label">选择分</span><WheelColumn className="tdp-time-wheel__list" ariaLabel="选择分钟" values={minuteValues} value={draft.minute} onChange={(minute) => { setField("minute"); patch({ minute }) }} /></div>
+          <div className="tdp-time-wheel">
+            <span className="tdp-time-wheel__label">选择时</span>
+            <WheelColumn
+              className="tdp-time-wheel__list"
+              ariaLabel="选择小时"
+              values={hourValues}
+              value={draft.hour}
+              onChange={(hour) => {
+                setField('hour');
+                patch({ hour });
+              }}
+            />
+          </div>
+          <span className="tdp-time-wheels__colon" aria-hidden="true">
+            :
+          </span>
+          <div className="tdp-time-wheel">
+            <span className="tdp-time-wheel__label">选择分</span>
+            <WheelColumn
+              className="tdp-time-wheel__list"
+              ariaLabel="选择分钟"
+              values={minuteValues}
+              value={draft.minute}
+              onChange={(minute) => {
+                setField('minute');
+                patch({ minute });
+              }}
+            />
+          </div>
         </div>
-      )
+      );
     }
-    return null
+    return null;
   }
 
-  const vw = typeof window !== "undefined" ? window.innerWidth : 360
-  const targetPanelWidth = mode === "time" ? 268 : mode === "date" ? 312 : 320
-  const pw = Math.min(targetPanelWidth, vw - 16)
+  const vw = typeof window !== 'undefined' ? window.innerWidth : 360;
+  const targetPanelWidth = mode === 'time' ? 268 : mode === 'date' ? 312 : 320;
+  const pw = Math.min(targetPanelWidth, vw - 16);
   const panelStyle: CSSProperties | undefined =
-    density === "compact" && anchorRect
+    density === 'compact' && anchorRect
       ? {
-          position: "fixed",
+          position: 'fixed',
           width: pw,
-          left: compactPlacement === "right"
-            ? anchorRect.left + anchorRect.width + 8
-            : Math.min(Math.max(8, anchorRect.left), vw - pw - 8),
-          top: compactPlacement === "right"
-            ? anchorRect.top + anchorRect.height / 2
-            : anchorRect.top + anchorRect.height + 8,
+          left:
+            compactPlacement === 'right'
+              ? anchorRect.left + anchorRect.width + 8
+              : Math.min(Math.max(8, anchorRect.left), vw - pw - 8),
+          top:
+            compactPlacement === 'right'
+              ? anchorRect.top + anchorRect.height / 2
+              : anchorRect.top + anchorRect.height + 8,
         }
-      : undefined
+      : undefined;
 
-  const showPreview = preview !== false && (!preview || preview.show !== false)
+  const showPreview = preview !== false && (!preview || preview.show !== false);
 
   const node = (
     <div
@@ -338,7 +371,7 @@ export function DateTimePicker(props: DateTimePickerProps) {
       data-density={density}
       data-mode={mode}
       onPointerDown={(e) => {
-        if (e.target === e.currentTarget) dismissAfterPointerAction(onCancel)
+        if (e.target === e.currentTarget) dismissAfterPointerAction(onCancel);
       }}
     >
       <div
@@ -346,7 +379,7 @@ export function DateTimePicker(props: DateTimePickerProps) {
         ref={panelRef}
         role="dialog"
         aria-modal="true"
-        aria-label={title || "选择日期和时间"}
+        aria-label={title || '选择日期和时间'}
         tabIndex={-1}
         style={panelStyle}
       >
@@ -355,12 +388,12 @@ export function DateTimePicker(props: DateTimePickerProps) {
           {readoutDefs.map((s) => (
             <span key={s.k} className="tdp-seg-wrap">
               <TapButton
-                className={"tdp-seg" + (field === s.k ? " is-active" : "")}
-                ariaLabel={s.k + " " + s.t}
+                className={'tdp-seg' + (field === s.k ? ' is-active' : '')}
+                ariaLabel={s.k + ' ' + s.t}
                 onTap={() => {
-                  if (field === s.k && advanceField()) return
-                  setField(s.k)
-                  setError(null)
+                  if (field === s.k && advanceField()) return;
+                  setField(s.k);
+                  setError(null);
                 }}
               >
                 {s.t}
@@ -370,37 +403,35 @@ export function DateTimePicker(props: DateTimePickerProps) {
             </span>
           ))}
         </div>
-        {showPreview && (
-          <SelectionPreview value={draft} mode={mode} weekday={weekday} preview={preview || undefined} />
-        )}
+        {showPreview && <SelectionPreview value={draft} mode={mode} weekday={weekday} preview={preview || undefined} />}
         {error && (
           <div className="tdp-error" role="alert">
-            {"⚠ " + error}
+            {'⚠ ' + error}
           </div>
         )}
         <div className="tdp-body">{renderBody()}</div>
         <div className="tdp-footer">
           <TapButton className="tdp-cancel" onTap={() => dismissAfterPointerAction(onCancel)}>
-            {cancelLabel || "取消"}
+            {cancelLabel || '取消'}
           </TapButton>
           <TapButton
             className="tdp-ok"
             onTap={() => {
-              if (advanceField()) return
-              const msg = validate ? validate(draft) : null
+              if (advanceField()) return;
+              const msg = validate ? validate(draft) : null;
               if (msg) {
-                setError(msg)
-                return
+                setError(msg);
+                return;
               }
-              dismissAfterPointerAction(() => onConfirm(draft))
+              dismissAfterPointerAction(() => onConfirm(draft));
             }}
           >
-            {nextField ? "下一步" : confirmLabel || "确定"}
+            {nextField ? '下一步' : confirmLabel || '确定'}
           </TapButton>
         </div>
       </div>
     </div>
-  )
+  );
 
-  return typeof document !== "undefined" ? createPortal(node, document.body) : node
+  return typeof document !== 'undefined' ? createPortal(node, document.body) : node;
 }

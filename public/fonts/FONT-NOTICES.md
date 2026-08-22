@@ -9,4 +9,5 @@ All font files in this folder are locally packaged; the app requests no external
 - LXGW WenKai Mono / 霞鹜文楷等宽: digits and time punctuation subset (SIL Open Font License 1.1)
 
 Alibaba PuHuiTi remains subject to its upstream license terms. Preserve upstream notices when redistributing.
+
 - JetBrains Mono: Regular / SemiBold / ExtraBold digits and time-punctuation subset (SIL Open Font License 1.1) — used as the primary large-screen clock/number font ("Exam Mono Digit").

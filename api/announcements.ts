@@ -27,9 +27,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const imgOrigin = new URL(ANNOUNCE_URL).origin;
     // 图片改走同源代理：把绝对遥测台地址改回相对路径（相对路径不变）
     const toSameOrigin = (c: unknown) =>
-      typeof c === 'string'
-        ? c.split(`](${imgOrigin}/api/announcement-images`).join('](/api/announcement-images')
-        : c;
+      typeof c === 'string' ? c.split(`](${imgOrigin}/api/announcement-images`).join('](/api/announcement-images') : c;
     const list = Array.isArray(data?.announcements)
       ? data.announcements.map((a: Record<string, unknown>) => ({ ...a, content: toSameOrigin(a.content) }))
       : [];

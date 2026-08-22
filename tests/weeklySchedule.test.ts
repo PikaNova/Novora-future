@@ -8,7 +8,9 @@ import {
   isoWeekdayOfDateKey,
   resolveWeeklyOccurrences,
   validateWeeklyPlan,
-  weekIndexOfDateKey, weekRangeStarts } from '../src/utils/weeklySchedule.js';
+  weekIndexOfDateKey,
+  weekRangeStarts,
+} from '../src/utils/weeklySchedule.js';
 import type { WeeklyExamItem, WeeklyExamOverride, WeeklyPlan } from '../src/types/exam.js';
 
 function shanghaiNoonMsFor(dateKey: string): number {
@@ -102,7 +104,10 @@ test('resolveWeeklyOccurrences: ignores missing or disabled plans and items', ()
   assert.deepEqual(resolveWeeklyOccurrences(null, now), []);
   assert.deepEqual(resolveWeeklyOccurrences(undefined, now), []);
   assert.deepEqual(
-    resolveWeeklyOccurrences(plan({ items: [item({ id: 'i1', weekday: 1, enabled: false })] }), now, { daysBack: 0, daysForward: 0 }),
+    resolveWeeklyOccurrences(plan({ items: [item({ id: 'i1', weekday: 1, enabled: false })] }), now, {
+      daysBack: 0,
+      daysForward: 0,
+    }),
     [],
   );
 });
@@ -111,9 +116,24 @@ test('resolveWeeklyOccurrences: applies the active date range and excluded dates
   const now = shanghaiNoonMsFor('2026-01-05');
   const monday = item({ id: 'i1', weekday: 1 });
 
-  assert.deepEqual(resolveWeeklyOccurrences(plan({ items: [monday], activeFrom: '2026-01-06' }), now, { daysBack: 0, daysForward: 0 }), []);
-  assert.deepEqual(resolveWeeklyOccurrences(plan({ items: [monday], activeUntil: '2026-01-04' }), now, { daysBack: 0, daysForward: 0 }), []);
-  assert.deepEqual(resolveWeeklyOccurrences(plan({ items: [monday], excludedDates: ['2026-01-05'] }), now, { daysBack: 0, daysForward: 0 }), []);
+  assert.deepEqual(
+    resolveWeeklyOccurrences(plan({ items: [monday], activeFrom: '2026-01-06' }), now, { daysBack: 0, daysForward: 0 }),
+    [],
+  );
+  assert.deepEqual(
+    resolveWeeklyOccurrences(plan({ items: [monday], activeUntil: '2026-01-04' }), now, {
+      daysBack: 0,
+      daysForward: 0,
+    }),
+    [],
+  );
+  assert.deepEqual(
+    resolveWeeklyOccurrences(plan({ items: [monday], excludedDates: ['2026-01-05'] }), now, {
+      daysBack: 0,
+      daysForward: 0,
+    }),
+    [],
+  );
 });
 
 test('resolveWeeklyOccurrences: excludes built-in official holidays', () => {
@@ -137,34 +157,43 @@ test('resolveWeeklyOccurrences: aligns repeat intervals with the anchor week', (
     { daysBack: 0, daysForward: 14 },
   );
 
-  assert.deepEqual(result.map(occurrence => occurrence.date), ['2026-01-05', '2026-01-19']);
+  assert.deepEqual(
+    result.map((occurrence) => occurrence.date),
+    ['2026-01-05', '2026-01-19'],
+  );
 });
 
 test('resolveWeeklyOccurrences: uses A/B filtering instead of repeat intervals', () => {
   const result = resolveWeeklyOccurrences(
     plan({
       weekMode: 'ab',
-      items: [
-        item({ id: 'a1', weekday: 1, weekType: 'a' }),
-        item({ id: 'b1', weekday: 1, weekType: 'b' }),
-      ],
+      items: [item({ id: 'a1', weekday: 1, weekType: 'a' }), item({ id: 'b1', weekday: 1, weekType: 'b' })],
     }),
     shanghaiNoonMsFor('2026-01-05'),
     { daysBack: 0, daysForward: 7 },
   );
 
-  assert.deepEqual(result.map(occurrence => [occurrence.date, occurrence.weeklyItemId]), [
-    ['2026-01-05', 'a1'],
-    ['2026-01-12', 'b1'],
-  ]);
+  assert.deepEqual(
+    result.map((occurrence) => [occurrence.date, occurrence.weeklyItemId]),
+    [
+      ['2026-01-05', 'a1'],
+      ['2026-01-12', 'b1'],
+    ],
+  );
 });
 
 test('resolveWeeklyOccurrences: applies cancel overrides only on their date', () => {
   const override: WeeklyExamOverride = { id: 'ov1', sourceItemId: 'i1', date: '2026-01-05', action: 'cancel' };
   const weeklyPlan = plan({ items: [item({ id: 'i1', weekday: 1 })], overrides: [override] });
 
-  assert.deepEqual(resolveWeeklyOccurrences(weeklyPlan, shanghaiNoonMsFor('2026-01-05'), { daysBack: 0, daysForward: 0 }), []);
-  assert.equal(resolveWeeklyOccurrences(weeklyPlan, shanghaiNoonMsFor('2026-01-12'), { daysBack: 0, daysForward: 0 }).length, 1);
+  assert.deepEqual(
+    resolveWeeklyOccurrences(weeklyPlan, shanghaiNoonMsFor('2026-01-05'), { daysBack: 0, daysForward: 0 }),
+    [],
+  );
+  assert.equal(
+    resolveWeeklyOccurrences(weeklyPlan, shanghaiNoonMsFor('2026-01-12'), { daysBack: 0, daysForward: 0 }).length,
+    1,
+  );
 });
 
 test('resolveWeeklyOccurrences: applies replacement schedule and forced status', () => {
@@ -211,26 +240,61 @@ test('validateWeeklyPlan: accepts a well-formed plan', () => {
 });
 
 test('validateWeeklyPlan: reports invalid dates and repeat intervals', () => {
-  assert.ok(validateWeeklyPlan(plan({ activeFrom: 'not-a-date' })).some(issue => issue.code === 'plan.activeFrom' && issue.level === 'error'));
-  assert.ok(validateWeeklyPlan(plan({ activeFrom: '2026-01-10', activeUntil: '2026-01-01' })).some(issue => issue.code === 'plan.activeUntil' && issue.level === 'error'));
-  assert.ok(validateWeeklyPlan(plan({ repeatEveryWeeks: 20 })).some(issue => issue.code === 'plan.repeatEveryWeeks' && issue.level === 'warn'));
+  assert.ok(
+    validateWeeklyPlan(plan({ activeFrom: 'not-a-date' })).some(
+      (issue) => issue.code === 'plan.activeFrom' && issue.level === 'error',
+    ),
+  );
+  assert.ok(
+    validateWeeklyPlan(plan({ activeFrom: '2026-01-10', activeUntil: '2026-01-01' })).some(
+      (issue) => issue.code === 'plan.activeUntil' && issue.level === 'error',
+    ),
+  );
+  assert.ok(
+    validateWeeklyPlan(plan({ repeatEveryWeeks: 20 })).some(
+      (issue) => issue.code === 'plan.repeatEveryWeeks' && issue.level === 'warn',
+    ),
+  );
 });
 
 test('validateWeeklyPlan: reports invalid items and duplicate schedules', () => {
-  assert.ok(validateWeeklyPlan(plan({ items: [item({ id: 'i1', weekday: 9 as WeeklyExamItem['weekday'] })] })).some(issue => issue.code === 'item.weekday'));
-  assert.ok(validateWeeklyPlan(plan({ items: [item({ id: 'i1', weekday: 1, startTime: '25:00' })] })).some(issue => issue.code === 'item.time'));
-  assert.ok(validateWeeklyPlan(plan({ items: [item({ id: 'i1', weekday: 1, startTime: '20:00', endTime: '19:00' })] })).some(issue => issue.code === 'item.range'));
-  assert.equal(validateWeeklyPlan(plan({ items: [item({ id: 'i1', weekday: 1, startTime: '20:00', endTime: '19:00', endNextDay: true })] })).some(issue => issue.code === 'item.range'), false);
-  assert.ok(validateWeeklyPlan(plan({ items: [item({ id: 'i1', weekday: 1, name: 'Same' }), item({ id: 'i2', weekday: 1, name: 'Same' })] })).some(issue => issue.code === 'item.duplicate'));
+  assert.ok(
+    validateWeeklyPlan(plan({ items: [item({ id: 'i1', weekday: 9 as WeeklyExamItem['weekday'] })] })).some(
+      (issue) => issue.code === 'item.weekday',
+    ),
+  );
+  assert.ok(
+    validateWeeklyPlan(plan({ items: [item({ id: 'i1', weekday: 1, startTime: '25:00' })] })).some(
+      (issue) => issue.code === 'item.time',
+    ),
+  );
+  assert.ok(
+    validateWeeklyPlan(plan({ items: [item({ id: 'i1', weekday: 1, startTime: '20:00', endTime: '19:00' })] })).some(
+      (issue) => issue.code === 'item.range',
+    ),
+  );
+  assert.equal(
+    validateWeeklyPlan(
+      plan({ items: [item({ id: 'i1', weekday: 1, startTime: '20:00', endTime: '19:00', endNextDay: true })] }),
+    ).some((issue) => issue.code === 'item.range'),
+    false,
+  );
+  assert.ok(
+    validateWeeklyPlan(
+      plan({ items: [item({ id: 'i1', weekday: 1, name: 'Same' }), item({ id: 'i2', weekday: 1, name: 'Same' })] }),
+    ).some((issue) => issue.code === 'item.duplicate'),
+  );
 });
 
 test('validateWeeklyPlan: reports overrides that reference a missing item', () => {
-  const issues = validateWeeklyPlan(plan({
-    items: [item({ id: 'i1', weekday: 1 })],
-    overrides: [{ id: 'ov1', sourceItemId: 'missing', date: '2026-01-05', action: 'cancel' }],
-  }));
+  const issues = validateWeeklyPlan(
+    plan({
+      items: [item({ id: 'i1', weekday: 1 })],
+      overrides: [{ id: 'ov1', sourceItemId: 'missing', date: '2026-01-05', action: 'cancel' }],
+    }),
+  );
 
-  assert.ok(issues.some(issue => issue.code === 'override.orphan'));
+  assert.ok(issues.some((issue) => issue.code === 'override.orphan'));
 });
 
 test('weekRangeStarts: returns 1-3 consecutive week starts', () => {

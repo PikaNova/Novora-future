@@ -35,7 +35,11 @@ type MergeContext = { conflicts: number };
 function equal(a: MergeValue, b: MergeValue): boolean {
   if (a === MISSING || b === MISSING) return a === b;
   if (Object.is(a, b)) return true;
-  try { return sameJson(a, b); } catch { return false; }
+  try {
+    return sameJson(a, b);
+  } catch {
+    return false;
+  }
 }
 
 function clone<T>(value: T): T {
@@ -48,16 +52,23 @@ function isObject(value: MergeValue): value is Record<string, unknown> {
 }
 
 function isIdArray(value: MergeValue): value is Array<Record<string, unknown>> {
-  return Array.isArray(value) && value.every(entry => isObject(entry) && typeof entry.id === 'string');
+  return Array.isArray(value) && value.every((entry) => isObject(entry) && typeof entry.id === 'string');
 }
 
-function mergeIdArray(base: Array<Record<string, unknown>>, local: Array<Record<string, unknown>>, remote: Array<Record<string, unknown>>, ctx: MergeContext): Array<Record<string, unknown>> {
-  const byId = (list: Array<Record<string, unknown>>) => new Map(list.map(item => [String(item.id), item]));
+function mergeIdArray(
+  base: Array<Record<string, unknown>>,
+  local: Array<Record<string, unknown>>,
+  remote: Array<Record<string, unknown>>,
+  ctx: MergeContext,
+): Array<Record<string, unknown>> {
+  const byId = (list: Array<Record<string, unknown>>) => new Map(list.map((item) => [String(item.id), item]));
   const baseById = byId(base);
   const localById = byId(local);
   const remoteById = byId(remote);
   // 先遵从本机顺序，再补入远端新增项，最后保留基线中仍存在的项目。
-  const ids = [...local, ...remote, ...base].map(item => String(item.id)).filter((id, index, all) => all.indexOf(id) === index);
+  const ids = [...local, ...remote, ...base]
+    .map((item) => String(item.id))
+    .filter((id, index, all) => all.indexOf(id) === index);
   const merged: Array<Record<string, unknown>> = [];
   for (const id of ids) {
     const value = mergeValue(
@@ -71,7 +82,12 @@ function mergeIdArray(base: Array<Record<string, unknown>>, local: Array<Record<
   return merged;
 }
 
-function mergeObject(base: Record<string, unknown>, local: Record<string, unknown>, remote: Record<string, unknown>, ctx: MergeContext): Record<string, unknown> {
+function mergeObject(
+  base: Record<string, unknown>,
+  local: Record<string, unknown>,
+  remote: Record<string, unknown>,
+  ctx: MergeContext,
+): Record<string, unknown> {
   const keys = new Set([...Object.keys(base), ...Object.keys(local), ...Object.keys(remote)]);
   const merged: Record<string, unknown> = {};
   for (const key of keys) {
@@ -105,21 +121,55 @@ function mergeValue(base: MergeValue, local: MergeValue, remote: MergeValue, ctx
   return clone(local);
 }
 
-export function threeWayMergeExam(base: MergeableExamPayload, local: MergeableExamPayload, remote: MergeableExamPayload): ExamMergeResult {
+export function threeWayMergeExam(
+  base: MergeableExamPayload,
+  local: MergeableExamPayload,
+  remote: MergeableExamPayload,
+): ExamMergeResult {
   const ctx: MergeContext = { conflicts: 0 };
   const majors = mergeValue(base.majors, local.majors, remote.majors, ctx) as MajorExam[];
   let activeMajorId = mergeValue(base.activeMajorId, local.activeMajorId, remote.activeMajorId, ctx) as string;
-  if (!majors.some(major => major.id === activeMajorId)) activeMajorId = majors[0]?.id ?? '';
-  const active = majors.find(major => major.id === activeMajorId) ?? majors[0];
+  if (!majors.some((major) => major.id === activeMajorId)) activeMajorId = majors[0]?.id ?? '';
+  const active = majors.find((major) => major.id === activeMajorId) ?? majors[0];
   const alerts = mergeValue(base.alerts, local.alerts, remote.alerts, ctx) as AlertsSettings | null;
-  const weeklyPlans = mergeValue(base.weeklyPlans ?? [], local.weeklyPlans ?? [], remote.weeklyPlans ?? [], ctx) as WeeklyPlan[];
-  const activeWeeklyPlanId = mergeValue(base.activeWeeklyPlanId ?? null, local.activeWeeklyPlanId ?? null, remote.activeWeeklyPlanId ?? null, ctx) as string | null;
-  const activeWeeklyPlanIdByClassId = mergeValue(base.activeWeeklyPlanIdByClassId ?? {}, local.activeWeeklyPlanIdByClassId ?? {}, remote.activeWeeklyPlanIdByClassId ?? {}, ctx) as Record<string, string | null>;
+  const weeklyPlans = mergeValue(
+    base.weeklyPlans ?? [],
+    local.weeklyPlans ?? [],
+    remote.weeklyPlans ?? [],
+    ctx,
+  ) as WeeklyPlan[];
+  const activeWeeklyPlanId = mergeValue(
+    base.activeWeeklyPlanId ?? null,
+    local.activeWeeklyPlanId ?? null,
+    remote.activeWeeklyPlanId ?? null,
+    ctx,
+  ) as string | null;
+  const activeWeeklyPlanIdByClassId = mergeValue(
+    base.activeWeeklyPlanIdByClassId ?? {},
+    local.activeWeeklyPlanIdByClassId ?? {},
+    remote.activeWeeklyPlanIdByClassId ?? {},
+    ctx,
+  ) as Record<string, string | null>;
   const grades = mergeValue(base.grades ?? [], local.grades ?? [], remote.grades ?? [], ctx) as SchoolGrade[];
   const classes = mergeValue(base.classes ?? [], local.classes ?? [], remote.classes ?? [], ctx) as SchoolClass[];
-  const initialization = mergeValue(base.initialization ?? DEFAULT_INITIALIZATION, local.initialization ?? DEFAULT_INITIALIZATION, remote.initialization ?? DEFAULT_INITIALIZATION, ctx) as InitializationState;
-  const scheduleMode = mergeValue(base.scheduleMode ?? 'major-only', local.scheduleMode ?? 'major-only', remote.scheduleMode ?? 'major-only', ctx) as ScheduleMode;
-  const weeklyConflictPolicy = mergeValue(base.weeklyConflictPolicy ?? null, local.weeklyConflictPolicy ?? null, remote.weeklyConflictPolicy ?? null, ctx) as WeeklyConflictPolicy | null;
+  const initialization = mergeValue(
+    base.initialization ?? DEFAULT_INITIALIZATION,
+    local.initialization ?? DEFAULT_INITIALIZATION,
+    remote.initialization ?? DEFAULT_INITIALIZATION,
+    ctx,
+  ) as InitializationState;
+  const scheduleMode = mergeValue(
+    base.scheduleMode ?? 'major-only',
+    local.scheduleMode ?? 'major-only',
+    remote.scheduleMode ?? 'major-only',
+    ctx,
+  ) as ScheduleMode;
+  const weeklyConflictPolicy = mergeValue(
+    base.weeklyConflictPolicy ?? null,
+    local.weeklyConflictPolicy ?? null,
+    remote.weeklyConflictPolicy ?? null,
+    ctx,
+  ) as WeeklyConflictPolicy | null;
 
   return {
     payload: {

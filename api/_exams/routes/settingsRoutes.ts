@@ -1,44 +1,39 @@
 // 系统设置相关路由：设计策略更新、数据重置（需管理员权限）。
 // 从 api/exams.ts 拆分而来，逻辑与对外行为保持不变。
-import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { acquireWriteSlotOrReject, database, ensureTableOnce, missingRelation } from "../db.js";
-import { allScope } from "../permissions.js";
-import {
-  type AdminActor,
-  isPasswordRequired,
-  requireActor,
-  writeAudit,
-} from "../../_auth.js";
+import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { acquireWriteSlotOrReject, database, ensureTableOnce, missingRelation } from '../db.js';
+import { allScope } from '../permissions.js';
+import { type AdminActor, isPasswordRequired, requireActor, writeAudit } from '../../_auth.js';
 
 export type DesignPolicyRule = {
   id: string;
-  scope: "school" | "grade" | "class" | "device";
+  scope: 'school' | 'grade' | 'class' | 'device';
   scopeId: string;
   designId: string;
 };
 
 export function sanitizeDesignPolicyRules(rawRules: unknown): DesignPolicyRule[] {
   const rules = Array.isArray(rawRules) ? rawRules : [];
-  const allowedScopes = new Set(["school", "grade", "class", "device"]);
-  const parsedRules = rules
-    .slice(0, 500)
-    .flatMap((rule: any, index: number) => {
-      const scope = String(rule?.scope ?? "");
-      const scopeId = String(rule?.scopeId ?? "")
-        .trim()
-        .slice(0, 128);
-      const designId = String(rule?.designId ?? "")
-        .trim()
-        .slice(0, 80);
-      if (!allowedScopes.has(scope) || !designId || (scope !== "school" && !scopeId)) return [];
-      return [{
+  const allowedScopes = new Set(['school', 'grade', 'class', 'device']);
+  const parsedRules = rules.slice(0, 500).flatMap((rule: any, index: number) => {
+    const scope = String(rule?.scope ?? '');
+    const scopeId = String(rule?.scopeId ?? '')
+      .trim()
+      .slice(0, 128);
+    const designId = String(rule?.designId ?? '')
+      .trim()
+      .slice(0, 80);
+    if (!allowedScopes.has(scope) || !designId || (scope !== 'school' && !scopeId)) return [];
+    return [
+      {
         id: String(rule?.id ?? `design-${index}`).slice(0, 128),
-        scope: scope as DesignPolicyRule["scope"],
-        scopeId: scope === "school" ? "*" : scopeId,
+        scope: scope as DesignPolicyRule['scope'],
+        scopeId: scope === 'school' ? '*' : scopeId,
         designId,
-      }];
-    });
-  const schoolRule = [...parsedRules].reverse().find((rule) => rule.scope === "school");
+      },
+    ];
+  });
+  const schoolRule = [...parsedRules].reverse().find((rule) => rule.scope === 'school');
   return schoolRule ? [schoolRule] : parsedRules;
 }
 
@@ -46,12 +41,10 @@ export async function handleDesignPolicy(req: VercelRequest, res: VercelResponse
   const sql = database();
   let designActor: AdminActor | null = null;
   if (await isPasswordRequired()) {
-    designActor = await requireActor(req, res, "settings.edit");
+    designActor = await requireActor(req, res, 'settings.edit');
     if (!designActor) return;
     if (!allScope(designActor)) {
-      res
-        .status(403)
-        .json({ ok: false, error: "只有全校范围管理员可以下发考试端设计" });
+      res.status(403).json({ ok: false, error: '只有全校范围管理员可以下发考试端设计' });
       return;
     }
   }
@@ -69,13 +62,7 @@ export async function handleDesignPolicy(req: VercelRequest, res: VercelResponse
     await ensureTableOnce();
     await run();
   }
-  await writeAudit(
-    designActor,
-    "settings.design-policy",
-    "exam_data",
-    "1",
-    { ruleCount: rules.length },
-  );
+  await writeAudit(designActor, 'settings.design-policy', 'exam_data', '1', { ruleCount: rules.length });
   res.status(200).json({ ok: true, designPolicy, updatedAt });
   return;
 }
@@ -92,10 +79,11 @@ export async function handleMajorBatchPresets(req: VercelRequest, res: VercelRes
   const sql = database();
   let presetActor: AdminActor | null = null;
   if (await isPasswordRequired()) {
-    presetActor = await requireActor(req, res, "majorBatch.preset_edit");
+    presetActor = await requireActor(req, res, 'majorBatch.preset_edit');
     if (!presetActor) return;
   }
-  const source = (req.body as Record<string, unknown>)?.presets ?? (req.body as Record<string, unknown>)?.majorBatchPresets;
+  const source =
+    (req.body as Record<string, unknown>)?.presets ?? (req.body as Record<string, unknown>)?.majorBatchPresets;
   const presets = sanitizeMajorBatchPresets(source);
   const updatedAt = Date.now();
   const payload = { ...presets, updatedAt };
@@ -109,16 +97,12 @@ export async function handleMajorBatchPresets(req: VercelRequest, res: VercelRes
     await ensureTableOnce();
     await run();
   }
-  await writeAudit(
-    presetActor,
-    "settings.major-batch-presets",
-    "exam_data",
-    "1",
-    { subjectGroups: payload.subjectGroups.length, timeGroups: payload.timeGroups.length },
-  );
+  await writeAudit(presetActor, 'settings.major-batch-presets', 'exam_data', '1', {
+    subjectGroups: payload.subjectGroups.length,
+    timeGroups: payload.timeGroups.length,
+  });
   res.status(200).json({ ok: true, majorBatchPresets: payload, updatedAt });
 }
-
 
 export type ResetCategoryFlags = {
   resetMajor: boolean;
@@ -129,14 +113,14 @@ export type ResetCategoryFlags = {
 };
 
 export function resolveResetCategories(categories: readonly string[]): ResetCategoryFlags {
-  const resetAll = categories.includes("all");
-  const resetSchool = resetAll || categories.includes("school");
+  const resetAll = categories.includes('all');
+  const resetSchool = resetAll || categories.includes('school');
   return {
-    resetMajor: resetAll || categories.includes("major"),
-    resetWeekly: resetAll || categories.includes("weekly"),
+    resetMajor: resetAll || categories.includes('major'),
+    resetWeekly: resetAll || categories.includes('weekly'),
     resetSchool,
-    resetSettings: resetAll || categories.includes("settings"),
-    resetDevices: resetAll || categories.includes("devices") || resetSchool,
+    resetSettings: resetAll || categories.includes('settings'),
+    resetDevices: resetAll || categories.includes('devices') || resetSchool,
   };
 }
 
@@ -144,28 +128,24 @@ export async function handleResetData(req: VercelRequest, res: VercelResponse): 
   const sql = database();
   let resetActor: AdminActor | null = null;
   if (await isPasswordRequired()) {
-    resetActor = await requireActor(req, res, "initialization.run");
+    resetActor = await requireActor(req, res, 'initialization.run');
     if (!resetActor) return;
     if (!allScope(resetActor)) {
-      res
-        .status(403)
-        .json({ ok: false, error: "只有超级管理员可以重置数据库" });
+      res.status(403).json({ ok: false, error: '只有超级管理员可以重置数据库' });
       return;
     }
   }
-  const categories = Array.isArray(req.body?.categories)
-    ? req.body.categories.map(String)
-    : [];
+  const categories = Array.isArray(req.body?.categories) ? req.body.categories.map(String) : [];
   const resetFlags = resolveResetCategories(categories);
   const { resetMajor, resetWeekly, resetSchool, resetSettings, resetDevices } = resetFlags;
   if (!Object.values(resetFlags).some(Boolean)) {
-    res.status(400).json({ ok: false, error: "请选择需要重置的数据" });
+    res.status(400).json({ ok: false, error: '请选择需要重置的数据' });
     return;
   }
   await ensureTableOnce();
   if (!(await acquireWriteSlotOrReject(req, res))) return;
   const at = Date.now();
-  await sql.transaction(transaction => [
+  await sql.transaction((transaction) => [
     transaction`UPDATE exam_data SET
     items=CASE WHEN ${resetMajor} THEN '[]'::jsonb ELSE items END,
     title=CASE WHEN ${resetMajor} THEN '' ELSE title END,
@@ -182,12 +162,11 @@ export async function handleResetData(req: VercelRequest, res: VercelResponse): 
     weekly_conflict_policy=CASE WHEN ${resetSettings} THEN NULL ELSE weekly_conflict_policy END,
     design_policy=CASE WHEN ${resetSettings} THEN '{"rules":[],"updatedAt":0}'::jsonb ELSE design_policy END,
       updated_at=${at} WHERE id=1`,
-    ...(resetDevices ? [
-      transaction`DELETE FROM device_instances`,
-      transaction`DELETE FROM classisland_plugin_instances`,
-    ] : []),
+    ...(resetDevices
+      ? [transaction`DELETE FROM device_instances`, transaction`DELETE FROM classisland_plugin_instances`]
+      : []),
   ]);
-  await writeAudit(resetActor, "database.reset", "exam_data", "1", {
+  await writeAudit(resetActor, 'database.reset', 'exam_data', '1', {
     categories,
   });
   res.status(200).json({ ok: true, updatedAt: at });

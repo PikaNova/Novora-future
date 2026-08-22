@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
-import { fetchAnnouncements } from "../../services/announcements";
-import type { Announcement } from "../../services/announcements";
+import { useEffect, useState } from 'react';
+import { fetchAnnouncements } from '../../services/announcements';
+import type { Announcement } from '../../services/announcements';
 
 export function useAnnouncementsSettings() {
   const [anns, setAnns] = useState<Announcement[]>([]);

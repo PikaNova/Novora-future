@@ -22,28 +22,43 @@ async function readError(response: Response, fallback: string): Promise<string> 
 }
 
 export async function fetchPluginPairInfo(token: string): Promise<PluginPairInfo> {
-  const response = await fetchWithTimeout(`${API_URL}?action=plugin-pair-info&token=${encodeURIComponent(token)}&viewerInstanceId=${encodeURIComponent(getClassBindingInstanceId())}`, { cache: 'no-store' }, 12_000);
+  const response = await fetchWithTimeout(
+    `${API_URL}?action=plugin-pair-info&token=${encodeURIComponent(token)}&viewerInstanceId=${encodeURIComponent(getClassBindingInstanceId())}`,
+    { cache: 'no-store' },
+    12_000,
+  );
   if (!response.ok) throw new Error(await readError(response, '无法读取配对请求'));
   const data = await response.json();
   return {
     pluginInstanceId: String(data.pluginInstanceId ?? ''),
     expiresAt: Number(data.expiresAt ?? 0),
-    binding: data.binding && typeof data.binding === 'object' ? {
-      gradeId: String(data.binding.gradeId ?? ''),
-      classId: String(data.binding.classId ?? ''),
-      revoked: data.binding.revoked === true,
-      isManagement: data.binding.isManagement === true,
-      classTag: String(data.binding.classTag ?? ''),
-    } : null,
+    binding:
+      data.binding && typeof data.binding === 'object'
+        ? {
+            gradeId: String(data.binding.gradeId ?? ''),
+            classId: String(data.binding.classId ?? ''),
+            revoked: data.binding.revoked === true,
+            isManagement: data.binding.isManagement === true,
+            classTag: String(data.binding.classTag ?? ''),
+          }
+        : null,
   };
 }
 
 export async function confirmPluginPairing(token: string): Promise<void> {
-  const response = await fetchWithTimeout(API_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: 'plugin-pair-confirm', pairToken: token, viewerInstanceId: getClassBindingInstanceId() }),
-  }, 20_000);
+  const response = await fetchWithTimeout(
+    API_URL,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'plugin-pair-confirm',
+        pairToken: token,
+        viewerInstanceId: getClassBindingInstanceId(),
+      }),
+    },
+    20_000,
+  );
   if (!response.ok) throw new Error(await readError(response, '班级绑定失败'));
 }
 
@@ -57,11 +72,15 @@ export async function sendPluginViewerHeartbeat(pluginInstanceId: string, viewer
   if (pluginViewerHeartbeatInFlight) return;
   pluginViewerHeartbeatInFlight = true;
   try {
-    await fetchWithTimeout(API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'plugin-viewer-heartbeat', pluginInstanceId, viewerInstanceId }),
-    }, 8_000);
+    await fetchWithTimeout(
+      API_URL,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'plugin-viewer-heartbeat', pluginInstanceId, viewerInstanceId }),
+      },
+      8_000,
+    );
   } catch {
     /* heartbeat failures are non-blocking */
   } finally {

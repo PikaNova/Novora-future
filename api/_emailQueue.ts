@@ -3,13 +3,7 @@
 // 或 opportunisticDrain（任意请求顺带消费，Hobby 兜底）重试。
 import { sendVerificationCode, type SmtpConfig } from '../src/services/emailSender.js';
 import { authSql, ensureAuthTables } from './_auth.js';
-import {
-  assertRows,
-  rowShape,
-  isString,
-  isDatabaseInt8,
-  type DatabaseInt8,
-} from './_validation.js';
+import { assertRows, rowShape, isString, isDatabaseInt8, type DatabaseInt8 } from './_validation.js';
 
 export const OUTBOX_MAX_ATTEMPTS = 3;
 const OUTBOX_RETRY_BACKOFF_MS = [60_000, 300_000];
@@ -53,7 +47,11 @@ export function outboxRetryDelayMs(attemptsAfterFailure: number): number {
 }
 
 /** 入队一条发送任务并返回 outbox id（同时记录“最近入队时间”供顺带消费判断）。 */
-export async function enqueueEmailOutbox(email: string, purpose: 'login' | 'bind', codeId: DatabaseInt8): Promise<DatabaseInt8> {
+export async function enqueueEmailOutbox(
+  email: string,
+  purpose: 'login' | 'bind',
+  codeId: DatabaseInt8,
+): Promise<DatabaseInt8> {
   const now = Date.now();
   const rows = assertRows(
     await authSql()`INSERT INTO email_outbox (email, purpose, code_id, status, attempts, max_attempts, next_attempt_at, last_error, created_at, updated_at)
@@ -126,15 +124,34 @@ async function voidCode(codeId: DatabaseInt8 | null): Promise<void> {
   await authSql()`UPDATE email_verification_codes SET used=TRUE WHERE id=${codeId}`;
 }
 
-function sendWithTimeout(smtp: SmtpConfig, input: { to: string; code: string; purpose: 'login' | 'bind' }, timeoutMs: number): Promise<void> {
+function sendWithTimeout(
+  smtp: SmtpConfig,
+  input: { to: string; code: string; purpose: 'login' | 'bind' },
+  timeoutMs: number,
+): Promise<void> {
   return new Promise((resolve, reject) => {
     let settled = false;
     const timer = setTimeout(() => {
-      if (!settled) { settled = true; reject(new Error('SMTP 发送超时')); }
+      if (!settled) {
+        settled = true;
+        reject(new Error('SMTP 发送超时'));
+      }
     }, timeoutMs);
     sendVerificationCode(smtp, input).then(
-      () => { if (!settled) { settled = true; clearTimeout(timer); resolve(); } },
-      (error: unknown) => { if (!settled) { settled = true; clearTimeout(timer); reject(error); } },
+      () => {
+        if (!settled) {
+          settled = true;
+          clearTimeout(timer);
+          resolve();
+        }
+      },
+      (error: unknown) => {
+        if (!settled) {
+          settled = true;
+          clearTimeout(timer);
+          reject(error);
+        }
+      },
     );
   });
 }
@@ -162,7 +179,14 @@ export type OutboxDrainResult = { sent: number; failed: number; remaining: numbe
 
 export async function drainOutbox(
   smtp: SmtpConfig,
-  options: { max?: number; hardTimeoutMs?: number; deadlineMs?: number; acquireSlot?: boolean; slotWaitMs?: number; jobId?: DatabaseInt8 } = {},
+  options: {
+    max?: number;
+    hardTimeoutMs?: number;
+    deadlineMs?: number;
+    acquireSlot?: boolean;
+    slotWaitMs?: number;
+    jobId?: DatabaseInt8;
+  } = {},
 ): Promise<OutboxDrainResult> {
   await ensureAuthTables();
   const now = Date.now();
@@ -245,7 +269,11 @@ async function hasDueOutbox(now: number): Promise<boolean> {
  * 顺带消费：仅当“最近有新入队”且距上次顺带消费超过 20s 时，才加载配置并最多发送 1 封（3s 预算）。
  * 空闲时零数据库开销，供 Hobby 套餐（Cron 每日一次）兜底投递。
  */
-export async function opportunisticDrain(options: { smtpLoader: () => Promise<SmtpConfig | null>; budgetMs?: number; max?: number }): Promise<{ ran: boolean; sent: number }> {
+export async function opportunisticDrain(options: {
+  smtpLoader: () => Promise<SmtpConfig | null>;
+  budgetMs?: number;
+  max?: number;
+}): Promise<{ ran: boolean; sent: number }> {
   const now = Date.now();
   if (now - lastEnqueueAt > ENQUEUE_WINDOW_MS) return { ran: false, sent: 0 };
   if (now - lastOpportunisticDrainAt < OPPORTUNISTIC_MIN_INTERVAL_MS) return { ran: false, sent: 0 };

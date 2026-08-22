@@ -1,7 +1,7 @@
-import React from "react";
-import type { IsoWeekday } from "../../types/exam";
-import { useWeeklyExceptions } from "../../hooks/weekly/useWeeklyExceptions";
-import { WEEKDAY_LABEL, type PreviewOcc } from "./weeklyShared";
+import React from 'react';
+import type { IsoWeekday } from '../../types/exam';
+import { useWeeklyExceptions } from '../../hooks/weekly/useWeeklyExceptions';
+import { WEEKDAY_LABEL, type PreviewOcc } from './weeklyShared';
 
 type ExceptionsState = ReturnType<typeof useWeeklyExceptions<PreviewOcc>>;
 
@@ -11,7 +11,7 @@ export interface WeeklyCalendarDay {
   entries: PreviewOcc[];
   officialHoliday: string | null;
   manuallyExcluded: boolean;
-  weekType: "a" | "b" | null;
+  weekType: 'a' | 'b' | null;
 }
 
 interface WeeklyCalendarPreviewProps {
@@ -22,7 +22,7 @@ interface WeeklyCalendarPreviewProps {
   setPrintClassIds: (ids: string[]) => void;
   setPrintPickerOpen: (value: boolean) => void;
   setPrintOpen: (value: boolean) => void;
-  setConflictTarget: ExceptionsState["setConflictTarget"];
+  setConflictTarget: ExceptionsState['setConflictTarget'];
   openReschedule: (entry: PreviewOcc) => void;
   cancelOccurrence: (entry: PreviewOcc) => void | Promise<void>;
 }
@@ -56,16 +56,8 @@ export default function WeeklyCalendarPreview({
           A4 预览与下载 PDF
         </button>
       </div>
-      <div
-        className="weekly-calendar-scroll"
-        tabIndex={0}
-        aria-label="横向滚动查看未来两周"
-      >
-        <div
-          className="weekly-calendar"
-          role="grid"
-          aria-label="未来两周周测日历"
-        >
+      <div className="weekly-calendar-scroll" tabIndex={0} aria-label="横向滚动查看未来两周">
+        <div className="weekly-calendar" role="grid" aria-label="未来两周周测日历">
           {calendarWeeks.map((week, weekIndex) => (
             <div
               className="weekly-calendar__week"
@@ -75,43 +67,35 @@ export default function WeeklyCalendarPreview({
             >
               {week.map((day) => (
                 <section
-                  className={`weekly-calendar__day${day.entries.length ? " has-events" : ""}${day.officialHoliday || day.manuallyExcluded ? " is-holiday" : ""}`}
+                  className={`weekly-calendar__day${day.entries.length ? ' has-events' : ''}${day.officialHoliday || day.manuallyExcluded ? ' is-holiday' : ''}`}
                   key={day.date}
                   role="gridcell"
                 >
                   <header>
                     <strong>
                       {WEEKDAY_LABEL[day.weekday]}
-                      {day.weekType ? ` · ${day.weekType.toUpperCase()}周` : ""}
+                      {day.weekType ? ` · ${day.weekType.toUpperCase()}周` : ''}
                     </strong>
                     <span>{day.date.slice(5)}</span>
                   </header>
                   <div className="weekly-calendar__events">
                     {(day.officialHoliday || day.manuallyExcluded) && (
-                      <span className="weekly-calendar__holiday">
-                        {day.officialHoliday || "已排除"}
-                      </span>
+                      <span className="weekly-calendar__holiday">{day.officialHoliday || '已排除'}</span>
                     )}
                     {day.entries.length === 0 ? (
                       <span className="weekly-calendar__empty">
-                        {day.officialHoliday || day.manuallyExcluded
-                          ? "周测已暂停"
-                          : "无安排"}
+                        {day.officialHoliday || day.manuallyExcluded ? '周测已暂停' : '无安排'}
                       </span>
                     ) : (
                       day.entries.map((entry) => (
                         <article
-                          className={`weekly-calendar__event${entry.suppressed ? " is-suppressed" : ""}${entry.forced ? " is-forced" : ""}`}
+                          className={`weekly-calendar__event${entry.suppressed ? ' is-suppressed' : ''}${entry.forced ? ' is-forced' : ''}`}
                           key={`${entry.date}-${entry.weeklyItemId}`}
                         >
                           <button
                             className="weekly-calendar__event-main"
-                            onClick={() =>
-                              entry.suppressed
-                                ? setConflictTarget(entry)
-                                : openReschedule(entry)
-                            }
-                            title={entry.message || "点击临时调整"}
+                            onClick={() => (entry.suppressed ? setConflictTarget(entry) : openReschedule(entry))}
+                            title={entry.message || '点击临时调整'}
                           >
                             <b>{entry.name}</b>
                             <span>

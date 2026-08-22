@@ -7,19 +7,12 @@ import {
   handlePluginPairInfo,
   handlePluginViewerHeartbeat,
 } from '../api/_exams/routes/pluginRoutes.js';
-import {
-  handleDeviceBindings,
-  handleDeviceBindingOptions,
-} from '../api/_exams/routes/deviceAdminRoutes.js';
-import {
-  handleDeviceBinding,
-  handleDeviceHeartbeat,
-} from '../api/_exams/routes/deviceSelfRoutes.js';
+import { handleDeviceBindings, handleDeviceBindingOptions } from '../api/_exams/routes/deviceAdminRoutes.js';
+import { handleDeviceBinding, handleDeviceHeartbeat } from '../api/_exams/routes/deviceSelfRoutes.js';
 
 // 这些测试只覆盖各路由处理函数中"命中数据库之前"就会返回的纯校验分支
 // （方法校验、必填字段/格式校验），因为测试沙箱没有真实数据库可用。
-process.env.DATABASE_URL =
-  process.env.DATABASE_URL || 'postgresql://test:test@127.0.0.1:5432/novora_test';
+process.env.DATABASE_URL = process.env.DATABASE_URL || 'postgresql://test:test@127.0.0.1:5432/novora_test';
 
 function makeRes() {
   const calls: { statusCode?: number; body?: any; headers: Record<string, unknown> } = {
@@ -114,10 +107,7 @@ test('handlePluginViewerHeartbeat: non-POST is rejected with 405', async () => {
 
 test('handlePluginViewerHeartbeat: an invalid plugin instance id is rejected with 400', async () => {
   const { res, calls } = makeRes();
-  await handlePluginViewerHeartbeat(
-    makeReq({ method: 'POST', body: { pluginInstanceId: 'x' } }),
-    res,
-  );
+  await handlePluginViewerHeartbeat(makeReq({ method: 'POST', body: { pluginInstanceId: 'x' } }), res);
   assert.equal(calls.statusCode, 400);
 });
 

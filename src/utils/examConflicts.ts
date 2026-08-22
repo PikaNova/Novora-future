@@ -4,9 +4,7 @@ import type { MajorExam } from '../types';
 type ConflictScan = { labels: string[]; itemKeys: Set<string> };
 
 function scanConflicts(majors: MajorExam[]): ConflictScan {
-  const items = majors.flatMap((major) =>
-    major.items.filter((item) => item.enabled).map((item) => ({ major, item })),
-  );
+  const items = majors.flatMap((major) => major.items.filter((item) => item.enabled).map((item) => ({ major, item })));
   const labels: string[] = [];
   const itemKeys = new Set<string>();
   for (let index = 0; index < items.length; index += 1) {

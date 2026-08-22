@@ -1,4 +1,5 @@
 const LOGIN_DESTINATIONS = new Set(['/', '/admin', '/settings']);
+// 登录跳转目标拦截控制字符，防止伪造空白字符绕过校验（no-control-regex 有意保留）
 const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f]/;
 
 export function safeLoginDestination(value: string | null | undefined): string {
@@ -20,7 +21,8 @@ export function safeLoginDestination(value: string | null | undefined): string {
 
   try {
     const destination = new URL(value, 'https://novora.invalid');
-    if (destination.origin !== 'https://novora.invalid' || !LOGIN_DESTINATIONS.has(destination.pathname)) return '/admin';
+    if (destination.origin !== 'https://novora.invalid' || !LOGIN_DESTINATIONS.has(destination.pathname))
+      return '/admin';
     return `${destination.pathname}${destination.search}${destination.hash}`;
   } catch {
     return '/admin';

@@ -4,10 +4,18 @@ import type { PendingExamSync } from '../src/services/examOutbox.js';
 
 class MemoryStorage {
   private readonly values = new Map<string, string>();
-  getItem(key: string): string | null { return this.values.get(key) ?? null; }
-  setItem(key: string, value: string): void { this.values.set(key, value); }
-  removeItem(key: string): void { this.values.delete(key); }
-  clear(): void { this.values.clear(); }
+  getItem(key: string): string | null {
+    return this.values.get(key) ?? null;
+  }
+  setItem(key: string, value: string): void {
+    this.values.set(key, value);
+  }
+  removeItem(key: string): void {
+    this.values.delete(key);
+  }
+  clear(): void {
+    this.values.clear();
+  }
 }
 
 const storage = new MemoryStorage();
@@ -22,16 +30,19 @@ const { clearPendingExamSync, flushPendingExamSync, getPendingExamSync, queuePen
   await import('../src/services/examOutbox.js');
 
 function selectOwner(id: number): void {
-  storage.setItem('admin_user_context', JSON.stringify({
-    id,
-    username: `owner-${id}`,
-    displayName: `Owner ${id}`,
-    roleId: 'custom',
-    roleName: 'Custom',
-    permissions: [],
-    scopes: [],
-    mustChangePassword: false,
-  }));
+  storage.setItem(
+    'admin_user_context',
+    JSON.stringify({
+      id,
+      username: `owner-${id}`,
+      displayName: `Owner ${id}`,
+      roleId: 'custom',
+      roleName: 'Custom',
+      permissions: [],
+      scopes: [],
+      mustChangePassword: false,
+    }),
+  );
 }
 
 function pending(savedAt: number): PendingExamSync {

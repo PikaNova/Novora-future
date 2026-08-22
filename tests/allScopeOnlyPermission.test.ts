@@ -7,7 +7,10 @@ test('all-scope-only permissions allow wildcard roles', () => {
 });
 
 test('ordinary permissions can be assigned to a class scope', () => {
-  assert.equal(allScopeOnlyPermissionError(['major.read', 'weekly.edit'], [{ type: 'class', gradeId: 'g1', classId: 'c1' }]), '');
+  assert.equal(
+    allScopeOnlyPermissionError(['major.read', 'weekly.edit'], [{ type: 'class', gradeId: 'g1', classId: 'c1' }]),
+    '',
+  );
 });
 
 test('each all-scope-only permission allows an all-school account', () => {

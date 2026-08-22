@@ -6,9 +6,9 @@ import {
   canAccessGrade,
   hasAllScope,
   type PermissionSubject,
-} from "../../src/shared/permissionRules.js";
-import { getShanghaiDateKey, weekIndexOfDateKey } from "../../src/utils/weeklySchedule.js";
-import { parseZonedTime } from "../../src/utils/zonedTime.js";
+} from '../../src/shared/permissionRules.js';
+import { getShanghaiDateKey, weekIndexOfDateKey } from '../../src/utils/weeklySchedule.js';
+import { parseZonedTime } from '../../src/utils/zonedTime.js';
 
 export type DashboardGrade = { id: string; name: string; enabled?: boolean };
 export type DashboardClass = { id: string; gradeId: string; name: string; enabled?: boolean };
@@ -95,30 +95,24 @@ const itemDateKey = (item: DashboardItem | ScopedItem): string => item.startTime
 const itemStartMs = (item: DashboardItem | ScopedItem): number => parseZonedTime(item.startTime);
 const itemEndMs = (item: DashboardItem | ScopedItem): number => parseZonedTime(item.endTime);
 
-export function actorVisibleGradeIds(
-  actor: PermissionSubject,
-  grades: DashboardGrade[],
-): string[] {
-  if (hasAllScope(actor)) return grades.map(grade => grade.id);
+export function actorVisibleGradeIds(actor: PermissionSubject, grades: DashboardGrade[]): string[] {
+  if (hasAllScope(actor)) return grades.map((grade) => grade.id);
   const ids = new Set<string>();
   for (const scope of actor.scopes) {
-    if ((scope.type === "grade" || scope.type === "class") && scope.gradeId) {
+    if ((scope.type === 'grade' || scope.type === 'class') && scope.gradeId) {
       ids.add(scope.gradeId);
     }
   }
   return [...ids];
 }
 
-export function actorVisibleClassIds(
-  actor: PermissionSubject,
-  classes: DashboardClass[],
-): string[] {
-  if (hasAllScope(actor)) return classes.map(item => item.id);
+export function actorVisibleClassIds(actor: PermissionSubject, classes: DashboardClass[]): string[] {
+  if (hasAllScope(actor)) return classes.map((item) => item.id);
   const gradeScopes = new Set<string>();
   const classIds = new Set<string>();
   for (const scope of actor.scopes) {
-    if (scope.type === "grade" && scope.gradeId) gradeScopes.add(scope.gradeId);
-    if (scope.type === "class" && scope.classId) classIds.add(scope.classId);
+    if (scope.type === 'grade' && scope.gradeId) gradeScopes.add(scope.gradeId);
+    if (scope.type === 'class' && scope.classId) classIds.add(scope.classId);
   }
   for (const schoolClass of classes) {
     if (gradeScopes.has(schoolClass.gradeId)) classIds.add(schoolClass.id);
@@ -127,20 +121,14 @@ export function actorVisibleClassIds(
 }
 
 /** 场次有效年级目标；undefined 表示全校（沿用大型考试范围或空 = 全部年级）。 */
-function effectiveGradeIds(
-  major: DashboardMajor,
-  item: DashboardItem,
-): string[] | undefined {
+function effectiveGradeIds(major: DashboardMajor, item: DashboardItem): string[] | undefined {
   if (item.targetGradeIds?.length) return item.targetGradeIds;
   if (major.targetGradeIds?.length) return major.targetGradeIds;
   return undefined;
 }
 
 /** 场次有效班级目标；undefined 表示所选年级全部班级。 */
-function effectiveClassIds(
-  major: DashboardMajor,
-  item: DashboardItem,
-): string[] | undefined {
+function effectiveClassIds(major: DashboardMajor, item: DashboardItem): string[] | undefined {
   if (item.targetClassIds?.length) return item.targetClassIds;
   if (major.targetClassIds?.length) return major.targetClassIds;
   return undefined;
@@ -154,13 +142,13 @@ export function itemAppliesToActor(
   classes: DashboardClass[],
 ): boolean {
   if (hasAllScope(actor)) return true;
-  const gradePool = effectiveGradeIds(major, item) ?? grades.map(grade => grade.id);
-  const gradeVisible = gradePool.some(gradeId => canAccessGrade(actor, gradeId));
+  const gradePool = effectiveGradeIds(major, item) ?? grades.map((grade) => grade.id);
+  const gradeVisible = gradePool.some((gradeId) => canAccessGrade(actor, gradeId));
   if (!gradeVisible) return false;
   const classTargets = effectiveClassIds(major, item);
   if (!classTargets?.length) return true;
-  const classById = new Map(classes.map(schoolClass => [schoolClass.id, schoolClass]));
-  return classTargets.some(classId => {
+  const classById = new Map(classes.map((schoolClass) => [schoolClass.id, schoolClass]));
+  return classTargets.some((classId) => {
     const schoolClass = classById.get(classId);
     return schoolClass ? canAccessClass(actor, schoolClass.gradeId, classId) : false;
   });
@@ -172,8 +160,8 @@ export function collectScopedItems(
   classes: DashboardClass[],
   actor: PermissionSubject,
 ): ScopedItem[] {
-  const gradeById = new Map(grades.map(grade => [grade.id, grade]));
-  const classById = new Map(classes.map(schoolClass => [schoolClass.id, schoolClass]));
+  const gradeById = new Map(grades.map((grade) => [grade.id, grade]));
+  const classById = new Map(classes.map((schoolClass) => [schoolClass.id, schoolClass]));
   const result: ScopedItem[] = [];
   for (const major of majors) {
     if (!Array.isArray(major.items)) continue;
@@ -182,19 +170,17 @@ export function collectScopedItems(
       if (!itemAppliesToActor(actor, major, item, grades, classes)) continue;
       const effGrades = effectiveGradeIds(major, item);
       const effClasses = effectiveClassIds(major, item);
-      const gradeNames = (effGrades ?? grades.map(grade => grade.id))
-        .map(gradeId => gradeById.get(gradeId)?.name ?? "")
+      const gradeNames = (effGrades ?? grades.map((grade) => grade.id))
+        .map((gradeId) => gradeById.get(gradeId)?.name ?? '')
         .filter(Boolean);
-      const classNames = (effClasses ?? [])
-        .map(classId => classById.get(classId)?.name ?? "")
-        .filter(Boolean);
+      const classNames = (effClasses ?? []).map((classId) => classById.get(classId)?.name ?? '').filter(Boolean);
       result.push({
         id: item.id,
         subject: item.name,
         majorName: major.name,
         startTime: item.startTime,
         endTime: item.endTime,
-        majorEndedAt: typeof major.endedAt === "number" ? major.endedAt : null,
+        majorEndedAt: typeof major.endedAt === 'number' ? major.endedAt : null,
         gradeNames,
         classNames,
         isSchoolWide: effGrades === undefined,
@@ -208,7 +194,10 @@ function isMajorEnded(item: ScopedItem, now: number): boolean {
   return item.majorEndedAt !== null && item.majorEndedAt <= now;
 }
 
-export function aggregateStats(items: ScopedItem[], now: number): Omit<DashboardStats, "onlineDevices" | "inExamDevices"> {
+export function aggregateStats(
+  items: ScopedItem[],
+  now: number,
+): Omit<DashboardStats, 'onlineDevices' | 'inExamDevices'> {
   const todayKey = getShanghaiDateKey(now);
   const thisWeekIndex = weekIndexOfDateKey(todayKey);
   let total = 0;
@@ -235,8 +224,8 @@ export function aggregateStats(items: ScopedItem[], now: number): Omit<Dashboard
 function entryFromItem(item: ScopedItem): DashboardEntry {
   const durationMinutes = Math.max(0, Math.round((itemEndMs(item) - itemStartMs(item)) / 60_000));
   const scopeLabel = item.isSchoolWide
-    ? "全校"
-    : [item.gradeNames.join("、"), item.classNames.join("、")].filter(Boolean).join(" · ");
+    ? '全校'
+    : [item.gradeNames.join('、'), item.classNames.join('、')].filter(Boolean).join(' · ');
   return {
     id: item.id,
     subject: item.subject,
@@ -244,13 +233,13 @@ function entryFromItem(item: ScopedItem): DashboardEntry {
     startTime: item.startTime,
     endTime: item.endTime,
     durationMinutes,
-    scopeLabel: scopeLabel || "全校",
+    scopeLabel: scopeLabel || '全校',
   };
 }
 
 export function buildUpcoming(items: ScopedItem[], now: number, limit = 5): DashboardEntry[] {
   return items
-    .filter(item => !isMajorEnded(item, now) && itemStartMs(item) > now)
+    .filter((item) => !isMajorEnded(item, now) && itemStartMs(item) > now)
     .sort((a, b) => a.startTime.localeCompare(b.startTime))
     .slice(0, limit)
     .map(entryFromItem);
@@ -258,7 +247,7 @@ export function buildUpcoming(items: ScopedItem[], now: number, limit = 5): Dash
 
 export function buildOngoing(items: ScopedItem[], now: number, limit = 5): DashboardEntry[] {
   return items
-    .filter(item => !isMajorEnded(item, now) && itemStartMs(item) <= now && now < itemEndMs(item))
+    .filter((item) => !isMajorEnded(item, now) && itemStartMs(item) <= now && now < itemEndMs(item))
     .sort((a, b) => a.endTime.localeCompare(b.endTime))
     .slice(0, limit)
     .map(entryFromItem);
@@ -266,17 +255,13 @@ export function buildOngoing(items: ScopedItem[], now: number, limit = 5): Dashb
 
 export function buildRecentEnded(items: ScopedItem[], now: number, limit = 5): DashboardEntry[] {
   return items
-    .filter(item => isMajorEnded(item, now) || itemEndMs(item) <= now)
+    .filter((item) => isMajorEnded(item, now) || itemEndMs(item) <= now)
     .sort((a, b) => b.endTime.localeCompare(a.endTime))
     .slice(0, limit)
     .map(entryFromItem);
 }
 
-export function buildSubjectDistribution(
-  items: ScopedItem[],
-  now: number,
-  windowDays = 7,
-): DistributionRow[] {
+export function buildSubjectDistribution(items: ScopedItem[], now: number, windowDays = 7): DistributionRow[] {
   const windowEnd = now + windowDays * 86_400_000;
   const counts = new Map<string, number>();
   for (const item of items) {
@@ -293,31 +278,30 @@ export function buildGradeDistribution(
   grades: DashboardGrade[],
   visibleGradeIds?: string[],
 ): DistributionRow[] {
-  const pool = visibleGradeIds && visibleGradeIds.length
-    ? grades.filter(grade => visibleGradeIds.includes(grade.id))
-    : grades;
-  const gradeById = new Map(grades.map(grade => [grade.id, grade]));
+  const pool =
+    visibleGradeIds && visibleGradeIds.length ? grades.filter((grade) => visibleGradeIds.includes(grade.id)) : grades;
+  const gradeById = new Map(grades.map((grade) => [grade.id, grade]));
   const counts = new Map<string, number>();
   for (const item of items) {
     const targets = item.isSchoolWide
-      ? pool.map(grade => grade.id)
+      ? pool.map((grade) => grade.id)
       : item.gradeNames.length
-        ? pool.filter(grade => item.gradeNames.includes(grade.name)).map(grade => grade.id)
-        : pool.map(grade => grade.id);
+        ? pool.filter((grade) => item.gradeNames.includes(grade.name)).map((grade) => grade.id)
+        : pool.map((grade) => grade.id);
     for (const gradeId of targets) counts.set(gradeId, (counts.get(gradeId) ?? 0) + 1);
   }
-  return toDistributionRows(counts, id => gradeById.get(id)?.name ?? id);
+  return toDistributionRows(counts, (id) => gradeById.get(id)?.name ?? id);
 }
 
 function toDistributionRows(
   counts: Map<string, number>,
-  labelOf: (key: string) => string = key => key,
+  labelOf: (key: string) => string = (key) => key,
 ): DistributionRow[] {
   const rows = [...counts.entries()]
     .map(([key, count]) => ({ label: labelOf(key), count }))
     .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
   const max = rows.length ? rows[0].count : 0;
-  return rows.map(row => ({ ...row, percent: max ? Math.round((row.count / max) * 100) : 0 }));
+  return rows.map((row) => ({ ...row, percent: max ? Math.round((row.count / max) * 100) : 0 }));
 }
 
 export function scopedDevices(
@@ -326,7 +310,7 @@ export function scopedDevices(
   classes: DashboardClass[],
 ): DashboardDevice[] {
   const visibleClassIds = new Set(actorVisibleClassIds(actor, classes));
-  return devices.filter(device => {
+  return devices.filter((device) => {
     if (device.revoked === true || device.is_management === true) return false;
     if (!device.grade_id || !device.class_id) return false;
     return hasAllScope(actor) || visibleClassIds.has(device.class_id);
@@ -340,7 +324,7 @@ export function buildOnlineDevices(
   onlineWindowMs = 90_000,
   limit = 50,
 ): OnlineDevice[] {
-  const classById = new Map(classes.map(item => [item.id, item]));
+  const classById = new Map(classes.map((item) => [item.id, item]));
   const rows: OnlineDevice[] = [];
   for (const device of devices) {
     const lastSeen = num(device.last_seen_at);
@@ -349,10 +333,8 @@ export function buildOnlineDevices(
     const inExam = Boolean(device.current_exam);
     rows.push({
       instanceId: device.instance_id,
-      scopeLabel: schoolClass?.name || "未绑定班级",
-      statusLabel: inExam
-        ? `考试中${device.current_exam ? " · " + device.current_exam : ""}`
-        : "空闲",
+      scopeLabel: schoolClass?.name || '未绑定班级',
+      statusLabel: inExam ? `考试中${device.current_exam ? ' · ' + device.current_exam : ''}` : '空闲',
       inExam,
       lastSeenAt: lastSeen,
     });
@@ -382,15 +364,12 @@ export function classifyDevices(
   return { onlineDevices, inExamDevices };
 }
 
-export function dashboardScopeLabel(
-  actor: PermissionSubject,
-  grades: DashboardGrade[],
-): string {
-  if (hasAllScope(actor)) return "全校数据大屏";
+export function dashboardScopeLabel(actor: PermissionSubject, grades: DashboardGrade[]): string {
+  if (hasAllScope(actor)) return '全校数据大屏';
   const gradeIds = actorVisibleGradeIds(actor, grades);
   const names = grades
-    .filter(grade => gradeIds.includes(grade.id))
-    .map(grade => grade.name)
+    .filter((grade) => gradeIds.includes(grade.id))
+    .map((grade) => grade.name)
     .filter(Boolean);
-  return names.length ? names.join("、") + "数据大屏" : "数据大屏";
+  return names.length ? names.join('、') + '数据大屏' : '数据大屏';
 }

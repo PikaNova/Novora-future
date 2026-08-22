@@ -1,5 +1,5 @@
-import { forwardRef, useEffect, useRef } from "react";
-import type { WheelEvent as ReactWheelEvent } from "react";
+import { forwardRef, useEffect, useRef } from 'react';
+import type { WheelEvent as ReactWheelEvent } from 'react';
 
 interface WheelColumnProps {
   values: number[];
@@ -12,15 +12,18 @@ interface WheelColumnProps {
 }
 
 /** Shared vertical wheel behavior for every date/time flow. */
-const WheelColumn = forwardRef<HTMLDivElement, WheelColumnProps>(function WheelColumn({
-  values,
-  value,
-  onChange,
-  className,
-  itemHeight = 48,
-  formatValue = (item) => String(item).padStart(2, "0"),
-  ariaLabel,
-}, forwardedRef) {
+const WheelColumn = forwardRef<HTMLDivElement, WheelColumnProps>(function WheelColumn(
+  {
+    values,
+    value,
+    onChange,
+    className,
+    itemHeight = 48,
+    formatValue = (item) => String(item).padStart(2, '0'),
+    ariaLabel,
+  },
+  forwardedRef,
+) {
   const listRef = useRef<HTMLDivElement | null>(null);
   const valueRef = useRef(value);
   const emittedValueRef = useRef<number | null>(null);
@@ -31,7 +34,7 @@ const WheelColumn = forwardRef<HTMLDivElement, WheelColumnProps>(function WheelC
 
   const assignRef = (node: HTMLDivElement | null) => {
     listRef.current = node;
-    if (typeof forwardedRef === "function") forwardedRef(node);
+    if (typeof forwardedRef === 'function') forwardedRef(node);
     else if (forwardedRef) forwardedRef.current = node;
   };
 
@@ -47,11 +50,14 @@ const WheelColumn = forwardRef<HTMLDivElement, WheelColumnProps>(function WheelC
     if (Math.abs(element.scrollTop - target) > 1) element.scrollTop = target;
   }, [itemHeight, value, values]);
 
-  useEffect(() => () => {
-    if (frameRef.current !== null) window.cancelAnimationFrame(frameRef.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (frameRef.current !== null) window.cancelAnimationFrame(frameRef.current);
+    },
+    [],
+  );
 
-  const select = (next: number, behavior: ScrollBehavior = "auto") => {
+  const select = (next: number, behavior: ScrollBehavior = 'auto') => {
     const index = values.indexOf(next);
     if (index < 0) return;
     valueRef.current = next;
@@ -71,7 +77,7 @@ const WheelColumn = forwardRef<HTMLDivElement, WheelColumnProps>(function WheelC
     deltaRef.current = 0;
     const currentIndex = Math.max(0, values.indexOf(valueRef.current));
     const nextIndex = Math.max(0, Math.min(values.length - 1, currentIndex + direction));
-    if (nextIndex !== currentIndex) select(values[nextIndex], "auto");
+    if (nextIndex !== currentIndex) select(values[nextIndex], 'auto');
   };
 
   const handleScroll = (element: HTMLDivElement) => {
@@ -88,20 +94,26 @@ const WheelColumn = forwardRef<HTMLDivElement, WheelColumnProps>(function WheelC
     });
   };
 
-  return <div
-    ref={assignRef}
-    className={className}
-    aria-label={ariaLabel}
-    onWheel={handleWheel}
-    onScroll={(event) => handleScroll(event.currentTarget)}
-  >
-    {values.map((item) => <button
-      type="button"
-      key={item}
-      className={item === value ? "is-selected" : ""}
-      onClick={() => select(item, "smooth")}
-    >{formatValue(item)}</button>)}
-  </div>;
+  return (
+    <div
+      ref={assignRef}
+      className={className}
+      aria-label={ariaLabel}
+      onWheel={handleWheel}
+      onScroll={(event) => handleScroll(event.currentTarget)}
+    >
+      {values.map((item) => (
+        <button
+          type="button"
+          key={item}
+          className={item === value ? 'is-selected' : ''}
+          onClick={() => select(item, 'smooth')}
+        >
+          {formatValue(item)}
+        </button>
+      ))}
+    </div>
+  );
 });
 
 export default WheelColumn;

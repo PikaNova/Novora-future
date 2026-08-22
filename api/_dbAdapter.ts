@@ -5,8 +5,18 @@
 // 两种驱动对外暴露一致的调用形状，api/_auth.ts 的 authSql() 与 api/_exams/db.ts 的 database() 无需感知底层驱动：
 //   标签模板：sql`SELECT ... ${value}` → Promise<rows[]>（rows 为对象数组）
 //   事务：sql.transaction(tx => [tx`...`, tx`...`]) → Promise<rows[][]>
-import { neon } from "@neondatabase/serverless";
-import { Pool } from "pg";
+import { neon } from '@neondatabase/serverless';
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
+
+let pgModule: typeof import('pg') | null = null;
+function pgClientModule(): typeof import('pg') {
+  if (!pgModule) {
+    pgModule = require('pg') as typeof import('pg');
+  }
+  return pgModule;
+}
 
 type Row = Record<string, unknown>;
 
@@ -26,16 +36,16 @@ type QueryExecutor = {
 export function isNeonEndpoint(connectionString: string): boolean {
   try {
     const url = new URL(connectionString);
-    return url.hostname.includes("neon.tech") || url.searchParams.has("channel_binding");
+    return url.hostname.includes('neon.tech') || url.searchParams.has('channel_binding');
   } catch {
     return false;
   }
 }
 
 export function buildSqlText(strings: readonly string[], values: unknown[]): string {
-  let text = strings[0] ?? "";
+  let text = strings[0] ?? '';
   for (let index = 0; index < values.length; index += 1) {
-    text += `$${index + 1}${strings[index + 1] ?? ""}`;
+    text += `$${index + 1}${strings[index + 1] ?? ''}`;
   }
   return text;
 }
@@ -45,6 +55,7 @@ function runQuery(executor: QueryExecutor, strings: TemplateStringsArray, values
 }
 
 function createPgClient(connectionString: string): DbClient {
+  const { Pool } = pgClientModule();
   const pool = new Pool({
     connectionString,
     max: 10,
@@ -60,14 +71,14 @@ function createPgClient(connectionString: string): DbClient {
     const connection = await pool.connect();
     const connectionExecutor = connection as unknown as QueryExecutor;
     try {
-      await connection.query("BEGIN");
+      await connection.query('BEGIN');
       const tx: SqlTx = (strings, ...values) => runQuery(connectionExecutor, strings, values);
       const listed = await callback(tx);
       const results = await Promise.all(listed.map((item) => Promise.resolve(item)));
-      await connection.query("COMMIT");
+      await connection.query('COMMIT');
       return results;
     } catch (error) {
-      await connection.query("ROLLBACK").catch(() => undefined);
+      await connection.query('ROLLBACK').catch(() => undefined);
       throw error;
     } finally {
       connection.release();

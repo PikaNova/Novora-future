@@ -4,14 +4,8 @@
  * 从 WeeklyPanel.tsx 中提取，保持与原有逻辑完全一致。
  */
 import { useEffect, useState } from 'react';
-import type {
-  WeeklyPlan,
-  WeeklyWeekMode,
-} from '../../types/exam';
-import {
-  createEmptyWeeklyPlan,
-  getShanghaiDateKey,
-} from '../../utils/weeklySchedule';
+import type { WeeklyPlan, WeeklyWeekMode } from '../../types/exam';
+import { createEmptyWeeklyPlan, getShanghaiDateKey } from '../../utils/weeklySchedule';
 import { notify } from '../../services/notify';
 import type { ClassPickerOption } from '../../components/ClassMultiPicker';
 import { DATE_RE, planTitleForClass } from '../../utils/settings/weekly';
@@ -86,10 +80,7 @@ export function useWeeklyPlanModal({
     const today = getShanghaiDateKey(Date.now());
     setPlanModal({
       mode: 'add',
-      name:
-        selectedClassName && selectedClassId
-          ? planTitleForClass(selectedClassName)
-          : '',
+      name: selectedClassName && selectedClassId ? planTitleForClass(selectedClassName) : '',
       gradeId: selectedGradeId,
       classIds: selectedClassId ? [selectedClassId] : [],
       activeFrom: today,
@@ -129,9 +120,18 @@ export function useWeeklyPlanModal({
       setPlanError('请输入计划名称');
       return;
     }
-    if (!planModal.gradeId || !planModal.classIds.length) { setPlanError('请至少选择一个适用班级'); return; }
-    if (!DATE_RE.test(planModal.activeFrom)) { setPlanError('请填写生效日期'); return; }
-    if (!DATE_RE.test(planModal.anchorDate)) { setPlanError('请填写学期开始日期'); return; }
+    if (!planModal.gradeId || !planModal.classIds.length) {
+      setPlanError('请至少选择一个适用班级');
+      return;
+    }
+    if (!DATE_RE.test(planModal.activeFrom)) {
+      setPlanError('请填写生效日期');
+      return;
+    }
+    if (!DATE_RE.test(planModal.anchorDate)) {
+      setPlanError('请填写学期开始日期');
+      return;
+    }
     if (!planModal.forever && planModal.activeUntil && planModal.activeUntil < planModal.activeFrom) {
       setPlanError('结束日期不得早于生效日期');
       return;
@@ -158,20 +158,9 @@ export function useWeeklyPlanModal({
         ...activeWeeklyPlanIdByClassId,
         ...Object.fromEntries(created.map((plan) => [plan.classId, plan.id])),
       };
-      onSavePlans(
-        [...weeklyPlans, ...created],
-        created[0].id,
-        created[0].classId,
-        true,
-        activeByClass,
-      );
+      onSavePlans([...weeklyPlans, ...created], created[0].id, created[0].classId, true, activeByClass);
       onSelectScope?.(created[0].gradeId, created[0].classId);
-      notify(
-        'success',
-        created.length > 1
-          ? `已为 ${created.length} 个班级创建独立周测计划。`
-          : '周测计划已创建。',
-      );
+      notify('success', created.length > 1 ? `已为 ${created.length} 个班级创建独立周测计划。` : '周测计划已创建。');
     } else {
       if (!activePlan) return;
       const plans = weeklyPlans.map((p) =>
@@ -197,9 +186,7 @@ export function useWeeklyPlanModal({
   const removePlan = () => {
     if (!activePlan) return;
     const index = weeklyPlans.findIndex((p) => p.id === activePlan.id);
-    const rest = weeklyPlans
-      .filter((p) => p.id !== activePlan.id)
-      .map((p, i) => ({ ...p, order: i }));
+    const rest = weeklyPlans.filter((p) => p.id !== activePlan.id).map((p, i) => ({ ...p, order: i }));
     const nextId = rest.find((p) => p.classId === selectedClassId)?.id ?? null;
     setLastDeleted({ kind: 'plan', plan: activePlan, index });
     onSavePlans(rest, nextId, selectedClassId, true);
@@ -208,9 +195,7 @@ export function useWeeklyPlanModal({
 
   const togglePlanEnabled = () => {
     if (!activePlan) return;
-    const plans = weeklyPlans.map((p) =>
-      p.id === activePlan.id ? { ...p, enabled: !p.enabled } : p,
-    );
+    const plans = weeklyPlans.map((p) => (p.id === activePlan.id ? { ...p, enabled: !p.enabled } : p));
     onSavePlans(plans, activePlan.id, selectedClassId, true);
   };
 

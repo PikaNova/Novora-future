@@ -6,14 +6,17 @@ type BackdropProps = Pick<HTMLAttributes<HTMLDivElement>, 'onPointerDown' | 'onC
 /** Only dismiss when both pointer-down and click begin on the backdrop itself. */
 export function useBackdropDismiss() {
   const startedOnBackdrop = useRef(false);
-  return useCallback((onDismiss: () => void): BackdropProps => ({
-    onPointerDown: (event: PointerEvent<HTMLDivElement>) => {
-      startedOnBackdrop.current = event.target === event.currentTarget;
-    },
-    onClick: event => {
-      const shouldDismiss = startedOnBackdrop.current && event.target === event.currentTarget;
-      startedOnBackdrop.current = false;
-      if (shouldDismiss) onDismiss();
-    },
-  }), []);
+  return useCallback(
+    (onDismiss: () => void): BackdropProps => ({
+      onPointerDown: (event: PointerEvent<HTMLDivElement>) => {
+        startedOnBackdrop.current = event.target === event.currentTarget;
+      },
+      onClick: (event) => {
+        const shouldDismiss = startedOnBackdrop.current && event.target === event.currentTarget;
+        startedOnBackdrop.current = false;
+        if (shouldDismiss) onDismiss();
+      },
+    }),
+    [],
+  );
 }

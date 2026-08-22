@@ -19,11 +19,7 @@ export default function EmailServiceSection({
       <p className="set-card__lead">
         配置 SMTP 后启用邮箱验证码登录与账号绑定；未配置时登录页不显示验证码入口。授权码会加密存储，不会明文返回。
       </p>
-      <EmailServicePanel
-        canEditSettings={canEditSettings}
-        showPolicy
-        canEditPolicy={canEditPolicy}
-      />
+      <EmailServicePanel canEditSettings={canEditSettings} showPolicy canEditPolicy={canEditPolicy} />
     </section>
   );
 }

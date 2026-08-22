@@ -23,7 +23,6 @@ import {
   isDatabaseInt8,
   type DatabaseInt8,
 } from './_validation.js';
-import type { AdminActor } from './_auth.js';
 import { consumeRateLimit } from './_rateLimiter.js';
 import { sendVerificationCode, type SmtpConfig } from '../src/services/emailSender.js';
 import { drainOutbox, enqueueEmailOutbox } from './_emailQueue.js';
@@ -103,10 +102,19 @@ const isUserIdRow = rowShape<{ id: DatabaseInt8 }>({ id: isDatabaseInt8 });
 function clientIp(req: VercelRequest): string {
   const fwd = req.headers['x-forwarded-for'];
   const raw = Array.isArray(fwd) ? fwd[0] : fwd;
-  return String(raw ?? req.socket?.remoteAddress ?? 'unknown').split(',')[0].trim().slice(0, 64);
+  return String(raw ?? req.socket?.remoteAddress ?? 'unknown')
+    .split(',')[0]
+    .trim()
+    .slice(0, 64);
 }
 
-function fail(res: VercelResponse, status: number, code: string, error: string, extra: Record<string, unknown> = {}): void {
+function fail(
+  res: VercelResponse,
+  status: number,
+  code: string,
+  error: string,
+  extra: Record<string, unknown> = {},
+): void {
   res.status(status).json({ ok: false, code, error, ...extra });
 }
 
@@ -117,7 +125,9 @@ async function secretKey(): Promise<Buffer> {
     rowShape<{ token_secret: string }>({ token_secret: isString }),
     'app_auth',
   );
-  return createHash('sha256').update(rows[0]?.token_secret ?? 'email-fallback').digest();
+  return createHash('sha256')
+    .update(rows[0]?.token_secret ?? 'email-fallback')
+    .digest();
 }
 
 function encryptSecret(plain: string, key: Buffer): string {
@@ -149,7 +159,11 @@ async function smtpConfigFromRow(row: EmailConfigRow): Promise<SmtpConfig | null
   if (!row.smtp_host || !row.smtp_from) return null;
   let pass = '';
   if (row.smtp_pass_enc) {
-    try { pass = decryptSecret(row.smtp_pass_enc, await secretKey()); } catch { pass = ''; }
+    try {
+      pass = decryptSecret(row.smtp_pass_enc, await secretKey());
+    } catch {
+      pass = '';
+    }
   }
   return {
     host: row.smtp_host,
@@ -187,11 +201,38 @@ async function issueAndEnqueueCode(
   email: string,
   purpose: 'login' | 'bind',
   ip: string,
-): Promise<{ ok: boolean; status?: number; code?: string; error?: string; retryAfterMs?: number; outboxId?: DatabaseInt8 }> {
-  const emailLimit = consumeRateLimit(`email-${purpose}-code:${email.toLowerCase()}`, { windowMs: EMAIL_COOLDOWN_MS, maxRequests: 1 });
-  if (!emailLimit.allowed) return { ok: false, status: 429, code: 'EMAIL_SEND_FREQUENT', error: '请等待60秒后再试', retryAfterMs: emailLimit.retryAfterMs };
-  const ipLimit = consumeRateLimit(`email-code-ip:${ip}`, { windowMs: IP_HOURLY_WINDOW_MS, maxRequests: IP_HOURLY_MAX });
-  if (!ipLimit.allowed) return { ok: false, status: 429, code: 'EMAIL_IP_LIMITED', error: '请求过于频繁，请稍后再试', retryAfterMs: ipLimit.retryAfterMs };
+): Promise<{
+  ok: boolean;
+  status?: number;
+  code?: string;
+  error?: string;
+  retryAfterMs?: number;
+  outboxId?: DatabaseInt8;
+}> {
+  const emailLimit = consumeRateLimit(`email-${purpose}-code:${email.toLowerCase()}`, {
+    windowMs: EMAIL_COOLDOWN_MS,
+    maxRequests: 1,
+  });
+  if (!emailLimit.allowed)
+    return {
+      ok: false,
+      status: 429,
+      code: 'EMAIL_SEND_FREQUENT',
+      error: '请等待60秒后再试',
+      retryAfterMs: emailLimit.retryAfterMs,
+    };
+  const ipLimit = consumeRateLimit(`email-code-ip:${ip}`, {
+    windowMs: IP_HOURLY_WINDOW_MS,
+    maxRequests: IP_HOURLY_MAX,
+  });
+  if (!ipLimit.allowed)
+    return {
+      ok: false,
+      status: 429,
+      code: 'EMAIL_IP_LIMITED',
+      error: '请求过于频繁，请稍后再试',
+      retryAfterMs: ipLimit.retryAfterMs,
+    };
   const code = String(randomInt(100000, 1000000)).padStart(6, '0');
   const now = Date.now();
   await authSql()`DELETE FROM email_verification_codes WHERE email=${email} AND purpose=${purpose} AND (used OR expires_at < ${now})`;
@@ -205,7 +246,11 @@ async function issueAndEnqueueCode(
   return { ok: true, outboxId };
 }
 
-async function verifyCode(email: string, purpose: 'login' | 'bind', code: string): Promise<{ ok: boolean; code?: string; error?: string }> {
+async function verifyCode(
+  email: string,
+  purpose: 'login' | 'bind',
+  code: string,
+): Promise<{ ok: boolean; code?: string; error?: string }> {
   const rows = assertRows(
     await authSql()`SELECT id, code, expires_at, used FROM email_verification_codes WHERE email=${email} AND purpose=${purpose} ORDER BY id DESC LIMIT 1`,
     isEmailCodeRow,
@@ -228,24 +273,61 @@ async function verifyCode(email: string, purpose: 'login' | 'bind', code: string
 }
 
 async function handleSendCode(req: VercelRequest, res: VercelResponse): Promise<void> {
-  const email = String((req.body ?? {}).email ?? '').trim().toLowerCase();
-  if (!validateEmailFormat(email)) { fail(res, 400, 'EMAIL_FORMAT_INVALID', '邮箱格式无效'); return; }
+  const email = String((req.body ?? {}).email ?? '')
+    .trim()
+    .toLowerCase();
+  if (!validateEmailFormat(email)) {
+    fail(res, 400, 'EMAIL_FORMAT_INVALID', '邮箱格式无效');
+    return;
+  }
   const row = await loadEmailConfigRow();
-  if (!row) { fail(res, 503, 'EMAIL_NOT_CONFIGURED', '邮件服务未配置'); return; }
+  if (!row) {
+    fail(res, 503, 'EMAIL_NOT_CONFIGURED', '邮件服务未配置');
+    return;
+  }
   const smtp = await smtpConfigFromRow(row);
-  if (!smtp) { fail(res, 503, 'EMAIL_NOT_CONFIGURED', '邮件服务未配置'); return; }
+  if (!smtp) {
+    fail(res, 503, 'EMAIL_NOT_CONFIGURED', '邮件服务未配置');
+    return;
+  }
   const users = assertRows(
     await authSql()`SELECT id FROM app_users WHERE LOWER(email)=LOWER(${email}) AND status='active' LIMIT 1`,
     isUserIdRow,
     'app_users',
   );
-  if (!users[0]) { await recordEmailFailure(email); await new Promise(r => setTimeout(r, AUTH_FAILURE_DELAY_MS)); fail(res, 403, 'EMAIL_NOT_BOUND', '该邮箱未绑定账号'); return; }
-  const whitelist = (row.admin_emails || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
-  if (whitelist.length && !whitelist.includes(email)) { fail(res, 403, 'EMAIL_NOT_ALLOWED', '该邮箱无权登录'); return; }
+  if (!users[0]) {
+    await recordEmailFailure(email);
+    await new Promise((r) => setTimeout(r, AUTH_FAILURE_DELAY_MS));
+    fail(res, 403, 'EMAIL_NOT_BOUND', '该邮箱未绑定账号');
+    return;
+  }
+  const whitelist = (row.admin_emails || '')
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+  if (whitelist.length && !whitelist.includes(email)) {
+    fail(res, 403, 'EMAIL_NOT_ALLOWED', '该邮箱无权登录');
+    return;
+  }
   const queued = await issueAndEnqueueCode(smtp, email, 'login', clientIp(req));
-  if (!queued.ok) { fail(res, queued.status ?? 500, queued.code ?? 'EMAIL_SEND_FAILED', queued.error ?? '发送失败', queued.retryAfterMs != null ? { retryAfterMs: queued.retryAfterMs } : {}); return; }
+  if (!queued.ok) {
+    fail(
+      res,
+      queued.status ?? 500,
+      queued.code ?? 'EMAIL_SEND_FAILED',
+      queued.error ?? '发送失败',
+      queued.retryAfterMs != null ? { retryAfterMs: queued.retryAfterMs } : {},
+    );
+    return;
+  }
   if (queued.outboxId != null) {
-    const first = await drainOutbox(smtp, { jobId: queued.outboxId, hardTimeoutMs: 8_000, slotWaitMs: 2_000, acquireSlot: true, deadlineMs: Date.now() + 9_000 });
+    const first = await drainOutbox(smtp, {
+      jobId: queued.outboxId,
+      hardTimeoutMs: 8_000,
+      slotWaitMs: 2_000,
+      acquireSlot: true,
+      deadlineMs: Date.now() + 9_000,
+    });
     if (first.sent > 0) {
       await writeAudit(null, 'auth.email.code', 'user', String(users[0].id), { email });
       res.json({ ok: true, message: '验证码已发送到您的邮箱，5 分钟内有效' });
@@ -258,9 +340,14 @@ async function handleSendCode(req: VercelRequest, res: VercelResponse): Promise<
 
 async function handleEmailLogin(req: VercelRequest, res: VercelResponse): Promise<void> {
   const body = (req.body ?? {}) as Record<string, unknown>;
-  const email = String(body.email ?? '').trim().toLowerCase();
+  const email = String(body.email ?? '')
+    .trim()
+    .toLowerCase();
   const code = String(body.code ?? '').trim();
-  if (!validateEmailFormat(email)) { fail(res, 400, 'EMAIL_FORMAT_INVALID', '邮箱格式无效'); return; }
+  if (!validateEmailFormat(email)) {
+    fail(res, 400, 'EMAIL_FORMAT_INVALID', '邮箱格式无效');
+    return;
+  }
   const users = assertRows(
     await authSql()`SELECT u.id, u.username, u.display_name, u.role_id, r.name AS role_name, r.permissions, u.status, u.must_change_password, u.token_version, u.last_login_at
       FROM app_users u JOIN app_roles r ON r.id=u.role_id WHERE LOWER(u.email)=LOWER(${email}) LIMIT 1`,
@@ -270,11 +357,14 @@ async function handleEmailLogin(req: VercelRequest, res: VercelResponse): Promis
   const user = users[0];
   if (!user) {
     await recordEmailFailure(email);
-    await new Promise(r => setTimeout(r, AUTH_FAILURE_DELAY_MS));
+    await new Promise((r) => setTimeout(r, AUTH_FAILURE_DELAY_MS));
     fail(res, 403, 'EMAIL_NOT_BOUND', '该邮箱未绑定账号');
     return;
   }
-  if (user.status !== 'active') { fail(res, 403, 'ACCOUNT_DISABLED', '账号已停用'); return; }
+  if (user.status !== 'active') {
+    fail(res, 403, 'ACCOUNT_DISABLED', '账号已停用');
+    return;
+  }
   const lock = await emailLockout(email);
   if (lock.locked) {
     res.setHeader('Retry-After', String(Math.max(1, Math.ceil(lock.retryAfterMs / 1000))));
@@ -285,7 +375,7 @@ async function handleEmailLogin(req: VercelRequest, res: VercelResponse): Promis
   if (!verify.ok) {
     await recordEmailFailure(email);
     const lock2 = await emailLockout(email);
-    await new Promise(r => setTimeout(r, AUTH_FAILURE_DELAY_MS));
+    await new Promise((r) => setTimeout(r, AUTH_FAILURE_DELAY_MS));
     if (lock2.locked) {
       res.setHeader('Retry-After', String(Math.max(1, Math.ceil(lock2.retryAfterMs / 1000))));
       fail(res, 429, 'EMAIL_CODE_LOCKED', '验证失败次数过多，请稍后重试', { retryAfterMs: lock2.retryAfterMs });
@@ -296,32 +386,70 @@ async function handleEmailLogin(req: VercelRequest, res: VercelResponse): Promis
   }
   await authSql()`DELETE FROM app_audit_logs WHERE LOWER(username)=LOWER(${email}) AND action='auth.email.failed'`;
   const issued = await issueTokenForUser(user);
-  if (!issued) { fail(res, 500, 'TOKEN_ISSUE_FAILED', '登录令牌签发失败'); return; }
+  if (!issued) {
+    fail(res, 500, 'TOKEN_ISSUE_FAILED', '登录令牌签发失败');
+    return;
+  }
   await authSql()`UPDATE app_users SET last_login_at=${Date.now()} WHERE id=${user.id}`;
   const actor = await getActor(issued.token);
   await writeAudit(actor, 'auth.email.login', 'user', String(user.id), { email });
-  res.json({ ok: true, token: issued.token, expiresAt: issued.expiresAt, user: actor, firstLogin: user.last_login_at == null });
+  res.json({
+    ok: true,
+    token: issued.token,
+    expiresAt: issued.expiresAt,
+    user: actor,
+    firstLogin: user.last_login_at == null,
+  });
 }
 
 async function handleBindRequest(req: VercelRequest, res: VercelResponse): Promise<void> {
   const actor = await requireActor(req, res, undefined, true);
   if (!actor) return;
-  const email = String((req.body ?? {}).email ?? '').trim().toLowerCase();
-  if (!validateEmailFormat(email)) { fail(res, 400, 'EMAIL_FORMAT_INVALID', '邮箱格式无效'); return; }
+  const email = String((req.body ?? {}).email ?? '')
+    .trim()
+    .toLowerCase();
+  if (!validateEmailFormat(email)) {
+    fail(res, 400, 'EMAIL_FORMAT_INVALID', '邮箱格式无效');
+    return;
+  }
   const row = await loadEmailConfigRow();
-  if (!row) { fail(res, 503, 'EMAIL_NOT_CONFIGURED', '邮件服务未配置'); return; }
+  if (!row) {
+    fail(res, 503, 'EMAIL_NOT_CONFIGURED', '邮件服务未配置');
+    return;
+  }
   const smtp = await smtpConfigFromRow(row);
-  if (!smtp) { fail(res, 503, 'EMAIL_NOT_CONFIGURED', '邮件服务未配置'); return; }
+  if (!smtp) {
+    fail(res, 503, 'EMAIL_NOT_CONFIGURED', '邮件服务未配置');
+    return;
+  }
   const taken = assertRows(
     await authSql()`SELECT id FROM app_users WHERE LOWER(email)=LOWER(${email}) AND id <> ${actor.id} LIMIT 1`,
     isUserIdRow,
     'app_users',
   );
-  if (taken[0]) { fail(res, 409, 'EMAIL_TAKEN', '该邮箱已被其他账号绑定'); return; }
+  if (taken[0]) {
+    fail(res, 409, 'EMAIL_TAKEN', '该邮箱已被其他账号绑定');
+    return;
+  }
   const queued = await issueAndEnqueueCode(smtp, email, 'bind', clientIp(req));
-  if (!queued.ok) { fail(res, queued.status ?? 500, queued.code ?? 'EMAIL_SEND_FAILED', queued.error ?? '发送失败', queued.retryAfterMs != null ? { retryAfterMs: queued.retryAfterMs } : {}); return; }
+  if (!queued.ok) {
+    fail(
+      res,
+      queued.status ?? 500,
+      queued.code ?? 'EMAIL_SEND_FAILED',
+      queued.error ?? '发送失败',
+      queued.retryAfterMs != null ? { retryAfterMs: queued.retryAfterMs } : {},
+    );
+    return;
+  }
   if (queued.outboxId != null) {
-    const first = await drainOutbox(smtp, { jobId: queued.outboxId, hardTimeoutMs: 8_000, slotWaitMs: 2_000, acquireSlot: true, deadlineMs: Date.now() + 9_000 });
+    const first = await drainOutbox(smtp, {
+      jobId: queued.outboxId,
+      hardTimeoutMs: 8_000,
+      slotWaitMs: 2_000,
+      acquireSlot: true,
+      deadlineMs: Date.now() + 9_000,
+    });
     if (first.sent > 0) {
       await writeAudit(actor, 'auth.email.bind.request', 'user', String(actor.id), { email });
       res.json({ ok: true, message: '验证码已发送到您的邮箱，5 分钟内有效' });
@@ -336,17 +464,28 @@ async function handleBindConfirm(req: VercelRequest, res: VercelResponse): Promi
   const actor = await requireActor(req, res, undefined, true);
   if (!actor) return;
   const body = (req.body ?? {}) as Record<string, unknown>;
-  const email = String(body.email ?? '').trim().toLowerCase();
+  const email = String(body.email ?? '')
+    .trim()
+    .toLowerCase();
   const code = String(body.code ?? '').trim();
-  if (!validateEmailFormat(email)) { fail(res, 400, 'EMAIL_FORMAT_INVALID', '邮箱格式无效'); return; }
+  if (!validateEmailFormat(email)) {
+    fail(res, 400, 'EMAIL_FORMAT_INVALID', '邮箱格式无效');
+    return;
+  }
   const taken = assertRows(
     await authSql()`SELECT id FROM app_users WHERE LOWER(email)=LOWER(${email}) AND id <> ${actor.id} LIMIT 1`,
     isUserIdRow,
     'app_users',
   );
-  if (taken[0]) { fail(res, 409, 'EMAIL_TAKEN', '该邮箱已被其他账号绑定'); return; }
+  if (taken[0]) {
+    fail(res, 409, 'EMAIL_TAKEN', '该邮箱已被其他账号绑定');
+    return;
+  }
   const verify = await verifyCode(email, 'bind', code);
-  if (!verify.ok) { fail(res, 401, verify.code ?? 'EMAIL_CODE_INVALID', verify.error ?? '验证码无效'); return; }
+  if (!verify.ok) {
+    fail(res, 401, verify.code ?? 'EMAIL_CODE_INVALID', verify.error ?? '验证码无效');
+    return;
+  }
   await authSql()`UPDATE app_users SET email=${email}, email_bound_at=${Date.now()} WHERE id=${actor.id}`;
   await writeAudit(actor, 'auth.email.bind.confirm', 'user', String(actor.id), { email });
   res.json({ ok: true });
@@ -382,12 +521,19 @@ async function handleSaveConfig(req: VercelRequest, res: VercelResponse): Promis
   if (!actor) return;
   const body = (req.body ?? {}) as Record<string, unknown>;
   const smtp = smtpConfigFromBody(body, '');
-  if (!smtp) { fail(res, 400, 'EMAIL_CONFIG_INCOMPLETE', '请填写 SMTP 主机与发件地址'); return; }
+  if (!smtp) {
+    fail(res, 400, 'EMAIL_CONFIG_INCOMPLETE', '请填写 SMTP 主机与发件地址');
+    return;
+  }
   const existing = await loadEmailConfigRow();
   let passEnc = existing?.smtp_pass_enc ?? '';
   if (smtp.pass) passEnc = encryptSecret(smtp.pass, await secretKey());
   const initBindPolicy = normalizeInitBindPolicy(body.initBindPolicy);
-  const adminEmails = String(body.adminEmails ?? '').split(/[，,\s]+/).map(s => s.trim()).filter(Boolean).join(',');
+  const adminEmails = String(body.adminEmails ?? '')
+    .split(/[，,\s]+/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .join(',');
   await authSql()`INSERT INTO email_config (id, smtp_host, smtp_port, smtp_secure, smtp_require_tls, smtp_user, smtp_pass_enc, smtp_from, smtp_from_name, admin_emails, init_bind_policy, updated_at)
     VALUES (1, ${smtp.host}, ${smtp.port}, ${smtp.secure}, ${smtp.requireTls}, ${smtp.user}, ${passEnc}, ${smtp.from}, ${smtp.fromName}, ${adminEmails}, ${initBindPolicy}, ${Date.now()})
     ON CONFLICT (id) DO UPDATE SET smtp_host=EXCLUDED.smtp_host, smtp_port=EXCLUDED.smtp_port, smtp_secure=EXCLUDED.smtp_secure,
@@ -401,14 +547,26 @@ async function handleTestConfig(req: VercelRequest, res: VercelResponse): Promis
   const actor = await requireActor(req, res, 'settings.edit');
   if (!actor) return;
   const body = (req.body ?? {}) as Record<string, unknown>;
-  const to = String(body.testEmail ?? '').trim().toLowerCase();
-  if (!validateEmailFormat(to)) { fail(res, 400, 'EMAIL_FORMAT_INVALID', '测试邮箱格式无效'); return; }
+  const to = String(body.testEmail ?? '')
+    .trim()
+    .toLowerCase();
+  if (!validateEmailFormat(to)) {
+    fail(res, 400, 'EMAIL_FORMAT_INVALID', '测试邮箱格式无效');
+    return;
+  }
   const existing = await loadEmailConfigRow();
   const smtp = smtpConfigFromBody(body, existing?.smtp_pass_enc ?? '');
-  if (!smtp) { fail(res, 400, 'EMAIL_CONFIG_INCOMPLETE', '请填写 SMTP 主机与发件地址'); return; }
+  if (!smtp) {
+    fail(res, 400, 'EMAIL_CONFIG_INCOMPLETE', '请填写 SMTP 主机与发件地址');
+    return;
+  }
   const existingEnc = existing?.smtp_pass_enc ?? '';
   if (!smtp.pass && existingEnc) {
-    try { smtp.pass = decryptSecret(existingEnc, await secretKey()); } catch { smtp.pass = ''; }
+    try {
+      smtp.pass = decryptSecret(existingEnc, await secretKey());
+    } catch {
+      smtp.pass = '';
+    }
   }
   try {
     await sendVerificationCode(smtp, { to, code: '123456', purpose: 'login' });
@@ -449,15 +607,26 @@ async function handleClearConfig(req: VercelRequest, res: VercelResponse): Promi
 
 async function handleSendStatus(req: VercelRequest, res: VercelResponse): Promise<void> {
   const body = (req.body ?? {}) as Record<string, unknown>;
-  const email = String(body.email ?? '').trim().toLowerCase();
-  if (!validateEmailFormat(email)) { fail(res, 400, 'EMAIL_FORMAT_INVALID', '邮箱格式无效'); return; }
+  const email = String(body.email ?? '')
+    .trim()
+    .toLowerCase();
+  if (!validateEmailFormat(email)) {
+    fail(res, 400, 'EMAIL_FORMAT_INVALID', '邮箱格式无效');
+    return;
+  }
   const codeRows = assertRows(
     await authSql()`SELECT id, used FROM email_verification_codes WHERE email=${email} AND purpose='login' ORDER BY id DESC LIMIT 1`,
-    rowShape<{ id: DatabaseInt8; used: boolean }>({ id: isDatabaseInt8, used: (v): v is boolean => typeof v === 'boolean' }),
+    rowShape<{ id: DatabaseInt8; used: boolean }>({
+      id: isDatabaseInt8,
+      used: (v): v is boolean => typeof v === 'boolean',
+    }),
     'email_verification_codes',
   );
   const code = codeRows[0];
-  if (!code) { res.json({ ok: true, status: 'none' }); return; }
+  if (!code) {
+    res.json({ ok: true, status: 'none' });
+    return;
+  }
   const outboxRows = assertRows(
     await authSql()`SELECT status, last_error FROM email_outbox WHERE code_id=${code.id} ORDER BY id DESC LIMIT 1`,
     rowShape<{ status: string; last_error: string }>({ status: isString, last_error: isString }),
@@ -481,36 +650,58 @@ export async function handleEmailAuth(req: VercelRequest, res: VercelResponse, a
   try {
     if (action === 'email-config' || action === 'email-config-full') {
       if (action === 'email-config-full') return handleConfigFull(req, res);
-    if (action === 'email-config') {
-      const row = await loadEmailConfigRow();
-      let ownEmail: string | null = null;
-      try {
-        const actor = await getActor(extractBearer(req.headers.authorization));
-        if (actor) {
-          const rows = assertRows(
-            await authSql()`SELECT email FROM app_users WHERE id=${actor.id} LIMIT 1`,
-            rowShape<{ email: string | null }>({ email: (value): value is string | null => value == null || isString(value) }),
-            'app_users',
-          );
-          ownEmail = rows[0]?.email ?? null;
+      if (action === 'email-config') {
+        const row = await loadEmailConfigRow();
+        let ownEmail: string | null = null;
+        try {
+          const actor = await getActor(extractBearer(req.headers.authorization));
+          if (actor) {
+            const rows = assertRows(
+              await authSql()`SELECT email FROM app_users WHERE id=${actor.id} LIMIT 1`,
+              rowShape<{ email: string | null }>({
+                email: (value): value is string | null => value == null || isString(value),
+              }),
+              'app_users',
+            );
+            ownEmail = rows[0]?.email ?? null;
+          }
+        } catch {
+          /* 未登录或令牌失效时不返回邮箱 */
         }
-      } catch { /* 未登录或令牌失效时不返回邮箱 */ }
-      res.json({ ok: true, enabled: !!(row && row.smtp_host && row.smtp_from), initBindPolicy: row?.init_bind_policy || 'optional', email: ownEmail });
+        res.json({
+          ok: true,
+          enabled: !!(row && row.smtp_host && row.smtp_from),
+          initBindPolicy: row?.init_bind_policy || 'optional',
+          email: ownEmail,
+        });
+        return;
+      }
+    }
+    if (req.method !== 'POST') {
+      fail(res, 405, 'METHOD_NOT_ALLOWED', 'Method not allowed');
       return;
     }
-    }
-    if (req.method !== 'POST') { fail(res, 405, 'METHOD_NOT_ALLOWED', 'Method not allowed'); return; }
     switch (action) {
-      case 'email-send-code': return handleSendCode(req, res);
-      case 'email-send-status': return handleSendStatus(req, res);
-      case 'email-login': return handleEmailLogin(req, res);
-      case 'email-bind-request': return handleBindRequest(req, res);
-      case 'email-bind-confirm': return handleBindConfirm(req, res);
-      case 'email-unbind': return handleUnbind(req, res);
-      case 'email-save-config': return handleSaveConfig(req, res);
-      case 'email-test-config': return handleTestConfig(req, res);
-      case 'email-clear-config': return handleClearConfig(req, res);
-      default: fail(res, 400, 'UNKNOWN_ACTION', '未知操作');
+      case 'email-send-code':
+        return handleSendCode(req, res);
+      case 'email-send-status':
+        return handleSendStatus(req, res);
+      case 'email-login':
+        return handleEmailLogin(req, res);
+      case 'email-bind-request':
+        return handleBindRequest(req, res);
+      case 'email-bind-confirm':
+        return handleBindConfirm(req, res);
+      case 'email-unbind':
+        return handleUnbind(req, res);
+      case 'email-save-config':
+        return handleSaveConfig(req, res);
+      case 'email-test-config':
+        return handleTestConfig(req, res);
+      case 'email-clear-config':
+        return handleClearConfig(req, res);
+      default:
+        fail(res, 400, 'UNKNOWN_ACTION', '未知操作');
     }
   } catch (error) {
     sendDatabaseError(req, res, error, 'write');

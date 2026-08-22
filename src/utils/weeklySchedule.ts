@@ -8,7 +8,15 @@ import type {
 } from '../types/exam.js';
 import { getZonedParts, DISPLAY_TIME_ZONE } from './zonedTime.js';
 import { expandOfficialHolidayDates } from '../data/officialHolidays.js';
-import { DATE_RE, HM_RE, genWeeklyPlanId, genWeeklyItemId, genWeeklyOverrideId, normalizeWeeklyPlan, padHM } from './settings/weekly.js';
+import {
+  DATE_RE,
+  HM_RE,
+  genWeeklyPlanId,
+  genWeeklyItemId,
+  genWeeklyOverrideId,
+  normalizeWeeklyPlan,
+  padHM,
+} from './settings/weekly.js';
 
 export { genWeeklyPlanId, genWeeklyItemId, genWeeklyOverrideId, normalizeWeeklyPlan };
 
@@ -126,7 +134,7 @@ export function resolveWeeklyOccurrences(
       if (!item.enabled || item.weekday !== iso) continue;
       const weekType = item.weekType ?? 'all';
       if (plan.weekMode === 'ab' && weekType !== 'all' && weekType !== getWeekTypeForDate(plan, dateKey)) continue;
-      const ov = overrides.find(o => o.sourceItemId === item.id && o.date === dateKey);
+      const ov = overrides.find((o) => o.sourceItemId === item.id && o.date === dateKey);
       if (ov?.action === 'cancel') continue; // 单次取消
       out.push(buildOccurrence(plan.id, item, dateKey, ov));
     }
@@ -214,20 +222,34 @@ export function validateWeeklyPlan(plan: WeeklyPlan): ScheduleValidationIssue[] 
     if (!HM_RE.test(item.startTime) || !HM_RE.test(item.endTime)) {
       issues.push({ level: 'error', code: 'item.time', message: `「${item.name}」时间必须为 HH:mm`, itemId: item.id });
     } else if (!item.endNextDay && item.endTime <= item.startTime) {
-      issues.push({ level: 'error', code: 'item.range', message: `「${item.name}」结束时间必须晚于开始时间`, itemId: item.id });
+      issues.push({
+        level: 'error',
+        code: 'item.range',
+        message: `「${item.name}」结束时间必须晚于开始时间`,
+        itemId: item.id,
+      });
     }
     const dup = `${item.weekType ?? 'all'}|${item.weekday}|${item.startTime}|${item.endTime}|${item.name}`;
     if (seen.has(dup)) {
-      issues.push({ level: 'warn', code: 'item.duplicate', message: `「${item.name}」存在完全重复的周测项`, itemId: item.id });
+      issues.push({
+        level: 'warn',
+        code: 'item.duplicate',
+        message: `「${item.name}」存在完全重复的周测项`,
+        itemId: item.id,
+      });
     } else {
       seen.set(dup, item.id);
     }
   }
 
-  const itemIds = new Set(plan.items.map(i => i.id));
+  const itemIds = new Set(plan.items.map((i) => i.id));
   for (const ov of plan.overrides) {
     if (!itemIds.has(ov.sourceItemId)) {
-      issues.push({ level: 'warn', code: 'override.orphan', message: `例外记录引用了不存在的周测项（${ov.sourceItemId}）` });
+      issues.push({
+        level: 'warn',
+        code: 'override.orphan',
+        message: `例外记录引用了不存在的周测项（${ov.sourceItemId}）`,
+      });
     }
   }
   return issues;

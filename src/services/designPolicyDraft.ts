@@ -18,16 +18,24 @@ export interface DesignPolicyDraft {
 export function saveDesignPolicyDraft(designPolicy: DesignPolicy, errorMessage: string): void {
   try {
     localStorage.setItem(DRAFT_KEY, JSON.stringify({ designPolicy, savedAt: Date.now(), errorMessage }));
-  } catch { /* 隐私模式下忽略 */ }
+  } catch {
+    /* 隐私模式下忽略 */
+  }
 }
 
 export function getDesignPolicyDraft(): DesignPolicyDraft | null {
   try {
     const v = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null');
-    return v && typeof v === 'object' && v.designPolicy ? v as DesignPolicyDraft : null;
-  } catch { return null; }
+    return v && typeof v === 'object' && v.designPolicy ? (v as DesignPolicyDraft) : null;
+  } catch {
+    return null;
+  }
 }
 
 export function clearDesignPolicyDraft(): void {
-  try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
+  try {
+    localStorage.removeItem(DRAFT_KEY);
+  } catch {
+    /* ignore */
+  }
 }

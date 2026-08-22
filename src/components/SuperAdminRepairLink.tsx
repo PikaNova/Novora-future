@@ -73,7 +73,15 @@ export default function SuperAdminRepairLink() {
 
   if (!open) {
     return (
-      <button type="button" className="login-form__link" onClick={() => { setOpen(true); setResult(null); setError(''); }}>
+      <button
+        type="button"
+        className="login-form__link"
+        onClick={() => {
+          setOpen(true);
+          setResult(null);
+          setError('');
+        }}
+      >
         超级管理员权限异常？修复/重建超级管理员
       </button>
     );
@@ -82,7 +90,9 @@ export default function SuperAdminRepairLink() {
   if (result) {
     return (
       <div className="login-recovery">
-        <div className="login-recovery__icon"><KeyRound size={20} aria-hidden="true" /></div>
+        <div className="login-recovery__icon">
+          <KeyRound size={20} aria-hidden="true" />
+        </div>
         <h2>{result === 'created' ? '已创建新的超级管理员账号' : '超级管理员账号已修复'}</h2>
         <p className="login-form__success">
           {result === 'created'
@@ -90,14 +100,18 @@ export default function SuperAdminRepairLink() {
             : '该账号已被强制设为超级管理员，授权范围已重置为全部年级与班级，密码也已更新。'}
           旧登录会话已全部失效，请使用新密码重新登录。
         </p>
-        <button type="button" className="login-form__link" onClick={reset}>返回登录</button>
+        <button type="button" className="login-form__link" onClick={reset}>
+          返回登录
+        </button>
       </div>
     );
   }
 
   return (
     <div className="login-recovery">
-      <div className="login-recovery__icon"><KeyRound size={20} aria-hidden="true" /></div>
+      <div className="login-recovery__icon">
+        <KeyRound size={20} aria-hidden="true" />
+      </div>
       <h2>修复/重建超级管理员账号</h2>
       <p className="login-form__notice">
         适用于账号角色或授权范围损坏，导致超级管理员仍提示“权限不足”的情况。此操作需要初始化时保存的恢复密钥；
@@ -108,34 +122,80 @@ export default function SuperAdminRepairLink() {
         请只在确认当前项目确实无法正常使用超级管理员账号时操作，并在修复后检查审计日志。
       </p>
       <form className="login-form" onSubmit={submit}>
-        <label className="login-form__label" htmlFor="repair-username">目标用户名</label>
+        <label className="login-form__label" htmlFor="repair-username">
+          目标用户名
+        </label>
         <div className="login-form__field">
           <span aria-hidden="true">@</span>
-          <input id="repair-username" autoComplete="username" value={username} onChange={event => setUsername(event.target.value)} placeholder="默认：admin" />
+          <input
+            id="repair-username"
+            autoComplete="username"
+            value={username}
+            onChange={(event) => setUsername(event.target.value)}
+            placeholder="默认：admin"
+          />
         </div>
-        <label className="login-form__label" htmlFor="repair-key">超级管理员恢复密钥</label>
+        <label className="login-form__label" htmlFor="repair-key">
+          超级管理员恢复密钥
+        </label>
         <div className="login-form__field">
           <span aria-hidden="true">◆</span>
-          <input id="repair-key" type="password" autoComplete="off" value={recoveryKey} onChange={event => setRecoveryKey(event.target.value)} placeholder="初始化时保存的 NVR- 密钥" />
+          <input
+            id="repair-key"
+            type="password"
+            autoComplete="off"
+            value={recoveryKey}
+            onChange={(event) => setRecoveryKey(event.target.value)}
+            placeholder="初始化时保存的 NVR- 密钥"
+          />
         </div>
-        <label className="login-form__label" htmlFor="repair-password">新密码</label>
+        <label className="login-form__label" htmlFor="repair-password">
+          新密码
+        </label>
         <div className="login-form__field">
           <span aria-hidden="true">●</span>
-          <input id="repair-password" type="password" autoComplete="new-password" value={next} onChange={event => setNext(event.target.value)} placeholder="至少 8 位" />
+          <input
+            id="repair-password"
+            type="password"
+            autoComplete="new-password"
+            value={next}
+            onChange={(event) => setNext(event.target.value)}
+            placeholder="至少 8 位"
+          />
         </div>
-        <label className="login-form__label" htmlFor="repair-confirm">确认新密码</label>
+        <label className="login-form__label" htmlFor="repair-confirm">
+          确认新密码
+        </label>
         <div className="login-form__field">
           <span aria-hidden="true">●</span>
-          <input id="repair-confirm" type="password" autoComplete="new-password" value={confirm} onChange={event => setConfirm(event.target.value)} />
+          <input
+            id="repair-confirm"
+            type="password"
+            autoComplete="new-password"
+            value={confirm}
+            onChange={(event) => setConfirm(event.target.value)}
+          />
         </div>
         {lockedUntil && remainingLockSeconds > 0 ? (
           <p className="login-form__error">{formatRetryMessage(remainingLockSeconds, '恢复尝试过于频繁')}</p>
-        ) : error && <p className="login-form__error">{error}</p>}
-        <button type="submit" className="login-form__submit" disabled={loading || (!!lockedUntil && remainingLockSeconds > 0)}>
-          {loading ? '正在处理…' : lockedUntil && remainingLockSeconds > 0 ? `请 ${remainingLockSeconds} 秒后再试` : '确认修复/创建'}
+        ) : (
+          error && <p className="login-form__error">{error}</p>
+        )}
+        <button
+          type="submit"
+          className="login-form__submit"
+          disabled={loading || (!!lockedUntil && remainingLockSeconds > 0)}
+        >
+          {loading
+            ? '正在处理…'
+            : lockedUntil && remainingLockSeconds > 0
+              ? `请 ${remainingLockSeconds} 秒后再试`
+              : '确认修复/创建'}
         </button>
       </form>
-      <button type="button" className="login-form__link" onClick={reset}>返回登录</button>
+      <button type="button" className="login-form__link" onClick={reset}>
+        返回登录
+      </button>
     </div>
   );
 }

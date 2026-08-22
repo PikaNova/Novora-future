@@ -2,17 +2,17 @@
 // 数据库连接与建表/迁移：从原 api/exams.ts 抽出，集中管理 neon 客户端、一次性 DDL 与
 // “关系/列缺失”“INTEGER 溢出”等错误识别，保持单一职责。
 
-import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { createDbClient, type DbClient } from "../_dbAdapter.js";
-import { SCHEMA_MIGRATION_LOCK_ID } from "../_auth.js";
-import { sendRateLimited } from "../_apiError.js";
+import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { createDbClient, type DbClient } from '../_dbAdapter.js';
+import { SCHEMA_MIGRATION_LOCK_ID } from '../_auth.js';
+import { sendRateLimited } from '../_apiError.js';
 
 // 性能：缓存 neon 客户端（同一 warm 实例复用）。
 let _sql: DbClient | null = null;
 export function database() {
   if (_sql) return _sql;
   const connectionString = process.env.DATABASE_URL;
-  if (!connectionString) throw new Error("DATABASE_URL is not set");
+  if (!connectionString) throw new Error('DATABASE_URL is not set');
   _sql = createDbClient(connectionString);
   return _sql;
 }
@@ -75,7 +75,7 @@ export function ensureTableOnce(): Promise<void> {
         transaction`ALTER TABLE exam_data ADD COLUMN IF NOT EXISTS classes JSONB NOT NULL DEFAULT '[]'`,
         transaction`ALTER TABLE exam_data ADD COLUMN IF NOT EXISTS initialization JSONB NOT NULL DEFAULT '{}'`,
         transaction`ALTER TABLE exam_data ADD COLUMN IF NOT EXISTS design_policy JSONB NOT NULL DEFAULT '{"rules":[],"updatedAt":0}'`,
-    transaction`ALTER TABLE exam_data ADD COLUMN IF NOT EXISTS major_batch_presets JSONB NOT NULL DEFAULT '{"subjectGroups":[],"timeGroups":[],"updatedAt":0}'`,
+        transaction`ALTER TABLE exam_data ADD COLUMN IF NOT EXISTS major_batch_presets JSONB NOT NULL DEFAULT '{"subjectGroups":[],"timeGroups":[],"updatedAt":0}'`,
         transaction`CREATE TABLE IF NOT EXISTS device_instances (
           instance_id TEXT PRIMARY KEY,
           grade_id TEXT NOT NULL DEFAULT '',
@@ -160,10 +160,8 @@ export function missingRelation(err: unknown): boolean {
 export function updatedAtIntegerOverflow(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
   const code =
-    typeof err === "object" && err !== null && "code" in err
-      ? String((err as { code?: unknown }).code ?? "")
-      : "";
-  return code === "22003" && /out of range for type integer/i.test(msg);
+    typeof err === 'object' && err !== null && 'code' in err ? String((err as { code?: unknown }).code ?? '') : '';
+  return code === '22003' && /out of range for type integer/i.test(msg);
 }
 
 export const GLOBAL_WRITE_MIN_INTERVAL_MS = 900;
@@ -199,10 +197,7 @@ export async function acquireGlobalWriteSlot(): Promise<boolean> {
  * scope, request-shape, and conflict validation. Call exactly once before the
  * route's first mutating statement.
  */
-export async function acquireWriteSlotOrReject(
-  req: VercelRequest,
-  res: VercelResponse,
-): Promise<boolean> {
+export async function acquireWriteSlotOrReject(req: VercelRequest, res: VercelResponse): Promise<boolean> {
   await ensureTableOnce();
   if (await acquireGlobalWriteSlot()) return true;
   sendRateLimited(req, res);

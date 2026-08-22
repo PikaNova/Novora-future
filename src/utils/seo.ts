@@ -21,15 +21,17 @@ function setMeta(name: string, content: string, property = false) {
   el.setAttribute('content', content);
 }
 
+import { buildSeoDescription, buildSeoTitle } from '../shared/seo';
+
 export function applyPageSeo(pathname: string) {
   const init = getAppSettings().exam.initialization;
   const schoolName = init.schoolName?.trim() ?? '';
   const seo = init.seo ?? { titleSuffix: '', description: '', keywords: '', siteUrl: '' };
-  const page = PAGE_LABELS.find((item) => pathname === item.path || pathname.startsWith(item.path + '/')) ?? PAGE_LABELS[0];
-  const suffix = seo.titleSuffix?.trim() || page.label;
-  const title = schoolName ? schoolName + ' · ' + suffix : 'Novora · ' + page.label;
+  const page =
+    PAGE_LABELS.find((item) => pathname === item.path || pathname.startsWith(item.path + '/')) ?? PAGE_LABELS[0];
+  const title = buildSeoTitle(schoolName, seo.titleSuffix?.trim() ?? '') ?? 'Novora · ' + page.label;
   document.title = title;
-  const description = seo.description?.trim() || (schoolName ? schoolName + '考试安排与教室大屏管理平台' : 'Novora 学校考试管理与教室大屏平台');
+  const description = buildSeoDescription(schoolName, seo.description?.trim() ?? '');
   setMeta('description', description);
   if (seo.keywords?.trim()) setMeta('keywords', seo.keywords.trim());
   const siteUrl = seo.siteUrl?.trim() || (typeof window !== 'undefined' ? window.location.origin : '');

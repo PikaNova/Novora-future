@@ -1,55 +1,39 @@
-import React, { useMemo, useState } from "react";
-import type { ExamItem } from "../types";
-import type {
-  ScheduleMode,
-  WeeklyPlan,
-  WeeklyConflictPolicy,
-} from "../types/exam";
+import React, { useMemo, useState } from 'react';
+import type { ExamItem } from '../types';
+import type { ScheduleMode, WeeklyPlan, WeeklyConflictPolicy } from '../types/exam';
 import {
   resolveWeeklyOccurrences,
   addDaysToDateKey,
   getShanghaiDateKey,
   getWeekTypeForDate,
   isoWeekdayOfDateKey,
-} from "../utils/weeklySchedule";
-import { resolveMajorWeeklyConflicts } from "../utils/scheduleConflict";
-import { useBackdropDismiss } from "../hooks/useBackdropDismiss";
-import { getOfficialHolidayName } from "../data/officialHolidays";
-import { type PrintScheduleDocument } from "./SchedulePrintPreview";
-import { type ClassPickerOption } from "./ClassMultiPicker";
-import { CalendarDays } from "lucide-react";
-import Mascot from "./Mascot";
-import {
-  useWeeklyPlanModal,
-  type LastDeleted,
-} from "../hooks/weekly/useWeeklyPlanModal";
-import { useWeeklyItemModal } from "../hooks/weekly/useWeeklyItemModal";
-import { useWeeklyImport } from "../hooks/weekly/useWeeklyImport";
-import { useWeeklyExceptions } from "../hooks/weekly/useWeeklyExceptions";
-import {
-  useWeeklyBatchOps,
-  lastLabelSegment,
-} from "../hooks/weekly/useWeeklyBatchOps";
-import {
-  WEEKDAY_ORDER,
-  weeklyPlanDetailName,
-  type PreviewOcc,
-} from "./weekly/weeklyShared";
-import PlanFormModal from "./weekly/PlanFormModal";
-import WeeklySidebar from "./weekly/WeeklySidebar";
-import WeeklyItemsList from "./weekly/WeeklyItemsList";
-import WeeklyCalendarPreview, {
-  type WeeklyCalendarDay,
-} from "./weekly/WeeklyCalendarPreview";
-import ItemFormModal from "./weekly/ItemFormModal";
-import ImportJsonModal from "./weekly/ImportJsonModal";
-import ConflictPolicyModal from "./weekly/ConflictPolicyModal";
-import ExceptionsModal from "./weekly/ExceptionsModal";
-import CopyPlanModal from "./weekly/CopyPlanModal";
-import ConflictResolutionModal from "./weekly/ConflictResolutionModal";
-import RescheduleModal from "./weekly/RescheduleModal";
-import PrintPickerModal from "./weekly/PrintPickerModal";
-import DeletePlanModals from "./weekly/DeletePlanModals";
+} from '../utils/weeklySchedule';
+import { resolveMajorWeeklyConflicts } from '../utils/scheduleConflict';
+import { useBackdropDismiss } from '../hooks/useBackdropDismiss';
+import { getOfficialHolidayName } from '../data/officialHolidays';
+import { type PrintScheduleDocument } from './SchedulePrintPreview';
+import { type ClassPickerOption } from './ClassMultiPicker';
+import { CalendarDays } from 'lucide-react';
+import Mascot from './Mascot';
+import { useWeeklyPlanModal, type LastDeleted } from '../hooks/weekly/useWeeklyPlanModal';
+import { useWeeklyItemModal } from '../hooks/weekly/useWeeklyItemModal';
+import { useWeeklyImport } from '../hooks/weekly/useWeeklyImport';
+import { useWeeklyExceptions } from '../hooks/weekly/useWeeklyExceptions';
+import { useWeeklyBatchOps, lastLabelSegment } from '../hooks/weekly/useWeeklyBatchOps';
+import { WEEKDAY_ORDER, weeklyPlanDetailName, type PreviewOcc } from './weekly/weeklyShared';
+import PlanFormModal from './weekly/PlanFormModal';
+import WeeklySidebar from './weekly/WeeklySidebar';
+import WeeklyItemsList from './weekly/WeeklyItemsList';
+import WeeklyCalendarPreview, { type WeeklyCalendarDay } from './weekly/WeeklyCalendarPreview';
+import ItemFormModal from './weekly/ItemFormModal';
+import ImportJsonModal from './weekly/ImportJsonModal';
+import ConflictPolicyModal from './weekly/ConflictPolicyModal';
+import ExceptionsModal from './weekly/ExceptionsModal';
+import CopyPlanModal from './weekly/CopyPlanModal';
+import ConflictResolutionModal from './weekly/ConflictResolutionModal';
+import RescheduleModal from './weekly/RescheduleModal';
+import PrintPickerModal from './weekly/PrintPickerModal';
+import DeletePlanModals from './weekly/DeletePlanModals';
 
 export interface WeeklyPanelProps {
   weeklyPlans: WeeklyPlan[];
@@ -70,10 +54,7 @@ export interface WeeklyPanelProps {
     immediate?: boolean,
     activeByClass?: Record<string, string | null>,
   ) => void;
-  onConflictPolicyChange: (
-    policy: WeeklyConflictPolicy,
-    immediate?: boolean,
-  ) => void;
+  onConflictPolicyChange: (policy: WeeklyConflictPolicy, immediate?: boolean) => void;
   onSelectScope?: (gradeId: string, classId: string) => void;
   allowBatchApply?: boolean;
   canEditConflictPolicy?: boolean;
@@ -99,18 +80,15 @@ export default function WeeklyPanel({
 }: WeeklyPanelProps) {
   const backdropProps = useBackdropDismiss();
   const scopedPlans = weeklyPlans.filter((p) => p.classId === selectedClassId);
-  const classActiveId = selectedClassId
-    ? activeWeeklyPlanIdByClassId[selectedClassId]
-    : activeWeeklyPlanId;
-  const activePlan =
-    scopedPlans.find((p) => p.id === classActiveId) ?? scopedPlans[0] ?? null;
+  const classActiveId = selectedClassId ? activeWeeklyPlanIdByClassId[selectedClassId] : activeWeeklyPlanId;
+  const activePlan = scopedPlans.find((p) => p.id === classActiveId) ?? scopedPlans[0] ?? null;
   const items = activePlan?.items ?? [];
   const pickerOptions = useMemo<ClassPickerOption[]>(
     () =>
       classOptions.map((item) => ({
         id: item.id,
         gradeId: item.gradeId,
-        gradeName: item.label.split(" · ")[0] || "未知年级",
+        gradeName: item.label.split(' · ')[0] || '未知年级',
         className: lastLabelSegment(item.label),
       })),
     [classOptions],
@@ -120,74 +98,159 @@ export default function WeeklyPanel({
   const [lastDeleted, setLastDeleted] = useState<LastDeleted>(null);
 
   const planModal$ = useWeeklyPlanModal({
-    weeklyPlans, activeWeeklyPlanIdByClassId, selectedGradeId, selectedClassId,
-    selectedClassName, pickerOptions, activePlan, onSavePlans, onSelectScope, setLastDeleted,
+    weeklyPlans,
+    activeWeeklyPlanIdByClassId,
+    selectedGradeId,
+    selectedClassId,
+    selectedClassName,
+    pickerOptions,
+    activePlan,
+    onSavePlans,
+    onSelectScope,
+    setLastDeleted,
   });
   const {
-    planModal, setPlanModal, planWizardStep, setPlanWizardStep,
-    planError, setPlanError, deletePlanOpen, setDeletePlanOpen,
-    policyOpen, setPolicyOpen,
-    openNewPlan, openPlanSettings, commitPlanModal, removePlan, togglePlanEnabled, switchPlan,
+    planModal,
+    setPlanModal,
+    planWizardStep,
+    setPlanWizardStep,
+    planError,
+    setPlanError,
+    deletePlanOpen,
+    setDeletePlanOpen,
+    policyOpen,
+    setPolicyOpen,
+    openNewPlan,
+    openPlanSettings,
+    commitPlanModal,
+    removePlan,
+    togglePlanEnabled,
+    switchPlan,
   } = planModal$;
 
   const itemModal$ = useWeeklyItemModal({
-    weeklyPlans, activePlan, selectedClassId, items, onSavePlans, setLastDeleted,
+    weeklyPlans,
+    activePlan,
+    selectedClassId,
+    items,
+    onSavePlans,
+    setLastDeleted,
   });
   const {
-    editing, setEditing, itemWizardStep, setItemWizardStep,
-    customWeeklySubjectActive, setCustomWeeklySubjectActive,
-    editError, setEditError, weeklyTimeFlowOpen, setWeeklyTimeFlowOpen,
-    deleteTarget, setDeleteTarget,
-    openWeeklyTimeFlow, cancelWeeklyTimeFlow, commitItemModal, removeItem, toggleItemEnabled,
+    editing,
+    setEditing,
+    itemWizardStep,
+    setItemWizardStep,
+    customWeeklySubjectActive,
+    setCustomWeeklySubjectActive,
+    editError,
+    setEditError,
+    weeklyTimeFlowOpen,
+    setWeeklyTimeFlowOpen,
+    deleteTarget,
+    setDeleteTarget,
+    openWeeklyTimeFlow,
+    cancelWeeklyTimeFlow,
+    commitItemModal,
+    removeItem,
+    toggleItemEnabled,
   } = itemModal$;
 
   const import$ = useWeeklyImport({
-    weeklyPlans, activePlan, items, selectedClassId, pickerOptions,
-    activeWeeklyPlanIdByClassId, onSavePlans,
+    weeklyPlans,
+    activePlan,
+    items,
+    selectedClassId,
+    pickerOptions,
+    activeWeeklyPlanIdByClassId,
+    onSavePlans,
   });
   const {
-    importOpen, importText, setImportText,
-    importError, importClassIds, setImportClassIds,
-    importStep, setImportStep, importSummary,
-    importExcludedIndexes, setImportExcludedIndexes,
-    openImport, closeImport, validateImportJson, importJson, exportJson,
+    importOpen,
+    importText,
+    setImportText,
+    importError,
+    importClassIds,
+    setImportClassIds,
+    importStep,
+    setImportStep,
+    importSummary,
+    importExcludedIndexes,
+    setImportExcludedIndexes,
+    openImport,
+    closeImport,
+    validateImportJson,
+    importJson,
+    exportJson,
   } = import$;
 
   const exceptions$ = useWeeklyExceptions<PreviewOcc>({
-    weeklyPlans, activePlan, selectedClassId, onSavePlans, setLastDeleted,
+    weeklyPlans,
+    activePlan,
+    selectedClassId,
+    onSavePlans,
+    setLastDeleted,
   });
   const {
-    exceptionsOpen, setExceptionsOpen, newExcludeDate, setNewExcludeDate,
-    conflictTarget, setConflictTarget, rescheduleTarget, setRescheduleTarget,
-    rescheduleError, setRescheduleError, rescheduleTimeOpen, setRescheduleTimeOpen,
-    removeOverride, addExcludedDate, removeExcludedDate,
-    cancelOccurrence, openReschedule, commitReschedule, keepSuppressed,
+    exceptionsOpen,
+    setExceptionsOpen,
+    newExcludeDate,
+    setNewExcludeDate,
+    conflictTarget,
+    setConflictTarget,
+    rescheduleTarget,
+    setRescheduleTarget,
+    rescheduleError,
+    setRescheduleError,
+    rescheduleTimeOpen,
+    setRescheduleTimeOpen,
+    removeOverride,
+    addExcludedDate,
+    removeExcludedDate,
+    cancelOccurrence,
+    openReschedule,
+    commitReschedule,
+    keepSuppressed,
     forceRunOccurrence,
   } = exceptions$;
 
   const batchOps$ = useWeeklyBatchOps({
-    weeklyPlans, classOptions, activeWeeklyPlanIdByClassId, activePlan,
-    selectedClassId, onSavePlans, setLastDeleted,
+    weeklyPlans,
+    classOptions,
+    activeWeeklyPlanIdByClassId,
+    activePlan,
+    selectedClassId,
+    onSavePlans,
+    setLastDeleted,
   });
   const {
-    copyModal, setCopyModal, copyWizardStep, setCopyWizardStep,
-    batchDeleteOpen, setBatchDeleteOpen, batchDeleteStep, setBatchDeleteStep,
-    batchDeletePlanIds, setBatchDeletePlanIds,
-    printOpen, setPrintOpen, printPickerOpen, setPrintPickerOpen,
-    printPickerStep, setPrintPickerStep, printClassIds, setPrintClassIds,
-    commitCopyPlan, removeSelectedPlans,
+    copyModal,
+    setCopyModal,
+    copyWizardStep,
+    setCopyWizardStep,
+    batchDeleteOpen,
+    setBatchDeleteOpen,
+    batchDeleteStep,
+    setBatchDeleteStep,
+    batchDeletePlanIds,
+    setBatchDeletePlanIds,
+    printOpen,
+    setPrintOpen,
+    printPickerOpen,
+    setPrintPickerOpen,
+    printPickerStep,
+    setPrintPickerStep,
+    printClassIds,
+    setPrintClassIds,
+    commitCopyPlan,
+    removeSelectedPlans,
   } = batchOps$;
   const planPickerOptions = useMemo<ClassPickerOption[]>(
     () =>
       weeklyPlans.map((plan) => {
         const target = classOptions.find((item) => item.id === plan.classId);
-        const [gradeName = "未知年级", className = "未知班级"] =
-          target?.label.split(" · ") ?? [];
-        const planDetail = weeklyPlanDetailName(
-          plan.name,
-          gradeName,
-          className,
-        );
+        const [gradeName = '未知年级', className = '未知班级'] = target?.label.split(' · ') ?? [];
+        const planDetail = weeklyPlanDetailName(plan.name, gradeName, className);
         return {
           id: plan.id,
           gradeId: plan.gradeId,
@@ -205,11 +268,11 @@ export default function WeeklyPanel({
       daysBack,
       daysForward: 13 + (7 - isoWeekdayOfDateKey(today)),
     });
-    if (scheduleMode === "automatic" && majorItems.length) {
+    if (scheduleMode === 'automatic' && majorItems.length) {
       const { suppressedWeekly, conflicts } = resolveMajorWeeklyConflicts(
         [
           {
-            id: "major",
+            id: 'major',
             name: majorName,
             items: majorItems,
             policy: weeklyConflictPolicy,
@@ -217,12 +280,8 @@ export default function WeeklyPanel({
         ],
         occ,
       );
-      const suppressedIds = new Set(
-        suppressedWeekly.map((o) => o.occurrenceId),
-      );
-      const conflictById = new Map(
-        conflicts.map((c) => [c.weeklyOccurrenceId, c]),
-      );
+      const suppressedIds = new Set(suppressedWeekly.map((o) => o.occurrenceId));
+      const conflictById = new Map(conflicts.map((c) => [c.weeklyOccurrenceId, c]));
       return occ.map((o) => {
         const c = conflictById.get(o.occurrenceId);
         return {
@@ -263,9 +322,7 @@ export default function WeeklyPanel({
     const first = addDaysToDateKey(today, -(isoWeekdayOfDateKey(today) - 1));
     const allDays = Array.from({ length: 14 }, (_, index) => {
       const date = addDaysToDateKey(first, index);
-      const officialHoliday = activePlan?.excludeOfficialHolidays
-        ? getOfficialHolidayName(date)
-        : null;
+      const officialHoliday = activePlan?.excludeOfficialHolidays ? getOfficialHolidayName(date) : null;
       const manuallyExcluded = !!activePlan?.excludedDates.includes(date);
       return {
         date,
@@ -273,32 +330,21 @@ export default function WeeklyPanel({
         entries: preview.filter((item) => item.date === date),
         officialHoliday,
         manuallyExcluded,
-        weekType:
-          activePlan?.weekMode === "ab"
-            ? getWeekTypeForDate(activePlan, date)
-            : null,
+        weekType: activePlan?.weekMode === 'ab' ? getWeekTypeForDate(activePlan, date) : null,
       };
     });
-    const showSaturday = allDays.some(
-      (day) => day.weekday === 6 && day.entries.length > 0,
-    );
-    const showSunday = allDays.some(
-      (day) => day.weekday === 7 && day.entries.length > 0,
-    );
+    const showSaturday = allDays.some((day) => day.weekday === 6 && day.entries.length > 0);
+    const showSunday = allDays.some((day) => day.weekday === 7 && day.entries.length > 0);
     const visibleDay = (day: (typeof allDays)[number]) =>
       day.weekday <= 5 || (day.weekday === 6 ? showSaturday : showSunday);
-    return [0, 1].map((weekIndex) =>
-      allDays.slice(weekIndex * 7, weekIndex * 7 + 7).filter(visibleDay),
-    );
+    return [0, 1].map((weekIndex) => allDays.slice(weekIndex * 7, weekIndex * 7 + 7).filter(visibleDay));
   }, [preview, activePlan]);
   const printSchedules = useMemo<PrintScheduleDocument[]>(
     () =>
       printClassIds.flatMap((classId) => {
         const planId = activeWeeklyPlanIdByClassId[classId];
         const plan =
-          weeklyPlans.find(
-            (item) => item.classId === classId && item.id === planId,
-          ) ??
+          weeklyPlans.find((item) => item.classId === classId && item.id === planId) ??
           weeklyPlans.find((item) => item.classId === classId && item.enabled);
         const target = pickerOptions.find((item) => item.id === classId);
         if (!plan || !target) return [];
@@ -315,7 +361,7 @@ export default function WeeklyPanel({
               name: item.name,
               startTime: item.startTime.slice(11, 16),
               endTime: item.endTime.slice(11, 16),
-              note: item.forced ? "冲突时保留" : "",
+              note: item.forced ? '冲突时保留' : '',
             })),
           },
         ];
@@ -351,14 +397,8 @@ export default function WeeklyPanel({
               <CalendarDays />
             </div>
             <p>请先选择年级与班级</p>
-            <span className="admin-major-card__hint">
-              也可以直接新建计划，并在新建界面选择适用班级。
-            </span>
-            <button
-              className="admin-btn admin-btn--primary"
-              style={{ marginTop: 12 }}
-              onClick={openNewPlan}
-            >
+            <span className="admin-major-card__hint">也可以直接新建计划，并在新建界面选择适用班级。</span>
+            <button className="admin-btn admin-btn--primary" style={{ marginTop: 12 }} onClick={openNewPlan}>
               选择班级并新建周测计划
             </button>
           </div>
@@ -399,11 +439,7 @@ export default function WeeklyPanel({
         <main className="admin-main">
           <div className="admin-list-header">
             <h2 className="admin-list-title">周测考试安排</h2>
-            <button
-              className="admin-btn"
-              disabled
-              title="当前班级还没有周测计划"
-            >
+            <button className="admin-btn" disabled title="当前班级还没有周测计划">
               A4 预览与下载 PDF
             </button>
           </div>
@@ -413,11 +449,7 @@ export default function WeeklyPanel({
               <CalendarDays />
             </div>
             <p>还没有周测计划</p>
-            <button
-              className="admin-btn admin-btn--primary"
-              style={{ marginTop: 12 }}
-              onClick={openNewPlan}
-            >
+            <button className="admin-btn admin-btn--primary" style={{ marginTop: 12 }} onClick={openNewPlan}>
               + 新建周测计划
             </button>
           </div>
@@ -441,7 +473,7 @@ export default function WeeklyPanel({
 
   function restoreLastDeleted() {
     if (!lastDeleted) return;
-    if (lastDeleted.kind === "plan") {
+    if (lastDeleted.kind === 'plan') {
       const plans = [...weeklyPlans];
       plans.splice(Math.max(0, lastDeleted.index), 0, lastDeleted.plan);
       onSavePlans(
@@ -450,11 +482,9 @@ export default function WeeklyPanel({
         lastDeleted.plan.classId,
         true,
       );
-    } else if (lastDeleted.kind === "plans") {
+    } else if (lastDeleted.kind === 'plans') {
       const plans = [...weeklyPlans];
-      for (const item of [...lastDeleted.plans].sort(
-        (left, right) => left.index - right.index,
-      ))
+      for (const item of [...lastDeleted.plans].sort((left, right) => left.index - right.index))
         plans.splice(Math.min(item.index, plans.length), 0, item.plan);
       const restored = plans.map((plan, order) => ({ ...plan, order }));
       onSavePlans(
@@ -464,7 +494,7 @@ export default function WeeklyPanel({
         true,
         lastDeleted.activeByClass,
       );
-    } else if (lastDeleted.kind === "item") {
+    } else if (lastDeleted.kind === 'item') {
       const plans = weeklyPlans.map((plan) => {
         if (plan.id !== lastDeleted.planId) return plan;
         const nextItems = [...plan.items];
@@ -483,9 +513,7 @@ export default function WeeklyPanel({
 
   const grouped = WEEKDAY_ORDER.map((wd) => ({
     wd,
-    list: items
-      .filter((i) => i.weekday === wd)
-      .sort((a, b) => a.order - b.order),
+    list: items.filter((i) => i.weekday === wd).sort((a, b) => a.order - b.order),
   }));
 
   return (
@@ -587,7 +615,7 @@ export default function WeeklyPanel({
         openWeeklyTimeFlow={openWeeklyTimeFlow}
         cancelWeeklyTimeFlow={cancelWeeklyTimeFlow}
         commitItemModal={commitItemModal}
-        planWeekMode={activePlan.weekMode ?? "single"}
+        planWeekMode={activePlan.weekMode ?? 'single'}
       />
       <ImportJsonModal
         backdropProps={backdropProps}

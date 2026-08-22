@@ -7,7 +7,9 @@
 }
 
 /* 登录页角落 */
-.login-card { position: relative; }
+.login-card {
+  position: relative;
+}
 .login-mascot {
   position: absolute;
   right: 14px;
@@ -24,8 +26,14 @@
   transform: rotate(-6deg) scale(1.1);
 }
 @keyframes mascot-peek {
-  from { opacity: 0; transform: translateY(-10px) scale(0.9); }
-  to { opacity: 0.9; transform: none; }
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.9);
+  }
+  to {
+    opacity: 0.9;
+    transform: none;
+  }
 }
 
 /* 空状态 */
@@ -36,8 +44,13 @@
   animation: mascot-bob 3s ease-in-out infinite;
 }
 @keyframes mascot-bob {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-4px); }
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
 }
 
 /* 关于页彩蛋 */

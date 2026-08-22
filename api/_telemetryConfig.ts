@@ -32,10 +32,8 @@ const BASE_URL = pick(process.env.TELEMETRY_BASE_URL, REPO_BASE_URL).replace(/\/
 export const telemetryConfig = {
   baseUrl: BASE_URL,
   collectUrl: pick(process.env.TELEMETRY_COLLECT_URL, REPO_COLLECT_URL) || `${BASE_URL}/api/collect`,
-  announceUrl:
-    pick(process.env.TELEMETRY_ANNOUNCE_URL, REPO_ANNOUNCE_URL) || `${BASE_URL}/api/public-announcements`,
-  errorReportUrl:
-    pick(process.env.TELEMETRY_ERROR_REPORT_URL, REPO_ERROR_REPORT_URL) || `${BASE_URL}/api/error-report`,
+  announceUrl: pick(process.env.TELEMETRY_ANNOUNCE_URL, REPO_ANNOUNCE_URL) || `${BASE_URL}/api/public-announcements`,
+  errorReportUrl: pick(process.env.TELEMETRY_ERROR_REPORT_URL, REPO_ERROR_REPORT_URL) || `${BASE_URL}/api/error-report`,
   tokenUrl: pick(process.env.TELEMETRY_TOKEN_URL, REPO_TOKEN_URL) || `${BASE_URL}/api/issue-client-token`,
 } as const;
 
@@ -47,11 +45,10 @@ export async function resolveIpSalt(): Promise<string> {
   const override = (process.env.TELEMETRY_IP_SALT ?? '').trim();
   if (override) return override;
   if (!resolvedIpSaltPromise) {
-    resolvedIpSaltPromise = ensureTelemetryIpSalt()
-      .catch(error => {
-        resolvedIpSaltPromise = null;
-        throw error;
-      });
+    resolvedIpSaltPromise = ensureTelemetryIpSalt().catch((error) => {
+      resolvedIpSaltPromise = null;
+      throw error;
+    });
   }
   return resolvedIpSaltPromise;
 }

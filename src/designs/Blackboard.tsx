@@ -6,11 +6,34 @@ import { ArrowLeft, LayoutGrid, Maximize, Megaphone, Minimize } from 'lucide-rea
 import './Blackboard.css';
 
 /** 方案 03 · 校园黑板 — 黑板绿 + 暖白，中央圆形进度环。 */
-export default function Blackboard({ vm, onDismissNotification, onBack, quickMenu, onOpenAnnouncements, onSwitchDesign, isFullscreen, onToggleFullscreen }: DesignProps) {
+export default function Blackboard({
+  vm,
+  onDismissNotification,
+  onBack,
+  quickMenu,
+  onOpenAnnouncements,
+  onSwitchDesign,
+  isFullscreen,
+  onToggleFullscreen,
+}: DesignProps) {
   const {
-    masterTitle, phase, clock, dateText, currentName, startHM, endHM,
-    progressPct, elapsedText, remainingText, countdownText,
-    nextName, nextStartHM, urgency, timeSynced, online, notification,
+    masterTitle,
+    phase,
+    clock,
+    dateText,
+    currentName,
+    startHM,
+    endHM,
+    progressPct,
+    elapsedText,
+    remainingText,
+    countdownText,
+    nextName,
+    nextStartHM,
+    urgency,
+    timeSynced,
+    online,
+    notification,
   } = vm;
 
   const pct = phase === 'ended' ? 100 : phase === 'before' ? 0 : Math.round(progressPct);
@@ -24,16 +47,29 @@ export default function Blackboard({ vm, onDismissNotification, onBack, quickMen
     <div className={`bb bb--${phase}`}>
       <div className="bb__frame">
         <header className="bb__top">
-          <button className="bb__ghost" onClick={onBack} aria-label="返回"><ArrowLeft /></button>
+          <button className="bb__ghost" onClick={onBack} aria-label="返回">
+            <ArrowLeft />
+          </button>
           <div className="bb__title-col">
             <span className="bb__master">{masterTitle || 'Novora'}</span>
             {phase !== 'empty' && <span className="bb__subject">{currentName ?? ''}</span>}
           </div>
           <div className="bb__top-right">
             <span className={`bb__sync is-${sync.tone}`}>{sync.text}</span>
-            <button className="bb__ghost" onClick={onOpenAnnouncements} aria-label="查看公告" title="系统公告"><Megaphone /></button>
-            <button className="bb__ghost" onClick={onSwitchDesign} aria-label="切换设计" title="切换展示设计"><LayoutGrid /></button>
-            <button className="bb__ghost" onClick={onToggleFullscreen} aria-label={isFullscreen ? '退出全屏' : '进入全屏'} title={isFullscreen ? '退出全屏' : '进入全屏'}>{isFullscreen ? <Minimize /> : <Maximize />}</button>
+            <button className="bb__ghost" onClick={onOpenAnnouncements} aria-label="查看公告" title="系统公告">
+              <Megaphone />
+            </button>
+            <button className="bb__ghost" onClick={onSwitchDesign} aria-label="切换设计" title="切换展示设计">
+              <LayoutGrid />
+            </button>
+            <button
+              className="bb__ghost"
+              onClick={onToggleFullscreen}
+              aria-label={isFullscreen ? '退出全屏' : '进入全屏'}
+              title={isFullscreen ? '退出全屏' : '进入全屏'}
+            >
+              {isFullscreen ? <Minimize /> : <Maximize />}
+            </button>
             {quickMenu}
           </div>
         </header>
@@ -43,20 +79,32 @@ export default function Blackboard({ vm, onDismissNotification, onBack, quickMen
 
         {notification && (
           <div className="bb__notify" role="status">
-            <span>{notification.icon}</span><span>{notification.message}</span>
-            <button onClick={onDismissNotification} aria-label="关闭">×</button>
+            <span>{notification.icon}</span>
+            <span>{notification.message}</span>
+            <button onClick={onDismissNotification} aria-label="关闭">
+              ×
+            </button>
           </div>
         )}
 
         {phase !== 'empty' ? (
           <div className="bb__lower">
             <div className="bb__side bb__side--left">
-              <div><span className="bb__k">时段</span><span className="bb__v">{startHM && endHM ? `${startHM}–${endHM}` : '—'}</span></div>
-              <div><span className="bb__k">已进行</span><span className="bb__v">{phase === 'live' ? elapsedText : '—'}</span></div>
-              <div><span className="bb__k">剩余</span><span className={`bb__v ${remindClass}`}>{phase === 'live' ? remainingText : '—'}</span></div>
+              <div>
+                <span className="bb__k">时段</span>
+                <span className="bb__v">{startHM && endHM ? `${startHM}–${endHM}` : '—'}</span>
+              </div>
+              <div>
+                <span className="bb__k">已进行</span>
+                <span className="bb__v">{phase === 'live' ? elapsedText : '—'}</span>
+              </div>
+              <div>
+                <span className="bb__k">剩余</span>
+                <span className={`bb__v ${remindClass}`}>{phase === 'live' ? remainingText : '—'}</span>
+              </div>
             </div>
 
-            <div className="bb__ring" style={{ ['--pct' as any]: pct, ['--ring' as any]: ringColor }}>
+            <div className="bb__ring" style={{ '--pct': pct, '--ring': ringColor } as React.CSSProperties}>
               <div className="bb__ring-inner">
                 <span className="bb__ring-label">{centerLabel}</span>
                 <span className="bb__ring-value">{centerValue}</span>
@@ -64,8 +112,22 @@ export default function Blackboard({ vm, onDismissNotification, onBack, quickMen
             </div>
 
             <div className="bb__side bb__side--right">
-              <div><span className="bb__k">温馨提醒</span><span className={`bb__v bb__remind ${remindClass}`}>{urgency === 'critical' ? '即将交卷，请检查' : urgency === 'warn' ? '接近结束，合理安排' : '保持安静 · 诚信应考'}</span></div>
-              {phase !== 'before' && (<div><span className="bb__k">下一科目</span><span className="bb__v">{nextName ? `${nextName}　${nextStartHM ?? ''}` : '无'}</span></div>)}
+              <div>
+                <span className="bb__k">温馨提醒</span>
+                <span className={`bb__v bb__remind ${remindClass}`}>
+                  {urgency === 'critical'
+                    ? '即将交卷，请检查'
+                    : urgency === 'warn'
+                      ? '接近结束，合理安排'
+                      : '保持安静 · 诚信应考'}
+                </span>
+              </div>
+              {phase !== 'before' && (
+                <div>
+                  <span className="bb__k">下一科目</span>
+                  <span className="bb__v">{nextName ? `${nextName}\u3000${nextStartHM ?? ''}` : '无'}</span>
+                </div>
+              )}
             </div>
           </div>
         ) : (

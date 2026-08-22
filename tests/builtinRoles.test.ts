@@ -11,10 +11,12 @@ function roleById(id: string) {
 }
 
 test('BUILTIN_ROLES: contains exactly the four expected built-in roles', () => {
-  assert.deepEqual(
-    BUILTIN_ROLES.map((role) => role.id).sort(),
-    ['class_admin', 'grade_admin', 'super_admin', 'viewer'],
-  );
+  assert.deepEqual(BUILTIN_ROLES.map((role) => role.id).sort(), [
+    'class_admin',
+    'grade_admin',
+    'super_admin',
+    'viewer',
+  ]);
 });
 
 test('BUILTIN_ROLES: every declared permission is valid', () => {
@@ -30,7 +32,11 @@ test('BUILTIN_ROLES: every declared permission is valid', () => {
 
 test('BUILTIN_ROLES: no role lists a permission twice', () => {
   for (const role of BUILTIN_ROLES) {
-    assert.equal(new Set(role.permissions).size, role.permissions.length, `role "${role.id}" has duplicate permissions`);
+    assert.equal(
+      new Set(role.permissions).size,
+      role.permissions.length,
+      `role "${role.id}" has duplicate permissions`,
+    );
   }
 });
 
@@ -47,23 +53,54 @@ test('BUILTIN_ROLES: grade_admin can delegate every class_admin permission', () 
 test('BUILTIN_ROLES: grade_admin permissions match the approved contract', () => {
   const expected = [
     'overview.read',
-    'major.read', 'major.create', 'major.quick_create', 'major.edit', 'major.delete', 'major.import', 'major.export',
-    'weekly.read', 'weekly.create', 'weekly.edit', 'weekly.delete', 'weekly.copy', 'weekly.override', 'weekly.import', 'weekly.export',
-    'school.read', 'school.class_manage',
-    'device.read', 'device.bind', 'device.revoke',
+    'major.read',
+    'major.create',
+    'major.quick_create',
+    'major.edit',
+    'major.delete',
+    'major.import',
+    'major.export',
+    'weekly.read',
+    'weekly.create',
+    'weekly.edit',
+    'weekly.delete',
+    'weekly.copy',
+    'weekly.override',
+    'weekly.import',
+    'weekly.export',
+    'school.read',
+    'school.class_manage',
+    'device.read',
+    'device.bind',
+    'device.revoke',
     'alerts.read',
     'settings.read',
-    'user.read', 'user.create', 'user.edit', 'user.disable', 'user.delete', 'user.reset_password',
+    'user.read',
+    'user.create',
+    'user.edit',
+    'user.disable',
+    'user.delete',
+    'user.reset_password',
   ].sort();
   assert.deepEqual([...roleById('grade_admin').permissions].sort(), expected);
 });
 
 test('BUILTIN_ROLES: class_admin permissions match the approved contract', () => {
   const expected = [
-    'major.read', 'major.quick_create',
-    'weekly.read', 'weekly.create', 'weekly.edit', 'weekly.delete', 'weekly.copy', 'weekly.override', 'weekly.import', 'weekly.export',
+    'major.read',
+    'major.quick_create',
+    'weekly.read',
+    'weekly.create',
+    'weekly.edit',
+    'weekly.delete',
+    'weekly.copy',
+    'weekly.override',
+    'weekly.import',
+    'weekly.export',
     'school.read',
-    'device.read', 'device.bind', 'device.revoke',
+    'device.read',
+    'device.bind',
+    'device.revoke',
     'alerts.read',
   ].sort();
   assert.deepEqual([...roleById('class_admin').permissions].sort(), expected);
@@ -86,7 +123,10 @@ test('BUILTIN_ROLES: viewer (班级访客) is limited to read/export permissions
     ].sort(),
   );
   for (const permission of viewer.permissions) {
-    assert.ok(/\.(read|export)$/.test(permission), `viewer should only hold read/export permissions, found "${permission}"`);
+    assert.ok(
+      /\.(read|export)$/.test(permission),
+      `viewer should only hold read/export permissions, found "${permission}"`,
+    );
   }
 });
 

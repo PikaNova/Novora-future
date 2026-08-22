@@ -13,11 +13,11 @@ export default function AdminModalPortal({ children, ...props }: AdminModalPorta
   const element = (
     <div
       {...props}
-      onPointerDownCapture={event => {
+      onPointerDownCapture={(event) => {
         stopPortalEvent(event);
         props.onPointerDownCapture?.(event);
       }}
-      onClick={event => {
+      onClick={(event) => {
         stopPortalEvent(event);
         props.onClick?.(event);
       }}

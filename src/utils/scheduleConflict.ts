@@ -91,17 +91,22 @@ function detectAgainstBlock(occ: WeeklyOccurrence, block: MajorScheduleBlock): D
   }
 
   if (pol.scope === 'whole-day') {
-    const hit = block.items.find(m => majorItemCoversDate(m, occ.date));
+    const hit = block.items.find((m) => majorItemCoversDate(m, occ.date));
     return hit ? { type: 'whole-day', majorItem: hit } : null;
   }
 
   // time-overlap（可带缓冲）
   const buffered = pol.bufferBeforeMinutes > 0 || pol.bufferAfterMinutes > 0;
-  const hit = block.items.find(m => isOverlapWithBuffer(m, occ, pol.bufferBeforeMinutes, pol.bufferAfterMinutes));
+  const hit = block.items.find((m) => isOverlapWithBuffer(m, occ, pol.bufferBeforeMinutes, pol.bufferAfterMinutes));
   return hit ? { type: buffered ? 'buffer-overlap' : 'time-overlap', majorItem: hit } : null;
 }
 
-function buildConflict(occ: WeeklyOccurrence, block: MajorScheduleBlock, detected: Detected, forced: boolean): ScheduleConflict {
+function buildConflict(
+  occ: WeeklyOccurrence,
+  block: MajorScheduleBlock,
+  detected: Detected,
+  forced: boolean,
+): ScheduleConflict {
   const m = detected.majorItem;
   return {
     id: `conflict_${occ.occurrenceId}_${block.id}`,
@@ -171,7 +176,15 @@ export interface ResolveScheduleInput {
   scheduleMode: ScheduleMode;
   activeMajorId: string | null;
   activeWeeklyPlanId: string | null;
-  majors: Array<{ id: string; name: string; items: ExamItem[]; targetGradeIds?: string[]; targetClassIds?: string[]; temporary?: boolean; priorityOverSchedule?: boolean }>;
+  majors: Array<{
+    id: string;
+    name: string;
+    items: ExamItem[];
+    targetGradeIds?: string[];
+    targetClassIds?: string[];
+    temporary?: boolean;
+    priorityOverSchedule?: boolean;
+  }>;
   weeklyPlans: Array<Parameters<typeof resolveWeeklyOccurrences>[0]>;
   activeWeeklyPlanIdByClassId?: Record<string, string | null>;
   selectedGradeId?: string;
@@ -193,15 +206,21 @@ export function resolveEffectiveSchedule(
   const selectedGradeId = (data.selectedGradeId || '').trim();
   const selectedClassId = (data.selectedClassId || '').trim();
   const selectedClassTrack = Array.isArray(data.selectedClassTrack) ? data.selectedClassTrack : [];
-  const subjectTrackModeEnabled = data.subjectTrackModeEnabled !== false;
-  const applicableMajors = data.majors.filter(major => {
-    const gradeApplies = !major.targetGradeIds?.length || (!!selectedGradeId && major.targetGradeIds.includes(selectedGradeId));
-    const classApplies = !major.targetClassIds?.length || (!!selectedClassId && major.targetClassIds.includes(selectedClassId));
+  const subjectTrackModeEnabled = data.subjectTrackModeEnabled === true;
+  const applicableMajors = data.majors.filter((major) => {
+    const gradeApplies =
+      !major.targetGradeIds?.length || (!!selectedGradeId && major.targetGradeIds.includes(selectedGradeId));
+    const classApplies =
+      !major.targetClassIds?.length || (!!selectedClassId && major.targetClassIds.includes(selectedClassId));
     return gradeApplies && classApplies;
   });
   const itemAppliesToScope = (item: ExamItem) => {
-    const gradeApplies = !item.targetGradeIds?.length || (!!selectedGradeId && item.targetGradeIds.includes(selectedGradeId));
-    const classApplies = !subjectTrackModeEnabled || !item.targetClassIds?.length || (!!selectedClassId && item.targetClassIds.includes(selectedClassId));
+    const gradeApplies =
+      !item.targetGradeIds?.length || (!!selectedGradeId && item.targetGradeIds.includes(selectedGradeId));
+    const classApplies =
+      !subjectTrackModeEnabled ||
+      !item.targetClassIds?.length ||
+      (!!selectedClassId && item.targetClassIds.includes(selectedClassId));
     const trackApplies =
       !subjectTrackModeEnabled ||
       item.targetClassIds?.length ||
@@ -210,23 +229,40 @@ export function resolveEffectiveSchedule(
       subjectAppliesToClass(item.name, { track: selectedClassTrack });
     return gradeApplies && classApplies && trackApplies;
   };
-  const candidates = applicableMajors.flatMap(major => {
+  const candidates = applicableMajors.flatMap((major) => {
     const scopePriority = major.targetClassIds?.length ? 2 : major.targetGradeIds?.length ? 1 : 0;
     const temporaryRank = major.temporary ? (major.priorityOverSchedule ? 100 : -100) : 0;
     const priorityRank = scopePriority + temporaryRank;
-    return major.items.filter(item => item.enabled && itemAppliesToScope(item)).map(item => ({ ...item, kind: 'major' as const, majorExamId: major.id, majorName: major.name, priorityRank }));
+    return major.items
+      .filter((item) => item.enabled && itemAppliesToScope(item))
+      .map((item) => ({ ...item, kind: 'major' as const, majorExamId: major.id, majorName: major.name, priorityRank }));
   });
   // 同时存在全校、年级和班级安排时，仅在实际时间重叠处使用更具体的安排；
   // 临时统一考试默认低于正式大型考试；只有明确勾选优先覆盖时才在重叠时段覆盖正式考试。
-  const majorItems = sortExamItemsByTime(candidates.filter(item => !candidates.some(other => other.priorityRank > item.priorityRank && isTimeOverlap(parseZonedTime(item.startTime), parseZonedTime(item.endTime), parseZonedTime(other.startTime), parseZonedTime(other.endTime)))).map(({ priorityRank: _priorityRank, ...item }) => item));
+  const majorItems = sortExamItemsByTime(
+    candidates
+      .filter(
+        (item) =>
+          !candidates.some(
+            (other) =>
+              other.priorityRank > item.priorityRank &&
+              isTimeOverlap(
+                parseZonedTime(item.startTime),
+                parseZonedTime(item.endTime),
+                parseZonedTime(other.startTime),
+                parseZonedTime(other.endTime),
+              ),
+          ),
+      )
+      .map(({ priorityRank: _priorityRank, ...item }) => item),
+  );
 
-  const classPlanId = selectedClassId
-    ? data.activeWeeklyPlanIdByClassId?.[selectedClassId]
-    : data.activeWeeklyPlanId;
-  const activePlan = data.weeklyPlans.find(p => p && p.id === classPlanId && p.classId === selectedClassId)
-    ?? data.weeklyPlans.find(p => p && p.classId === selectedClassId)
-    ?? data.weeklyPlans.find(p => p && p.id === classPlanId)
-    ?? null;
+  const classPlanId = selectedClassId ? data.activeWeeklyPlanIdByClassId?.[selectedClassId] : data.activeWeeklyPlanId;
+  const activePlan =
+    data.weeklyPlans.find((p) => p && p.id === classPlanId && p.classId === selectedClassId) ??
+    data.weeklyPlans.find((p) => p && p.classId === selectedClassId) ??
+    data.weeklyPlans.find((p) => p && p.id === classPlanId) ??
+    null;
   const weeklyOccurrences = resolveWeeklyOccurrences(activePlan, now, options);
 
   if (data.scheduleMode === 'major-only') {
@@ -238,10 +274,15 @@ export function resolveEffectiveSchedule(
 
   // automatic
   const policy = data.weeklyConflictPolicy ?? DEFAULT_WEEKLY_CONFLICT_POLICY;
-  const visibleIds = new Set(majorItems.map(item => item.majorExamId));
+  const visibleIds = new Set(majorItems.map((item) => item.majorExamId));
   const majorBlocks: MajorScheduleBlock[] = applicableMajors
-    .filter(major => visibleIds.has(major.id))
-    .map(major => ({ id: major.id, name: major.name, items: majorItems.filter(item => item.majorExamId === major.id), policy }));
+    .filter((major) => visibleIds.has(major.id))
+    .map((major) => ({
+      id: major.id,
+      name: major.name,
+      items: majorItems.filter((item) => item.majorExamId === major.id),
+      policy,
+    }));
 
   const { activeWeekly, suppressedWeekly, conflicts } = resolveMajorWeeklyConflicts(majorBlocks, weeklyOccurrences);
   return {

@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import React, { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   adminCan,
   getAdminUser,
@@ -7,50 +7,48 @@ import {
   isLoginRequired,
   refreshAdminUser,
   type AdminUserContext,
-} from "../services/examService";
-import BatchPresetSettingsPanel from "../components/BatchPresetSettingsPanel";
-import LoadingState from "../components/LoadingState";
-import { APP_VERSION } from "../services/telemetry";
-import "../styles/settings.css";
-import AccessDenied from "../components/AccessDenied";
-import AboutSection from "../components/settings/AboutSection";
-import AnnouncementsSection from "../components/settings/AnnouncementsSection";
-import TelemetrySection from "../components/settings/TelemetrySection";
-import DeploymentSection from "../components/settings/DeploymentSection";
-import SchoolInfoSection from "../components/settings/SchoolInfoSection";
-import EmailServiceSection from "../components/settings/EmailServiceSection";
-import WeeklyCalendarSection from "../components/settings/WeeklyCalendarSection";
-import SubjectTrackModeSection from "../components/settings/SubjectTrackModeSection";
-import TimeSyncSection from "../components/settings/TimeSyncSection";
-import AlertsAdvancedSection from "../components/settings/AlertsAdvancedSection";
-import DataMaintenanceSection from "../components/settings/DataMaintenanceSection";
-import SettingsGroupNav from "../components/settings/SettingsGroupNav";
-import SettingsCollapsibleCard from "../components/settings/SettingsCollapsibleCard";
-import SystemStatusSection from "../components/settings/SystemStatusSection";
-import { ArrowLeft, DatabaseZap, ListChecks, RadioTower, Rocket } from "lucide-react";
+} from '../services/examService';
+import BatchPresetSettingsPanel from '../components/BatchPresetSettingsPanel';
+import LoadingState from '../components/LoadingState';
+import { APP_VERSION } from '../services/telemetry';
+import '../styles/settings.css';
+import AccessDenied from '../components/AccessDenied';
+import AboutSection from '../components/settings/AboutSection';
+import AnnouncementsSection from '../components/settings/AnnouncementsSection';
+import TelemetrySection from '../components/settings/TelemetrySection';
+import DeploymentSection from '../components/settings/DeploymentSection';
+import SchoolInfoSection from '../components/settings/SchoolInfoSection';
+import EmailServiceSection from '../components/settings/EmailServiceSection';
+import WeeklyCalendarSection from '../components/settings/WeeklyCalendarSection';
+import SubjectTrackModeSection from '../components/settings/SubjectTrackModeSection';
+import TimeSyncSection from '../components/settings/TimeSyncSection';
+import AlertsAdvancedSection from '../components/settings/AlertsAdvancedSection';
+import DataMaintenanceSection from '../components/settings/DataMaintenanceSection';
+import SettingsGroupNav from '../components/settings/SettingsGroupNav';
+import SettingsCollapsibleCard from '../components/settings/SettingsCollapsibleCard';
+import SystemStatusSection from '../components/settings/SystemStatusSection';
+import { ArrowLeft, DatabaseZap, ListChecks, RadioTower, Rocket } from 'lucide-react';
 
 export default function SettingsPage() {
   const navigate = useNavigate();
   // 已有本地令牌时立即展示页面，跳过鉴权网络往返（数据库在新加坡、服务器在美国，
   // 跨洲往返会造成数秒白屏）；无令牌时才等待是否需要登录的判断。
   const [authed, setAuthed] = useState(() => hasValidLocalToken());
-  const [adminUser, setAdminUser] = useState<AdminUserContext | null>(() =>
-    getAdminUser(),
-  );
+  const [adminUser, setAdminUser] = useState<AdminUserContext | null>(() => getAdminUser());
   const [denied, setDenied] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
     if (hasValidLocalToken()) {
       refreshAdminUser().then((user) => {
         if (!user) {
-          navigate("/login?next=/settings", { replace: true });
+          navigate('/login?next=/settings', { replace: true });
           return;
         }
         if (user.mustChangePassword) {
-          navigate("/admin?tab=users&password=1", { replace: true });
+          navigate('/admin?tab=users&password=1', { replace: true });
           return;
         }
-        if (!adminCan("settings.read", user)) {
+        if (!adminCan('settings.read', user)) {
           setAdminUser(user);
           setAuthed(true);
           setDenied(true);
@@ -63,7 +61,7 @@ export default function SettingsPage() {
     }
     isLoginRequired().then((required) => {
       if (!required) setAuthed(true);
-      else navigate("/login?next=/settings", { replace: true });
+      else navigate('/login?next=/settings', { replace: true });
     });
   }, [navigate]);
   useEffect(() => {
@@ -72,50 +70,32 @@ export default function SettingsPage() {
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
-  const canEditSettings = adminUser
-    ? adminCan("settings.edit", adminUser)
-    : !hasValidLocalToken();
-  const canEditPresets = adminUser
-    ? adminCan("majorBatch.preset_edit", adminUser)
-    : !hasValidLocalToken();
-  const canEditWeekly = adminUser
-    ? adminCan("weekly.edit", adminUser)
-    : !hasValidLocalToken();
-  const canReadAlerts = adminUser
-    ? adminCan("alerts.read", adminUser)
-    : !hasValidLocalToken();
-  const canEditAlerts = adminUser
-    ? adminCan("alerts.edit", adminUser)
-    : !hasValidLocalToken();
-  const canEditSchool = adminUser
-    ? adminCan("initialization.run", adminUser)
-    : !hasValidLocalToken();
-  const canResetDatabase = adminUser
-    ? adminUser.permissions.includes("*")
-    : !hasValidLocalToken();
+  const canEditSettings = adminUser ? adminCan('settings.edit', adminUser) : !hasValidLocalToken();
+  const canEditPresets = adminUser ? adminCan('majorBatch.preset_edit', adminUser) : !hasValidLocalToken();
+  const canEditWeekly = adminUser ? adminCan('weekly.edit', adminUser) : !hasValidLocalToken();
+  const canReadAlerts = adminUser ? adminCan('alerts.read', adminUser) : !hasValidLocalToken();
+  const canEditAlerts = adminUser ? adminCan('alerts.edit', adminUser) : !hasValidLocalToken();
+  const canEditSchool = adminUser ? adminCan('initialization.run', adminUser) : !hasValidLocalToken();
+  const canResetDatabase = adminUser ? adminUser.permissions.includes('*') : !hasValidLocalToken();
   const hasAnyEditable =
     canEditSettings || canEditPresets || canEditWeekly || canEditAlerts || canEditSchool || canResetDatabase;
 
   const groups = [
-    { id: "basic", label: "基础信息" },
-    { id: "account", label: "登录与账号" },
-    { id: "exam", label: "考试与排课" },
-    { id: "runtime", label: "系统运行" },
-    ...(canResetDatabase ? [{ id: "maintenance", label: "数据与维护" }] : []),
+    { id: 'basic', label: '基础信息' },
+    { id: 'account', label: '登录与账号' },
+    { id: 'exam', label: '考试与排课' },
+    { id: 'runtime', label: '系统运行' },
+    ...(canResetDatabase ? [{ id: 'maintenance', label: '数据与维护' }] : []),
   ];
 
   if (!authed) return <LoadingState kind="auth" title="正在获取权限" message="正在确认系统设置权限…" />;
-  if (denied)
-    return (
-      <AccessDenied moduleName="系统设置" onBack={() => navigate("/admin")} />
-    );
-
+  if (denied) return <AccessDenied moduleName="系统设置" onBack={() => navigate('/admin')} />;
 
   return (
-    <div className={"set-page" + (scrolled ? " is-scrolled" : "")}>
+    <div className={'set-page' + (scrolled ? ' is-scrolled' : '')}>
       <header className="set-header">
         <div className="set-header__left">
-          <button className="set-back" onClick={() => navigate("/admin")}>
+          <button className="set-back" onClick={() => navigate('/admin')}>
             <ArrowLeft aria-hidden="true" />
             返回管理
           </button>
@@ -148,13 +128,13 @@ export default function SettingsPage() {
             {canEditSchool && <SchoolInfoSection canEditSchool={canEditSchool} />}
             {canResetDatabase && <SystemStatusSection />}
             {canEditSettings && (
-            <SettingsCollapsibleCard
-              storageKey="novora_set_collapse_deploy"
-              title="版本与更新"
-              icon={<Rocket size={18} />}
-            >
-              <DeploymentSection adminUser={adminUser} />
-            </SettingsCollapsibleCard>
+              <SettingsCollapsibleCard
+                storageKey="novora_set_collapse_deploy"
+                title="版本与更新"
+                icon={<Rocket size={18} />}
+              >
+                <DeploymentSection adminUser={adminUser} />
+              </SettingsCollapsibleCard>
             )}
             <AnnouncementsSection />
           </div>
@@ -164,10 +144,7 @@ export default function SettingsPage() {
           <h2 className="set-group__title">登录与账号</h2>
           <div className="set-group__body">
             {(canEditSettings || canResetDatabase) && (
-            <EmailServiceSection
-              canEditSettings={canEditSettings}
-              canEditPolicy={canResetDatabase}
-            />
+              <EmailServiceSection canEditSettings={canEditSettings} canEditPolicy={canResetDatabase} />
             )}
           </div>
         </section>
@@ -180,16 +157,16 @@ export default function SettingsPage() {
 
             {/* ―― 批量添加分考试预设 ―― */}
             {canEditPresets && (
-            <section className="set-card">
-              <h2 className="set-card__title">
-                <ListChecks size={18} />
-                批量添加分考试预设
-              </h2>
-              <p className="set-note">
-                管理批量添加分考试时可复用的常用科目组和常用时间组，与批量添加弹窗中的设置共享，可在此新建、排序或删除。
-              </p>
-              <BatchPresetSettingsPanel canEdit={canEditPresets} />
-            </section>
+              <section className="set-card">
+                <h2 className="set-card__title">
+                  <ListChecks size={18} />
+                  批量添加分考试预设
+                </h2>
+                <p className="set-note">
+                  管理批量添加分考试时可复用的常用科目组和常用时间组，与批量添加弹窗中的设置共享，可在此新建、排序或删除。
+                </p>
+                <BatchPresetSettingsPanel canEdit={canEditPresets} />
+              </section>
             )}
           </div>
         </section>
@@ -199,20 +176,20 @@ export default function SettingsPage() {
           <div className="set-group__body">
             {canEditSettings && <TimeSyncSection canEditSettings={canEditSettings} />}
             {canEditAlerts ? (
-            <AlertsAdvancedSection
-              canReadAlerts={canReadAlerts}
-              canEditAlerts={canEditAlerts}
-              canEditSettings={canEditSettings}
-            />
+              <AlertsAdvancedSection
+                canReadAlerts={canReadAlerts}
+                canEditAlerts={canEditAlerts}
+                canEditSettings={canEditSettings}
+              />
             ) : null}
             {canEditSettings && (
-            <SettingsCollapsibleCard
-              storageKey="novora_set_collapse_telemetry"
-              title="使用遥测"
-              icon={<RadioTower size={18} />}
-            >
-              <TelemetrySection canEditSettings={canEditSettings} />
-            </SettingsCollapsibleCard>
+              <SettingsCollapsibleCard
+                storageKey="novora_set_collapse_telemetry"
+                title="使用遥测"
+                icon={<RadioTower size={18} />}
+              >
+                <TelemetrySection canEditSettings={canEditSettings} />
+              </SettingsCollapsibleCard>
             )}
           </div>
         </section>

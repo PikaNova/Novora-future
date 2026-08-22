@@ -28,7 +28,19 @@ function formatClock(epochMs: number): string {
   if (!Number.isFinite(epochMs) || epochMs <= 0) return '—';
   const date = new Date(epochMs);
   const pad = (n: number) => String(n).padStart(2, '0');
-  return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate()) + ' ' + pad(date.getHours()) + ':' + pad(date.getMinutes()) + ':' + pad(date.getSeconds());
+  return (
+    date.getFullYear() +
+    '-' +
+    pad(date.getMonth() + 1) +
+    '-' +
+    pad(date.getDate()) +
+    ' ' +
+    pad(date.getHours()) +
+    ':' +
+    pad(date.getMinutes()) +
+    ':' +
+    pad(date.getSeconds())
+  );
 }
 
 function latencyTone(ms: number | null): string {
@@ -81,7 +93,6 @@ function SystemStatusBody() {
     void load();
     const timer = window.setInterval(() => void load(true), 10_000);
     return () => window.clearInterval(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (loading && !data) {
@@ -102,10 +113,13 @@ function SystemStatusBody() {
   const queueWarn = data.mailQueue.failed > 0 || data.mailQueue.pending > 20;
   const dbTone: 'ok' | 'err' | 'warn' = !data.database.reachable ? 'err' : !data.database.schemaOk ? 'warn' : 'ok';
   const events = data.events.slice(0, 5);
-  const memUsage =
-    data.server.memory.total > 0 ? (1 - data.server.memory.free / data.server.memory.total) * 100 : null;
+  const memUsage = data.server.memory.total > 0 ? (1 - data.server.memory.free / data.server.memory.total) * 100 : null;
   const loadText =
-    data.server.cpu.load1.toFixed(2) + ' / ' + data.server.cpu.load5.toFixed(2) + ' / ' + data.server.cpu.load15.toFixed(2);
+    data.server.cpu.load1.toFixed(2) +
+    ' / ' +
+    data.server.cpu.load5.toFixed(2) +
+    ' / ' +
+    data.server.cpu.load15.toFixed(2);
 
   return (
     <div className="system-status">
@@ -120,7 +134,13 @@ function SystemStatusBody() {
         <div className="system-status__summary-item">
           <StatusDot tone={dbTone} />
           <span>数据库</span>
-          <b>{data.database.reachable ? (data.database.latencyMs != null ? data.database.latencyMs + ' ms' : '正常') : '不可达'}</b>
+          <b>
+            {data.database.reachable
+              ? data.database.latencyMs != null
+                ? data.database.latencyMs + ' ms'
+                : '正常'
+              : '不可达'}
+          </b>
         </div>
         <div className="system-status__summary-item">
           <StatusDot tone={queueWarn ? 'warn' : 'ok'} />
@@ -143,32 +163,87 @@ function SystemStatusBody() {
         <section className="system-status__section">
           <h3>服务</h3>
           <ul className="set-status__list">
-            <li><span>应用版本</span><b>v{data.service.version === 'unknown' ? APP_VERSION : data.service.version}</b></li>
-            <li><span>平台 / 架构</span><b>{data.server.platform} / {data.server.arch}</b></li>
-            <li><span>运行时长</span><b>{formatUptime(data.server.uptimeSeconds)}</b></li>
-            <li><span>CPU 使用率</span><b>{formatPercent(data.server.cpu.usagePercent)}</b></li>
-            <li><span>负载（1/5/15 分钟）</span><b>{loadText}</b></li>
-            <li><span>内存使用率</span><b>{formatPercent(memUsage)}</b></li>
-            <li><span>内存（已用 / 总量）</span><b>{formatBytes(data.server.memory.total > 0 ? data.server.memory.total - data.server.memory.free : 0)} / {formatBytes(data.server.memory.total)}</b></li>
-            <li><span>内存占用</span><b className="system-status__usage-cell"><UsageBar value={memUsage} /></b></li>
+            <li>
+              <span>应用版本</span>
+              <b>v{data.service.version === 'unknown' ? APP_VERSION : data.service.version}</b>
+            </li>
+            <li>
+              <span>平台 / 架构</span>
+              <b>
+                {data.server.platform} / {data.server.arch}
+              </b>
+            </li>
+            <li>
+              <span>运行时长</span>
+              <b>{formatUptime(data.server.uptimeSeconds)}</b>
+            </li>
+            <li>
+              <span>CPU 使用率</span>
+              <b>{formatPercent(data.server.cpu.usagePercent)}</b>
+            </li>
+            <li>
+              <span>负载（1/5/15 分钟）</span>
+              <b>{loadText}</b>
+            </li>
+            <li>
+              <span>内存使用率</span>
+              <b>{formatPercent(memUsage)}</b>
+            </li>
+            <li>
+              <span>内存（已用 / 总量）</span>
+              <b>
+                {formatBytes(data.server.memory.total > 0 ? data.server.memory.total - data.server.memory.free : 0)} /{' '}
+                {formatBytes(data.server.memory.total)}
+              </b>
+            </li>
+            <li>
+              <span>内存占用</span>
+              <b className="system-status__usage-cell">
+                <UsageBar value={memUsage} />
+              </b>
+            </li>
           </ul>
         </section>
 
         <section className="system-status__section">
           <h3>数据库</h3>
           <ul className="set-status__list">
-            <li><span>连通性</span><b>{data.database.reachable ? '正常' : '异常'}</b></li>
-            <li><span>往返延迟</span><b className={'system-status__latency ' + latencyTone(data.database.latencyMs)}>{data.database.latencyMs != null ? data.database.latencyMs + ' ms' : '—'}</b></li>
-            <li><span>数据库大小</span><b>{formatBytes(data.database.sizeBytes ?? -1)}</b></li>
-            <li><span>连接（活跃 / 上限）</span><b>{data.database.activeConnections != null ? data.database.activeConnections + ' / ' + (data.database.maxConnections ?? '—') : '—'}</b></li>
+            <li>
+              <span>连通性</span>
+              <b>{data.database.reachable ? '正常' : '异常'}</b>
+            </li>
+            <li>
+              <span>往返延迟</span>
+              <b className={'system-status__latency ' + latencyTone(data.database.latencyMs)}>
+                {data.database.latencyMs != null ? data.database.latencyMs + ' ms' : '—'}
+              </b>
+            </li>
+            <li>
+              <span>数据库大小</span>
+              <b>{formatBytes(data.database.sizeBytes ?? -1)}</b>
+            </li>
+            <li>
+              <span>连接（活跃 / 上限）</span>
+              <b>
+                {data.database.activeConnections != null
+                  ? data.database.activeConnections + ' / ' + (data.database.maxConnections ?? '—')
+                  : '—'}
+              </b>
+            </li>
           </ul>
         </section>
 
         <section className="system-status__section">
           <h3>邮件队列</h3>
           <ul className="set-status__list">
-            <li><span>待发</span><b>{data.mailQueue.pending}</b></li>
-            <li><span>失败</span><b className={data.mailQueue.failed > 0 ? 'is-err-text' : ''}>{data.mailQueue.failed}</b></li>
+            <li>
+              <span>待发</span>
+              <b>{data.mailQueue.pending}</b>
+            </li>
+            <li>
+              <span>失败</span>
+              <b className={data.mailQueue.failed > 0 ? 'is-err-text' : ''}>{data.mailQueue.failed}</b>
+            </li>
           </ul>
         </section>
 

@@ -17,15 +17,28 @@ export default function SettingsCollapsibleCard({
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(() => {
-    try { return localStorage.getItem(storageKey) === '1'; } catch { return false; }
+    try {
+      return localStorage.getItem(storageKey) === '1';
+    } catch {
+      return false;
+    }
   });
   useEffect(() => {
-    try { localStorage.setItem(storageKey, open ? '1' : '0'); } catch { /* 忽略存储异常 */ }
+    try {
+      localStorage.setItem(storageKey, open ? '1' : '0');
+    } catch {
+      /* 忽略存储异常 */
+    }
   }, [open, storageKey]);
 
   return (
     <section className={'set-card set-collapse' + (danger ? ' set-collapse--danger' : '')}>
-      <button type="button" className="set-collapse__toggle" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
+      <button
+        type="button"
+        className="set-collapse__toggle"
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+      >
         <span className="set-collapse__label">
           {icon}
           <span className="set-collapse__title">{title}</span>

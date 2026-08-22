@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import AdminModalPortal from "./AdminModalPortal";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import AdminModalPortal from './AdminModalPortal';
 import {
   Activity,
   AlertTriangle,
@@ -11,33 +11,26 @@ import {
   MonitorCheck,
   X,
   Zap,
-} from "lucide-react";
-import type { MajorExam } from "../types";
-import { findMajorConflicts } from "../utils/examConflicts";
-import type { WeeklyPlan } from "../types/exam";
-import type { SchoolClass, SchoolGrade } from "../types/school";
-import {
-  fetchExamsFromServer,
-  type AdminUserContext,
-  type ExamPayload,
-} from "../services/examService";
-import {
-  fetchDeviceBindings,
-  type DeviceBindingInfo,
-} from "../services/classBinding";
-import { fetchAuditOverview, type AuditLog, type LoginFailureAlert } from "../services/adminUsers";
-import { getQuickMajorDisplayStatus } from "../utils/majorDisplayStatus";
-import "../styles/admin-design.css";
+} from 'lucide-react';
+import type { MajorExam } from '../types';
+import { findMajorConflicts } from '../utils/examConflicts';
+import type { WeeklyPlan } from '../types/exam';
+import type { SchoolClass, SchoolGrade } from '../types/school';
+import { fetchExamsFromServer, type AdminUserContext, type ExamPayload } from '../services/examService';
+import { fetchDeviceBindings, type DeviceBindingInfo } from '../services/classBinding';
+import { fetchAuditOverview, type AuditLog, type LoginFailureAlert } from '../services/adminUsers';
+import { getQuickMajorDisplayStatus } from '../utils/majorDisplayStatus';
+import '../styles/admin-design.css';
 
 const ONLINE_MS = 90_000;
-type OverviewDetail = "online" | "majors" | "database" | "attention";
+type OverviewDetail = 'online' | 'majors' | 'database' | 'attention';
 const HIGH_RISK_ACTIONS = new Set([
-  "database.reset",
-  "device.revoke",
-  "user.delete",
-  "user.password.reset",
-  "user.credentials.change",
-  "role.delete",
+  'database.reset',
+  'device.revoke',
+  'user.delete',
+  'user.password.reset',
+  'user.credentials.change',
+  'role.delete',
 ]);
 
 function useCountUp(value: number, duration = 700): number {
@@ -62,46 +55,46 @@ function useCountUp(value: number, duration = 700): number {
 }
 
 function formatDetailTime(value: unknown) {
-  const numeric = typeof value === "number" ? value : Number(value);
+  const numeric = typeof value === 'number' ? value : Number(value);
   const normalized = Number.isFinite(numeric) && numeric > 0 && numeric < 10_000_000_000 ? numeric * 1000 : numeric;
-  if (!Number.isFinite(normalized)) return "时间未知";
+  if (!Number.isFinite(normalized)) return '时间未知';
   const date = new Date(normalized);
-  if (!Number.isFinite(date.getTime())) return "时间未知";
-  return date.toLocaleString("zh-CN", { hour12: false });
+  if (!Number.isFinite(date.getTime())) return '时间未知';
+  return date.toLocaleString('zh-CN', { hour12: false });
 }
 
-function auditDetailSummary(detail: unknown, fallback = "云端数据已更新") {
-  if (!detail || typeof detail !== "object" || Array.isArray(detail)) return fallback;
+function auditDetailSummary(detail: unknown, fallback = '云端数据已更新') {
+  if (!detail || typeof detail !== 'object' || Array.isArray(detail)) return fallback;
   const source = detail as Record<string, unknown>;
   const parts: string[] = [];
   const updatedAt = source.updatedAt ?? source.updated_at;
   if (updatedAt) parts.push(`更新时间 ${formatDetailTime(updatedAt)}`);
-  const names = ["majorName", "className", "gradeName", "subject", "title"]
+  const names = ['majorName', 'className', 'gradeName', 'subject', 'title']
     .map((key) => source[key])
-    .filter((value): value is string => typeof value === "string" && value.trim().length > 0);
-  if (names.length) parts.push(names.slice(0, 2).join(" · "));
-  const countKeys = ["count", "added", "removed", "updated", "items"];
+    .filter((value): value is string => typeof value === 'string' && value.trim().length > 0);
+  if (names.length) parts.push(names.slice(0, 2).join(' · '));
+  const countKeys = ['count', 'added', 'removed', 'updated', 'items'];
   countKeys.forEach((key) => {
     const value = source[key];
     if (Number.isFinite(Number(value))) parts.push(`${key}: ${value}`);
   });
-  return parts.length ? parts.slice(0, 3).join("；") : fallback;
+  return parts.length ? parts.slice(0, 3).join('；') : fallback;
 }
 
 function cloudChangeLabel(log: AuditLog) {
-  if (log.action === "exam-data.update") return "同步了考试、班级或系统设置改动";
-  if (log.action === "database.reset") return "执行了数据重置";
+  if (log.action === 'exam-data.update') return '同步了考试、班级或系统设置改动';
+  if (log.action === 'database.reset') return '执行了数据重置';
   return log.action;
 }
 
 function highRiskLabel(log: AuditLog) {
   const labels: Record<string, string> = {
-    "database.reset": "重置了数据库数据",
-    "device.revoke": "撤销了设备绑定",
-    "user.delete": "删除了管理账号",
-    "user.password.reset": "重置了管理账号密码",
-    "user.credentials.change": "修改了账号凭据",
-    "role.delete": "删除了用户角色",
+    'database.reset': '重置了数据库数据',
+    'device.revoke': '撤销了设备绑定',
+    'user.delete': '删除了管理账号',
+    'user.password.reset': '重置了管理账号密码',
+    'user.credentials.change': '修改了账号凭据',
+    'role.delete': '删除了用户角色',
   };
   return labels[log.action] || log.action;
 }
@@ -128,41 +121,27 @@ export default function OverviewPanel({
   onQuickPublish,
 }: Props) {
   const [devices, setDevices] = useState<DeviceBindingInfo[]>([]);
-  const [deviceError, setDeviceError] = useState("");
+  const [deviceError, setDeviceError] = useState('');
   const [now, setNow] = useState(Date.now());
   const [detailOpen, setDetailOpen] = useState<OverviewDetail | null>(null);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [loginFailureAlerts, setLoginFailureAlerts] = useState<LoginFailureAlert[]>([]);
   const [auditLoading, setAuditLoading] = useState(false);
-  const [auditError, setAuditError] = useState("");
+  const [auditError, setAuditError] = useState('');
   const [cloudSnapshot, setCloudSnapshot] = useState<ExamPayload | null>(null);
-
-
-
 
   const liveGrades = cloudSnapshot?.grades ?? grades;
   const liveClasses = cloudSnapshot?.classes ?? classes;
   const liveMajors = cloudSnapshot?.majors ?? majors;
   const liveWeeklyPlans = cloudSnapshot?.weeklyPlans ?? weeklyPlans;
   const scope = useMemo(() => {
-    if (
-      user.permissions.includes("*") ||
-      user.scopes.some((item) => item.type === "all")
-    )
+    if (user.permissions.includes('*') || user.scopes.some((item) => item.type === 'all'))
       return {
         gradeIds: new Set(liveGrades.map((item) => item.id)),
         classIds: new Set(liveClasses.map((item) => item.id)),
       };
-    const gradeIds = new Set(
-      user.scopes
-        .filter((item) => item.type === "grade")
-        .map((item) => item.gradeId),
-    );
-    const classIds = new Set(
-      user.scopes
-        .filter((item) => item.type === "class")
-        .map((item) => item.classId),
-    );
+    const gradeIds = new Set(user.scopes.filter((item) => item.type === 'grade').map((item) => item.gradeId));
+    const classIds = new Set(user.scopes.filter((item) => item.type === 'class').map((item) => item.classId));
     liveClasses.forEach((item) => {
       if (gradeIds.has(item.gradeId)) classIds.add(item.id);
     });
@@ -172,14 +151,10 @@ export default function OverviewPanel({
   const loadDevices = useCallback(async () => {
     try {
       const result = await fetchDeviceBindings();
-      setDevices(
-        result.bindings.filter((item) => scope.classIds.has(item.classId)),
-      );
-      setDeviceError("");
+      setDevices(result.bindings.filter((item) => scope.classIds.has(item.classId)));
+      setDeviceError('');
     } catch (error) {
-      setDeviceError(
-        error instanceof Error ? error.message : "设备状态读取失败",
-      );
+      setDeviceError(error instanceof Error ? error.message : '设备状态读取失败');
     }
   }, [scope]);
 
@@ -205,29 +180,17 @@ export default function OverviewPanel({
   }, [loadCloudOverview, loadDevices]);
 
   const majorVisibleToScope = (major: MajorExam) => {
-    const gradeVisible =
-      !major.targetGradeIds?.length ||
-      major.targetGradeIds.some((id) => scope.gradeIds.has(id));
-    const classVisible =
-      !major.targetClassIds?.length ||
-      major.targetClassIds.some((id) => scope.classIds.has(id));
+    const gradeVisible = !major.targetGradeIds?.length || major.targetGradeIds.some((id) => scope.gradeIds.has(id));
+    const classVisible = !major.targetClassIds?.length || major.targetClassIds.some((id) => scope.classIds.has(id));
     return gradeVisible && classVisible;
   };
   const scopedMajors = liveMajors.filter(majorVisibleToScope);
   const activeMajors = scopedMajors.filter((major) =>
-    major.items.some(
-      (item) => item.enabled && new Date(item.endTime).getTime() >= now,
-    ),
+    major.items.some((item) => item.enabled && new Date(item.endTime).getTime() >= now),
   );
-  const scopedPlans = liveWeeklyPlans.filter((plan) =>
-    scope.classIds.has(plan.classId),
-  );
-  const onlineDevices = devices.filter(
-    (item) => !item.revoked && now - item.lastSeenAt <= ONLINE_MS,
-  );
-  const runningDevices = onlineDevices.filter(
-    (item) => item.status === "exam-running",
-  );
+  const scopedPlans = liveWeeklyPlans.filter((plan) => scope.classIds.has(plan.classId));
+  const onlineDevices = devices.filter((item) => !item.revoked && now - item.lastSeenAt <= ONLINE_MS);
+  const runningDevices = onlineDevices.filter((item) => item.status === 'exam-running');
   const majorConflicts = findMajorConflicts(activeMajors);
   const quickMajorDisplayStatuses: Array<{
     major: MajorExam;
@@ -239,17 +202,11 @@ export default function OverviewPanel({
     const status = getQuickMajorDisplayStatus(major, scopedMajors, now, liveClasses);
     if (status) quickMajorDisplayStatuses.push({ major, status });
   });
-  const canReadAudit =
-    user.permissions.includes("*") || user.permissions.includes("audit.read");
+  const canReadAudit = user.permissions.includes('*') || user.permissions.includes('audit.read');
   const cloudChangeLogs = auditLogs
-    .filter(
-      (item) =>
-        item.action === "exam-data.update" || item.action === "database.reset",
-    )
+    .filter((item) => item.action === 'exam-data.update' || item.action === 'database.reset')
     .slice(0, 12);
-  const highRiskLogs = auditLogs
-    .filter((item) => HIGH_RISK_ACTIONS.has(item.action))
-    .slice(0, 12);
+  const highRiskLogs = auditLogs.filter((item) => HIGH_RISK_ACTIONS.has(item.action)).slice(0, 12);
   const activeErrorCount =
     (deviceError ? 1 : 0) +
     (auditError ? 1 : 0) +
@@ -257,26 +214,24 @@ export default function OverviewPanel({
     majorConflicts.length;
   const riskCount = highRiskLogs.length + activeErrorCount + loginFailureAlerts.length;
   const detailTitle =
-    detailOpen === "online"
-      ? "在线设备"
-      : detailOpen === "majors"
-        ? "待执行大型考试"
-        : detailOpen === "database"
-          ? "数据库状态"
-          : "最近高风险操作";
+    detailOpen === 'online'
+      ? '在线设备'
+      : detailOpen === 'majors'
+        ? '待执行大型考试'
+        : detailOpen === 'database'
+          ? '数据库状态'
+          : '最近高风险操作';
 
   const loadAuditLogs = useCallback(async () => {
     if (!canReadAudit) return;
     setAuditLoading(true);
-    setAuditError("");
+    setAuditError('');
     try {
       const overview = await fetchAuditOverview();
       setAuditLogs(overview.logs);
       setLoginFailureAlerts(overview.loginFailureAlerts);
     } catch (error) {
-      setAuditError(
-        error instanceof Error ? error.message : "云端变更记录读取失败",
-      );
+      setAuditError(error instanceof Error ? error.message : '云端变更记录读取失败');
     } finally {
       setAuditLoading(false);
     }
@@ -306,14 +261,10 @@ export default function OverviewPanel({
       <header className="ovd__head">
         <div className="ovd__title">
           <span>项目运行情况</span>
-          <h2>
-            {user.roleId === "super_admin"
-              ? "全校仪表盘"
-              : "管理年级仪表盘"}
-          </h2>
+          <h2>{user.roleId === 'super_admin' ? '全校仪表盘' : '管理年级仪表盘'}</h2>
         </div>
         <div className="ovd__actions">
-          <strong className={`ovd-sync${online ? " is-ok" : " is-warn"}`}>
+          <strong className={`ovd-sync${online ? ' is-ok' : ' is-warn'}`}>
             <i aria-hidden="true" />
             {syncLabel}
           </strong>
@@ -321,47 +272,59 @@ export default function OverviewPanel({
       </header>
 
       <section className="ovd-capsules" aria-label="核心状态">
-        <button type="button" className="ovd-capsule is-live" onClick={() => openDetail("online")}>
-          <span className="ovd-capsule__icon"><MonitorCheck size={18} /></span>
+        <button type="button" className="ovd-capsule is-live" onClick={() => openDetail('online')}>
+          <span className="ovd-capsule__icon">
+            <MonitorCheck size={18} />
+          </span>
           <span className="ovd-capsule__body">
             <small>在线设备</small>
             <strong>{displayOnline}</strong>
-            <em>共 {devices.length} 台 · {runningDevices.length} 台考试中</em>
+            <em>
+              共 {devices.length} 台 · {runningDevices.length} 台考试中
+            </em>
           </span>
         </button>
-        <button type="button" className="ovd-capsule" onClick={() => openDetail("majors")}>
-          <span className="ovd-capsule__icon"><CalendarClock size={18} /></span>
+        <button type="button" className="ovd-capsule" onClick={() => openDetail('majors')}>
+          <span className="ovd-capsule__icon">
+            <CalendarClock size={18} />
+          </span>
           <span className="ovd-capsule__body">
             <small>待执行大型考试</small>
             <strong>{displayMajors}</strong>
             <em>{displayPlans} 个启用周测计划</em>
           </span>
         </button>
-        <button type="button" className="ovd-capsule" onClick={() => openDetail("database")}>
-          <span className="ovd-capsule__icon"><Database size={18} /></span>
+        <button type="button" className="ovd-capsule" onClick={() => openDetail('database')}>
+          <span className="ovd-capsule__icon">
+            <Database size={18} />
+          </span>
           <span className="ovd-capsule__body">
             <small>数据库状态</small>
-            <strong>{deviceError ? "连接异常" : "连接正常"}</strong>
-            <em>{displayGrades} 个年级 · {displayClasses} 个班级</em>
+            <strong>{deviceError ? '连接异常' : '连接正常'}</strong>
+            <em>
+              {displayGrades} 个年级 · {displayClasses} 个班级
+            </em>
           </span>
         </button>
         <button
           type="button"
-          className={`ovd-capsule${riskCount ? " is-warn" : ""}`}
-          onClick={() => openDetail("attention")}
+          className={`ovd-capsule${riskCount ? ' is-warn' : ''}`}
+          onClick={() => openDetail('attention')}
         >
-          <span className="ovd-capsule__icon"><AlertTriangle size={18} /></span>
+          <span className="ovd-capsule__icon">
+            <AlertTriangle size={18} />
+          </span>
           <span className="ovd-capsule__body">
             <small>最近高风险操作</small>
             <strong>{displayRisk}</strong>
             <em>
               {activeErrorCount
-                ? "存在同步、设备或排期异常"
+                ? '存在同步、设备或排期异常'
                 : loginFailureAlerts.length
                   ? `${loginFailureAlerts.length} 个账号登录失败预警`
                   : highRiskLogs.length
                     ? `${highRiskLogs.length} 条近期操作记录`
-                    : "暂无高风险操作"}
+                    : '暂无高风险操作'}
             </em>
           </span>
         </button>
@@ -395,18 +358,19 @@ export default function OverviewPanel({
       <section className="ovd-panels">
         <section className="ovd-panel">
           <header>
-            <h3><Activity size={15} /> 正在进行</h3>
-            <span>{runningDevices.length ? `${runningDevices.length} 台设备` : "暂无"}</span>
+            <h3>
+              <Activity size={15} /> 正在进行
+            </h3>
+            <span>{runningDevices.length ? `${runningDevices.length} 台设备` : '暂无'}</span>
           </header>
           {runningDevices.length ? (
             <div className="ovd-running">
               {runningDevices.map((item) => (
                 <div key={item.instanceId}>
-                  <strong>{item.currentSubject || "考试"}</strong>
+                  <strong>{item.currentSubject || '考试'}</strong>
                   <span>
-                    {item.currentExam || "当前考试"} ·{" "}
-                    {liveClasses.find((value) => value.id === item.classId)?.name ||
-                      "未识别班级"}
+                    {item.currentExam || '当前考试'} ·{' '}
+                    {liveClasses.find((value) => value.id === item.classId)?.name || '未识别班级'}
                   </span>
                   <small>{item.instanceId}</small>
                 </div>
@@ -420,7 +384,9 @@ export default function OverviewPanel({
         {quickMajorDisplayStatuses.length > 0 && (
           <section className="ovd-panel">
             <header>
-              <h3><Zap size={15} /> 临时统一考试显示状态</h3>
+              <h3>
+                <Zap size={15} /> 临时统一考试显示状态
+              </h3>
               <span>{quickMajorDisplayStatuses.length} 场</span>
             </header>
             <div className="ovd-running">
@@ -438,7 +404,9 @@ export default function OverviewPanel({
         {majorConflicts.length > 0 && (
           <section className="ovd-panel ovd-panel--danger">
             <header>
-              <h3><AlertTriangle size={15} /> 大型考试冲突</h3>
+              <h3>
+                <AlertTriangle size={15} /> 大型考试冲突
+              </h3>
               <span>{new Set(majorConflicts).size} 组</span>
             </header>
             <div className="ovd-running">
@@ -455,8 +423,10 @@ export default function OverviewPanel({
         {canReadAudit && (
           <section className="ovd-panel">
             <header>
-              <h3><Activity size={15} /> 最近高风险操作</h3>
-              <span>{highRiskLogs.length ? `${highRiskLogs.length} 条` : "暂无"}</span>
+              <h3>
+                <Activity size={15} /> 最近高风险操作
+              </h3>
+              <span>{highRiskLogs.length ? `${highRiskLogs.length} 条` : '暂无'}</span>
             </header>
             {auditLoading && !highRiskLogs.length ? (
               <p className="ovd-empty">正在读取云端操作记录…</p>
@@ -465,15 +435,19 @@ export default function OverviewPanel({
                 {highRiskLogs.slice(0, 4).map((log) => (
                   <div key={log.id}>
                     <strong>{highRiskLabel(log)}</strong>
-                    <span>{log.username || "系统"} · {formatDetailTime(log.createdAt)}</span>
-                    <small>{auditDetailSummary(log.detail, log.resourceId || log.resourceType || "操作详情已记录")}</small>
+                    <span>
+                      {log.username || '系统'} · {formatDetailTime(log.createdAt)}
+                    </span>
+                    <small>
+                      {auditDetailSummary(log.detail, log.resourceId || log.resourceType || '操作详情已记录')}
+                    </small>
                   </div>
                 ))}
               </div>
             ) : (
               <p className="ovd-empty">暂无近期高风险操作。</p>
             )}
-            <button type="button" className="ovd-panel__more" onClick={() => openDetail("attention")}>
+            <button type="button" className="ovd-panel__more" onClick={() => openDetail('attention')}>
               查看完整记录与登录失败预警
             </button>
           </section>
@@ -481,106 +455,135 @@ export default function OverviewPanel({
       </section>
 
       {detailOpen && (
-        <AdminModalPortal
-          className="overview-device-drawer"
-          role="dialog"
-          aria-modal="true"
-          aria-label={detailTitle}
-        >
-          <button
-            className="overview-device-drawer__backdrop"
-            aria-label="关闭"
-            onClick={() => setDetailOpen(null)}
-          />
+        <AdminModalPortal className="overview-device-drawer" role="dialog" aria-modal="true" aria-label={detailTitle}>
+          <button className="overview-device-drawer__backdrop" aria-label="关闭" onClick={() => setDetailOpen(null)} />
           <aside>
             <header>
               <div>
                 <span>当前授权范围</span>
                 <h3>{detailTitle}</h3>
               </div>
-              <button
-                className="admin-btn"
-                onClick={() => setDetailOpen(null)}
-                aria-label="关闭"
-              >
+              <button className="admin-btn" onClick={() => setDetailOpen(null)} aria-label="关闭">
                 <X size={17} />
               </button>
             </header>
             <div className="overview-device-drawer__list">
-              {detailOpen === "online" && (onlineDevices.length ? (
-                onlineDevices.map((device) => (
-                  <article key={device.instanceId}>
-                    <strong>
-                      {liveClasses.find((item) => item.id === device.classId)
-                        ?.name || "未绑定班级"}
-                    </strong>
-                    <span>
-                      {device.status === "exam-running"
-                        ? `${device.currentExam} · ${device.currentSubject}`
-                        : "在线待命"}
-                    </span>
-                    <code title={device.instanceId}>{device.instanceId}</code>
-                    <small>
-                      最近心跳：
-                      {new Date(device.lastSeenAt).toLocaleString("zh-CN", {
-                        hour12: false,
-                      })}
-                    </small>
-                  </article>
-                ))
-              ) : (
-                <p>暂无在线设备。</p>
-              ))}
-              {detailOpen === "majors" && (activeMajors.length ? (
-                activeMajors.map((major) => {
-                  const enabledItems = major.items.filter((item) => item.enabled);
-                  const nextItem = enabledItems
-                    .filter((item) => new Date(item.endTime).getTime() >= now)
-                    .sort((left, right) => new Date(left.startTime).getTime() - new Date(right.startTime).getTime())[0];
-                  return (
-                    <article key={major.id}>
-                      <strong>{major.name}</strong>
-                      <span>{enabledItems.length} 个启用科目{nextItem ? `· 下一场 ${nextItem.name}` : "· 全部已结束"}</span>
-                      <small>{nextItem ? `开始时间：${formatDetailTime(new Date(nextItem.startTime).getTime())}` : "请在大型考试模块查看完整安排"}</small>
+              {detailOpen === 'online' &&
+                (onlineDevices.length ? (
+                  onlineDevices.map((device) => (
+                    <article key={device.instanceId}>
+                      <strong>{liveClasses.find((item) => item.id === device.classId)?.name || '未绑定班级'}</strong>
+                      <span>
+                        {device.status === 'exam-running'
+                          ? `${device.currentExam} · ${device.currentSubject}`
+                          : '在线待命'}
+                      </span>
+                      <code title={device.instanceId}>{device.instanceId}</code>
+                      <small>
+                        最近心跳：
+                        {new Date(device.lastSeenAt).toLocaleString('zh-CN', {
+                          hour12: false,
+                        })}
+                      </small>
                     </article>
-                  );
-                })
-              ) : (
-                <p>当前授权范围内暂无待执行的大型考试。</p>
-              ))}
-              {detailOpen === "database" && (
+                  ))
+                ) : (
+                  <p>暂无在线设备。</p>
+                ))}
+              {detailOpen === 'majors' &&
+                (activeMajors.length ? (
+                  activeMajors.map((major) => {
+                    const enabledItems = major.items.filter((item) => item.enabled);
+                    const nextItem = enabledItems
+                      .filter((item) => new Date(item.endTime).getTime() >= now)
+                      .sort(
+                        (left, right) => new Date(left.startTime).getTime() - new Date(right.startTime).getTime(),
+                      )[0];
+                    return (
+                      <article key={major.id}>
+                        <strong>{major.name}</strong>
+                        <span>
+                          {enabledItems.length} 个启用科目{nextItem ? `· 下一场 ${nextItem.name}` : '· 全部已结束'}
+                        </span>
+                        <small>
+                          {nextItem
+                            ? `开始时间：${formatDetailTime(new Date(nextItem.startTime).getTime())}`
+                            : '请在大型考试模块查看完整安排'}
+                        </small>
+                      </article>
+                    );
+                  })
+                ) : (
+                  <p>当前授权范围内暂无待执行的大型考试。</p>
+                ))}
+              {detailOpen === 'database' && (
                 <>
                   <article>
-                    <strong>{deviceError ? "连接异常" : "连接正常"}</strong>
+                    <strong>{deviceError ? '连接异常' : '连接正常'}</strong>
                     <span>{syncLabel}</span>
-                    <small>{scope.gradeIds.size} 个年级 · {scope.classIds.size} 个班级</small>
+                    <small>
+                      {scope.gradeIds.size} 个年级 · {scope.classIds.size} 个班级
+                    </small>
                   </article>
                   {canReadAudit ? (
-                    auditLoading ? <p>正在读取最近同步到云端的改动…</p> : auditError ? <p>{auditError}</p> : cloudChangeLogs.length ? cloudChangeLogs.map((log) => (
-                      <article key={log.id}>
-                        <strong>{cloudChangeLabel(log)}</strong>
-                        <span>{log.username || "系统"} · {formatDetailTime(log.createdAt)}</span>
-                        <small>{auditDetailSummary(log.detail)}</small>
-                      </article>
-                    )) : <p>暂未找到考试、班级或设置的云端改动记录。</p>
+                    auditLoading ? (
+                      <p>正在读取最近同步到云端的改动…</p>
+                    ) : auditError ? (
+                      <p>{auditError}</p>
+                    ) : cloudChangeLogs.length ? (
+                      cloudChangeLogs.map((log) => (
+                        <article key={log.id}>
+                          <strong>{cloudChangeLabel(log)}</strong>
+                          <span>
+                            {log.username || '系统'} · {formatDetailTime(log.createdAt)}
+                          </span>
+                          <small>{auditDetailSummary(log.detail)}</small>
+                        </article>
+                      ))
+                    ) : (
+                      <p>暂未找到考试、班级或设置的云端改动记录。</p>
+                    )
                   ) : (
                     <p>当前账号无权查看云端改动记录。</p>
                   )}
                 </>
               )}
-              {detailOpen === "attention" && (
-                riskCount || auditLoading ? (
+              {detailOpen === 'attention' &&
+                (riskCount || auditLoading ? (
                   <>
-                    {(deviceError || auditError || devices.some((item) => item.revoked) || majorConflicts.length > 0) && (
+                    {(deviceError ||
+                      auditError ||
+                      devices.some((item) => item.revoked) ||
+                      majorConflicts.length > 0) && (
                       <div className="overview-device-drawer__group">
                         <strong>错误提醒</strong>
-                        {deviceError && <article><strong>同步或设备状态读取异常</strong><span>{deviceError}</span></article>}
-                        {auditError && <article><strong>云端审计日志读取异常</strong><span>{auditError}</span></article>}
-                        {devices.filter((item) => item.revoked).map((device) => (
-                          <article key={device.instanceId}><strong>设备已被撤销</strong><span>{device.instanceId}</span><small>该设备需要重新绑定后才能继续同步。</small></article>
-                        ))}
+                        {deviceError && (
+                          <article>
+                            <strong>同步或设备状态读取异常</strong>
+                            <span>{deviceError}</span>
+                          </article>
+                        )}
+                        {auditError && (
+                          <article>
+                            <strong>云端审计日志读取异常</strong>
+                            <span>{auditError}</span>
+                          </article>
+                        )}
+                        {devices
+                          .filter((item) => item.revoked)
+                          .map((device) => (
+                            <article key={device.instanceId}>
+                              <strong>设备已被撤销</strong>
+                              <span>{device.instanceId}</span>
+                              <small>该设备需要重新绑定后才能继续同步。</small>
+                            </article>
+                          ))}
                         {[...new Set(majorConflicts)].map((label) => (
-                          <article key={label}><strong>大型考试时间冲突</strong><span>{label}</span><small>请核对考试时间与适用范围。</small></article>
+                          <article key={label}>
+                            <strong>大型考试时间冲突</strong>
+                            <span>{label}</span>
+                            <small>请核对考试时间与适用范围。</small>
+                          </article>
                         ))}
                       </div>
                     )}
@@ -590,7 +593,9 @@ export default function OverviewPanel({
                         {loginFailureAlerts.map((alert) => (
                           <article key={alert.username}>
                             <strong>{alert.username}</strong>
-                            <span>连续失败 {alert.failureCount} 次 · {formatDetailTime(alert.latestFailureAt)}</span>
+                            <span>
+                              连续失败 {alert.failureCount} 次 · {formatDetailTime(alert.latestFailureAt)}
+                            </span>
                             <small>建议核实是否为异常登录尝试，必要时禁用账号或重置密码。</small>
                           </article>
                         ))}
@@ -598,25 +603,38 @@ export default function OverviewPanel({
                     )}
                     <div className="overview-device-drawer__group">
                       <strong>近期高风险操作</strong>
-                      {auditLoading && !highRiskLogs.length ? <p>正在读取云端操作记录…</p> : highRiskLogs.length ? highRiskLogs.map((log) => (
-                        <article key={log.id}>
-                          <strong>{highRiskLabel(log)}</strong>
-                          <span>{log.username || "系统"} · {formatDetailTime(log.createdAt)}</span>
-                          <small>{auditDetailSummary(log.detail, log.resourceId || log.resourceType || "操作详情已记录")}</small>
-                        </article>
-                      )) : <p>暂无近期高风险操作。</p>}
+                      {auditLoading && !highRiskLogs.length ? (
+                        <p>正在读取云端操作记录…</p>
+                      ) : highRiskLogs.length ? (
+                        highRiskLogs.map((log) => (
+                          <article key={log.id}>
+                            <strong>{highRiskLabel(log)}</strong>
+                            <span>
+                              {log.username || '系统'} · {formatDetailTime(log.createdAt)}
+                            </span>
+                            <small>
+                              {auditDetailSummary(log.detail, log.resourceId || log.resourceType || '操作详情已记录')}
+                            </small>
+                          </article>
+                        ))
+                      ) : (
+                        <p>暂无近期高风险操作。</p>
+                      )}
                     </div>
                   </>
                 ) : (
                   <p>当前没有错误提醒或高风险操作。</p>
-                )
-              )}
+                ))}
             </div>
             <footer>
-              {detailOpen === "online" || detailOpen === "attention" ? (
-                <a className="admin-btn" href="/admin?tab=devices">进入设备管理</a>
-              ) : detailOpen === "majors" ? (
-                <a className="admin-btn" href="/admin?tab=major">进入大型考试</a>
+              {detailOpen === 'online' || detailOpen === 'attention' ? (
+                <a className="admin-btn" href="/admin?tab=devices">
+                  进入设备管理
+                </a>
+              ) : detailOpen === 'majors' ? (
+                <a className="admin-btn" href="/admin?tab=major">
+                  进入大型考试
+                </a>
               ) : null}
             </footer>
           </aside>

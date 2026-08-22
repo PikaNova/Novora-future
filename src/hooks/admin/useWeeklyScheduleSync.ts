@@ -1,31 +1,23 @@
-import { useCallback, useRef, useState } from "react";
-import type { MutableRefObject } from "react";
-import type { NavigateFunction } from "react-router-dom";
-import type { MajorExam } from "../../types";
-import type {
-  ScheduleMode,
-  WeeklyPlan,
-  WeeklyConflictPolicy,
-} from "../../types/exam";
-import type { SchoolClass, SchoolGrade } from "../../types/school";
+import { useCallback, useRef, useState } from 'react';
+import type { MutableRefObject } from 'react';
+import type { NavigateFunction } from 'react-router-dom';
+import type { MajorExam } from '../../types';
+import type { ScheduleMode, WeeklyPlan, WeeklyConflictPolicy } from '../../types/exam';
+import type { SchoolClass, SchoolGrade } from '../../types/school';
 import {
   adminCanClass,
   adminCanGrade,
   getCloudSnapshot,
   saveExamsToServer,
   type AdminUserContext,
-} from "../../services/examService";
-import { threeWayMergeExam } from "../../utils/examMerge";
-import {
-  clearPendingExamSync,
-  getPendingExamSync,
-  queuePendingExamSync,
-} from "../../services/examOutbox";
-import { updateExamSettings } from "../../utils/appSettings";
-import { notify } from "../../services/notify";
-import { formatApiError } from "../../services/apiError";
-import type { SyncState } from "./adminPageUtils";
-import { syncMajorStateRef } from "./adminPageUtils";
+} from '../../services/examService';
+import { threeWayMergeExam } from '../../utils/examMerge';
+import { clearPendingExamSync, getPendingExamSync, queuePendingExamSync } from '../../services/examOutbox';
+import { updateExamSettings } from '../../utils/appSettings';
+import { notify } from '../../services/notify';
+import { formatApiError } from '../../services/apiError';
+import type { SyncState } from './adminPageUtils';
+import { syncMajorStateRef } from './adminPageUtils';
 
 export type WeeklyState = {
   scheduleMode: ScheduleMode;
@@ -38,9 +30,7 @@ export type WeeklyState = {
 };
 
 const retryBackoffDelay = (attempt: number) =>
-  new Promise((resolve) =>
-    setTimeout(resolve, Math.min(4000, 400 * 2 ** attempt)),
-  );
+  new Promise((resolve) => setTimeout(resolve, Math.min(4000, 400 * 2 ** attempt)));
 
 // Owns weekly-schedule + grade/class roster state, and the independent weekly
 // push/save pipeline (shares the /api/exams endpoint and conflict shape with
@@ -56,9 +46,7 @@ export function useWeeklyScheduleSync(params: {
   pendingRef: MutableRefObject<boolean>;
   examPushChainRef: MutableRefObject<Promise<void>>;
   weeklySaveTimer: MutableRefObject<ReturnType<typeof setTimeout> | null>;
-  buildPayloadRef: MutableRefObject<
-    (ms: MajorExam[], activeId: string) => Record<string, unknown>
-  >;
+  buildPayloadRef: MutableRefObject<(ms: MajorExam[], activeId: string) => Record<string, unknown>>;
   setMajorsRef: MutableRefObject<(ms: MajorExam[]) => void>;
   setActiveMajorIdRef: MutableRefObject<(id: string) => void>;
   setSync: (state: SyncState) => void;
@@ -77,23 +65,15 @@ export function useWeeklyScheduleSync(params: {
     setSync,
   } = params;
 
-  const [scheduleMode, setScheduleMode] = useState<ScheduleMode>(
-    initial.scheduleMode,
+  const [scheduleMode, setScheduleMode] = useState<ScheduleMode>(initial.scheduleMode);
+  const [weeklyPlans, setWeeklyPlans] = useState<WeeklyPlan[]>(initial.weeklyPlans);
+  const [activeWeeklyPlanId, setActiveWeeklyPlanId] = useState<string | null>(initial.activeWeeklyPlanId);
+  const [activeWeeklyPlanIdByClassId, setActiveWeeklyPlanIdByClassId] = useState<Record<string, string | null>>(
+    initial.activeWeeklyPlanIdByClassId,
   );
-  const [weeklyPlans, setWeeklyPlans] = useState<WeeklyPlan[]>(
-    initial.weeklyPlans,
-  );
-  const [activeWeeklyPlanId, setActiveWeeklyPlanId] = useState<string | null>(
-    initial.activeWeeklyPlanId,
-  );
-  const [activeWeeklyPlanIdByClassId, setActiveWeeklyPlanIdByClassId] =
-    useState<Record<string, string | null>>(
-      initial.activeWeeklyPlanIdByClassId,
-    );
   const [grades, setGrades] = useState<SchoolGrade[]>(initial.grades);
   const [classes, setClasses] = useState<SchoolClass[]>(initial.classes);
-  const [weeklyConflictPolicy, setWeeklyConflictPolicy] =
-    useState<WeeklyConflictPolicy>(initial.weeklyConflictPolicy);
+  const [weeklyConflictPolicy, setWeeklyConflictPolicy] = useState<WeeklyConflictPolicy>(initial.weeklyConflictPolicy);
 
   const weeklyStateRef = useRef<WeeklyState>({
     scheduleMode,
@@ -115,32 +95,20 @@ export function useWeeklyScheduleSync(params: {
   };
 
   const hasAllScope =
-    !!adminUser &&
-    (adminUser.permissions.includes("*") ||
-      adminUser.scopes.some((scope) => scope.type === "all"));
-  const visibleGrades = grades.filter((grade) =>
-    adminCanGrade(grade.id, adminUser),
-  );
-  const visibleClasses = classes.filter((item) =>
-    adminCanClass(item.gradeId, item.id, adminUser),
-  );
+    !!adminUser && (adminUser.permissions.includes('*') || adminUser.scopes.some((scope) => scope.type === 'all'));
+  const visibleGrades = grades.filter((grade) => adminCanGrade(grade.id, adminUser));
+  const visibleClasses = classes.filter((item) => adminCanClass(item.gradeId, item.id, adminUser));
   const visibleClassIds = new Set(visibleClasses.map((item) => item.id));
-  const visibleWeeklyPlans = weeklyPlans.filter((plan) =>
-    visibleClassIds.has(plan.classId),
-  );
+  const visibleWeeklyPlans = weeklyPlans.filter((plan) => visibleClassIds.has(plan.classId));
 
   const pushWeeklyToServerExec = useCallback(
-    async (weekly: WeeklyState, syncLabel = "保存周测与班级安排") => {
-      if (typeof navigator !== "undefined" && !navigator.onLine) {
+    async (weekly: WeeklyState, syncLabel = '保存周测与班级安排') => {
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
         pendingRef.current = true;
-        setSync("offline");
+        setSync('offline');
         const queued = getPendingExamSync();
         const basePayload =
-          queued?.payload ??
-          buildPayloadRef.current(
-            stateRef.current.majors,
-            stateRef.current.activeMajorId,
-          );
+          queued?.payload ?? buildPayloadRef.current(stateRef.current.majors, stateRef.current.activeMajorId);
         queuePendingExamSync({
           payload: { ...basePayload, ...weekly } as never,
           baseSnapshot: queued?.baseSnapshot ?? getCloudSnapshot(),
@@ -148,7 +116,7 @@ export function useWeeklyScheduleSync(params: {
         });
         return;
       }
-      setSync("saving");
+      setSync('saving');
       const ms = stateRef.current.majors;
       const activeId = stateRef.current.activeMajorId;
       const queued = getPendingExamSync();
@@ -157,28 +125,26 @@ export function useWeeklyScheduleSync(params: {
       const liveBaseSnapshot = getCloudSnapshot();
       const baseSnapshot =
         (queuedBaseSnapshot?.updatedAt ?? 0) >= (liveBaseSnapshot?.updatedAt ?? 0)
-          ? queuedBaseSnapshot ?? liveBaseSnapshot
-          : liveBaseSnapshot ?? queuedBaseSnapshot;
+          ? (queuedBaseSnapshot ?? liveBaseSnapshot)
+          : (liveBaseSnapshot ?? queuedBaseSnapshot);
       const payload = { ...base, ...weekly } as Record<string, unknown> & {
         majors: MajorExam[];
         activeMajorId: string;
       };
       const expectedSavedAt = queued?.savedAt;
-      const isStaleWeeklyPush = () =>
-        expectedSavedAt != null &&
-        getPendingExamSync()?.savedAt !== expectedSavedAt;
+      const isStaleWeeklyPush = () => expectedSavedAt != null && getPendingExamSync()?.savedAt !== expectedSavedAt;
       const result = await saveExamsToServer({
         ...payload,
         baseUpdatedAt: baseSnapshot?.updatedAt ?? 0,
-        clientQueueKey: "admin-exam-save",
+        clientQueueKey: 'admin-exam-save',
         clientSyncLabel: syncLabel,
       } as never);
       if (isStaleWeeklyPush()) return;
-      if (result === "unauthorized") {
-        navigate("/login?next=/admin", { replace: true });
+      if (result === 'unauthorized') {
+        navigate('/login?next=/admin', { replace: true });
         return;
       }
-      if (result && typeof result === "object" && result.kind === "conflict") {
+      if (result && typeof result === 'object' && result.kind === 'conflict') {
         if (result.remote) {
           const baseline = getCloudSnapshot() ?? {
             ...result.remote,
@@ -193,40 +159,31 @@ export function useWeeklyScheduleSync(params: {
           const retry = await saveExamsToServer({
             ...merged.payload,
             baseUpdatedAt: result.remote.updatedAt,
-            clientQueueKey: "admin-exam-save",
+            clientQueueKey: 'admin-exam-save',
             clientSyncLabel: `${syncLabel} · 合并后重试`,
           } as never);
           if (isStaleWeeklyPush()) return;
-          if (typeof retry === "number") {
+          if (typeof retry === 'number') {
             const mergedPayload = merged.payload as unknown as typeof payload & Partial<WeeklyState>;
             const mergedWeekly: WeeklyState = {
               scheduleMode: mergedPayload.scheduleMode ?? weekly.scheduleMode,
               weeklyPlans: mergedPayload.weeklyPlans ?? weekly.weeklyPlans,
               activeWeeklyPlanId: mergedPayload.activeWeeklyPlanId ?? null,
-              activeWeeklyPlanIdByClassId:
-                mergedPayload.activeWeeklyPlanIdByClassId ?? {},
+              activeWeeklyPlanIdByClassId: mergedPayload.activeWeeklyPlanIdByClassId ?? {},
               grades: mergedPayload.grades ?? weekly.grades,
               classes: mergedPayload.classes ?? weekly.classes,
-              weeklyConflictPolicy:
-                mergedPayload.weeklyConflictPolicy ?? weekly.weeklyConflictPolicy,
+              weeklyConflictPolicy: mergedPayload.weeklyConflictPolicy ?? weekly.weeklyConflictPolicy,
             };
             if (mergedPayload.majors?.length) {
-              const mergedActiveMajorId =
-                mergedPayload.activeMajorId || mergedPayload.majors[0].id;
-              syncMajorStateRef(
-                stateRef,
-                mergedPayload.majors,
-                mergedActiveMajorId,
-              );
+              const mergedActiveMajorId = mergedPayload.activeMajorId || mergedPayload.majors[0].id;
+              syncMajorStateRef(stateRef, mergedPayload.majors, mergedActiveMajorId);
               setMajorsRef.current(mergedPayload.majors);
               setActiveMajorIdRef.current(mergedActiveMajorId);
             }
             setScheduleMode(mergedWeekly.scheduleMode);
             setWeeklyPlans(mergedWeekly.weeklyPlans);
             setActiveWeeklyPlanId(mergedWeekly.activeWeeklyPlanId);
-            setActiveWeeklyPlanIdByClassId(
-              mergedWeekly.activeWeeklyPlanIdByClassId,
-            );
+            setActiveWeeklyPlanIdByClassId(mergedWeekly.activeWeeklyPlanIdByClassId);
             setGrades(mergedWeekly.grades);
             setClasses(mergedWeekly.classes);
             setWeeklyConflictPolicy(mergedWeekly.weeklyConflictPolicy);
@@ -238,56 +195,45 @@ export function useWeeklyScheduleSync(params: {
             } as never);
             pendingRef.current = false;
             clearPendingExamSync(queued?.savedAt);
-            setSync("saved");
+            setSync('saved');
             return;
           }
         }
         pendingRef.current = true;
-        setSync("error");
-        notify(
-          "error",
-          `${syncLabel}遇到云端变化，自动重试仍失败；请刷新后台后重新保存。`,
-          "同步失败",
-          { id: "admin-exam-sync-error" },
-        );
+        setSync('error');
+        notify('error', `${syncLabel}遇到云端变化，自动重试仍失败；请刷新后台后重新保存。`, '同步失败', {
+          id: 'admin-exam-sync-error',
+        });
         return;
       }
-      if (typeof result !== "number") {
+      if (typeof result !== 'number') {
         pendingRef.current = true;
         queuePendingExamSync({
           payload: payload as never,
           baseSnapshot: baseSnapshot ?? null,
           savedAt: queued?.savedAt ?? Date.now(),
         });
-        setSync(
-          typeof navigator !== "undefined" && !navigator.onLine
-            ? "offline"
-            : "error",
-        );
-        if (result && result.kind === "error")
+        setSync(typeof navigator !== 'undefined' && !navigator.onLine ? 'offline' : 'error');
+        if (result && result.kind === 'error')
           notify(
-            "error",
+            'error',
             formatApiError(result.error, `${syncLabel}失败`),
-            result.error.code.startsWith("DATABASE_")
-              ? "数据库连接失败"
-              : "同步失败",
-            { id: "admin-exam-sync-error" },
+            result.error.code.startsWith('DATABASE_') ? '数据库连接失败' : '同步失败',
+            { id: 'admin-exam-sync-error' },
           );
         return;
       }
       pendingRef.current = false;
       clearPendingExamSync(queued?.savedAt);
       updateExamSettings({ ...payload, updatedAt: result } as never);
-      setSync("saved");
+      setSync('saved');
     },
     [navigate],
   );
 
   const pushWeeklyToServer = useCallback(
     (weekly: WeeklyState, syncLabel?: string) => {
-      const run = examPushChainRef.current.then(() =>
-        pushWeeklyToServerExec(weekly, syncLabel),
-      );
+      const run = examPushChainRef.current.then(() => pushWeeklyToServerExec(weekly, syncLabel));
       examPushChainRef.current = run.catch(() => {});
       return run;
     },
@@ -309,11 +255,7 @@ export function useWeeklyScheduleSync(params: {
       updateExamSettings({ ...next, updatedAt: now } as never);
       const queued = getPendingExamSync();
       const basePayload =
-        queued?.payload ??
-        buildPayloadRef.current(
-          stateRef.current.majors,
-          stateRef.current.activeMajorId,
-        );
+        queued?.payload ?? buildPayloadRef.current(stateRef.current.majors, stateRef.current.activeMajorId);
       queuePendingExamSync({
         payload: { ...basePayload, ...next } as never,
         baseSnapshot: queued?.baseSnapshot ?? getCloudSnapshot(),
@@ -325,11 +267,7 @@ export function useWeeklyScheduleSync(params: {
         void pushWeeklyToServer(next, syncLabel);
         return;
       }
-      setSync(
-        typeof navigator !== "undefined" && !navigator.onLine
-          ? "offline"
-          : "saving",
-      );
+      setSync(typeof navigator !== 'undefined' && !navigator.onLine ? 'offline' : 'saving');
       weeklySaveTimer.current = setTimeout(() => {
         void pushWeeklyToServer(next, syncLabel);
       }, 650);
@@ -337,8 +275,7 @@ export function useWeeklyScheduleSync(params: {
     [pushWeeklyToServer],
   );
 
-  const handleScheduleModeChange = (mode: ScheduleMode) =>
-    commitWeekly({ scheduleMode: mode }, true);
+  const handleScheduleModeChange = (mode: ScheduleMode) => commitWeekly({ scheduleMode: mode }, true);
 
   const handleSaveWeeklyPlans = (
     plans: WeeklyPlan[],
@@ -350,9 +287,7 @@ export function useWeeklyScheduleSync(params: {
     const mergedPlans = hasAllScope
       ? plans
       : [
-          ...weeklyStateRef.current.weeklyPlans.filter(
-            (plan) => !visibleClassIds.has(plan.classId),
-          ),
+          ...weeklyStateRef.current.weeklyPlans.filter((plan) => !visibleClassIds.has(plan.classId)),
           ...plans.filter((plan) => visibleClassIds.has(plan.classId)),
         ];
     const nextByClass = activeByClass ?? {
@@ -362,19 +297,15 @@ export function useWeeklyScheduleSync(params: {
     commitWeekly(
       {
         weeklyPlans: mergedPlans,
-        activeWeeklyPlanId: classId
-          ? weeklyStateRef.current.activeWeeklyPlanId
-          : activeId,
+        activeWeeklyPlanId: classId ? weeklyStateRef.current.activeWeeklyPlanId : activeId,
         activeWeeklyPlanIdByClassId: nextByClass,
       },
       immediate,
     );
   };
 
-  const handleConflictPolicyChange = (
-    policy: WeeklyConflictPolicy,
-    immediate = false,
-  ) => commitWeekly({ weeklyConflictPolicy: policy }, immediate);
+  const handleConflictPolicyChange = (policy: WeeklyConflictPolicy, immediate = false) =>
+    commitWeekly({ weeklyConflictPolicy: policy }, immediate);
 
   return {
     scheduleMode,

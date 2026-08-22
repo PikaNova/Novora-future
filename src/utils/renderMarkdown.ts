@@ -14,11 +14,7 @@ export function safeUrl(u: string): string {
 }
 
 function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 function inline(raw: string): string {
@@ -31,8 +27,7 @@ function inline(raw: string): string {
   // 图片（需在链接之前处理）
   s = s.replace(
     /!\[([^\]]*)\]\(([^)\s]+)\)/g,
-    (_m, alt: string, url: string) =>
-      `<img class="md-img" src="${safeUrl(url)}" alt="${alt}" loading="lazy" />`,
+    (_m, alt: string, url: string) => `<img class="md-img" src="${safeUrl(url)}" alt="${alt}" loading="lazy" />`,
   );
   s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
   s = s.replace(/~~([^~]+)~~/g, '<del>$1</del>');
@@ -42,12 +37,18 @@ function inline(raw: string): string {
     (_m, text: string, url: string) =>
       `<a href="${safeUrl(url)}" target="_blank" rel="noopener noreferrer">${text}</a>`,
   );
+  // 代码片段占位符使用 \u0000 控制字符，避免与用户原文冲突（no-control-regex 有意保留）
   s = s.replace(/\u0000C(\d+)\u0000/g, (_m, i: string) => `<code>${codes[Number(i)]}</code>`);
   return s;
 }
 
 function splitRow(line: string): string[] {
-  return line.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map(c => c.trim());
+  return line
+    .trim()
+    .replace(/^\|/, '')
+    .replace(/\|$/, '')
+    .split('|')
+    .map((c) => c.trim());
 }
 
 export function renderMarkdown(md: string): string {
@@ -71,7 +72,10 @@ export function renderMarkdown(md: string): string {
       const lang = fence[1].trim();
       const buf: string[] = [];
       i++;
-      while (i < lines.length && !/^```/.test(lines[i])) { buf.push(lines[i]); i++; }
+      while (i < lines.length && !/^```/.test(lines[i])) {
+        buf.push(lines[i]);
+        i++;
+      }
       i++;
       out.push(
         `<pre class="md-pre"><code${lang ? ` data-lang="${escapeHtml(lang)}"` : ''}>${escapeHtml(buf.join('\n'))}</code></pre>`,
@@ -79,7 +83,11 @@ export function renderMarkdown(md: string): string {
       continue;
     }
 
-    if (/^\s*$/.test(line)) { closeList(); i++; continue; }
+    if (/^\s*$/.test(line)) {
+      closeList();
+      i++;
+      continue;
+    }
 
     const h = line.match(/^(#{1,6})\s+(.*)$/);
     if (h) {
@@ -90,27 +98,43 @@ export function renderMarkdown(md: string): string {
       continue;
     }
 
-    if (/^(-{3,}|\*{3,}|_{3,})\s*$/.test(line)) { closeList(); out.push('<hr class="md-hr" />'); i++; continue; }
+    if (/^(-{3,}|\*{3,}|_{3,})\s*$/.test(line)) {
+      closeList();
+      out.push('<hr class="md-hr" />');
+      i++;
+      continue;
+    }
 
     if (/^>\s?/.test(line)) {
       closeList();
       const buf: string[] = [];
-      while (i < lines.length && /^>\s?/.test(lines[i])) { buf.push(lines[i].replace(/^>\s?/, '')); i++; }
+      while (i < lines.length && /^>\s?/.test(lines[i])) {
+        buf.push(lines[i].replace(/^>\s?/, ''));
+        i++;
+      }
       out.push(`<blockquote class="md-quote">${inline(buf.join(' '))}</blockquote>`);
       continue;
     }
 
     if (
-      line.includes('|') && i + 1 < lines.length &&
-      /-/.test(lines[i + 1]) && /^\s*\|?[\s:|-]+\|[\s:|-]*$/.test(lines[i + 1])
+      line.includes('|') &&
+      i + 1 < lines.length &&
+      /-/.test(lines[i + 1]) &&
+      /^\s*\|?[\s:|-]+\|[\s:|-]*$/.test(lines[i + 1])
     ) {
       closeList();
       const header = splitRow(line);
       i += 2;
       const rows: string[][] = [];
-      while (i < lines.length && lines[i].includes('|') && lines[i].trim() !== '') { rows.push(splitRow(lines[i])); i++; }
-      let t = '<table class="md-table"><thead><tr>' + header.map(c => `<th>${inline(c)}</th>`).join('') + '</tr></thead><tbody>';
-      for (const r of rows) t += '<tr>' + r.map(c => `<td>${inline(c)}</td>`).join('') + '</tr>';
+      while (i < lines.length && lines[i].includes('|') && lines[i].trim() !== '') {
+        rows.push(splitRow(lines[i]));
+        i++;
+      }
+      let t =
+        '<table class="md-table"><thead><tr>' +
+        header.map((c) => `<th>${inline(c)}</th>`).join('') +
+        '</tr></thead><tbody>';
+      for (const r of rows) t += '<tr>' + r.map((c) => `<td>${inline(c)}</td>`).join('') + '</tr>';
       t += '</tbody></table>';
       out.push(t);
       continue;
@@ -118,7 +142,11 @@ export function renderMarkdown(md: string): string {
 
     const ul = line.match(/^\s*[-*+]\s+(.*)$/);
     if (ul) {
-      if (listType !== 'ul') { closeList(); out.push('<ul class="md-ul">'); listType = 'ul'; }
+      if (listType !== 'ul') {
+        closeList();
+        out.push('<ul class="md-ul">');
+        listType = 'ul';
+      }
       out.push(`<li>${inline(ul[1])}</li>`);
       i++;
       continue;
@@ -126,7 +154,11 @@ export function renderMarkdown(md: string): string {
 
     const ol = line.match(/^\s*\d+\.\s+(.*)$/);
     if (ol) {
-      if (listType !== 'ol') { closeList(); out.push('<ol class="md-ol">'); listType = 'ol'; }
+      if (listType !== 'ol') {
+        closeList();
+        out.push('<ol class="md-ol">');
+        listType = 'ol';
+      }
       out.push(`<li>${inline(ol[1])}</li>`);
       i++;
       continue;
@@ -136,9 +168,13 @@ export function renderMarkdown(md: string): string {
     const buf: string[] = [line];
     i++;
     while (
-      i < lines.length && !/^\s*$/.test(lines[i]) &&
+      i < lines.length &&
+      !/^\s*$/.test(lines[i]) &&
       !/^(#{1,6}\s|>|```|\s*[-*+]\s|\s*\d+\.\s|-{3,}|\*{3,})/.test(lines[i])
-    ) { buf.push(lines[i]); i++; }
+    ) {
+      buf.push(lines[i]);
+      i++;
+    }
     out.push(`<p class="md-p">${inline(buf.join(' '))}</p>`);
   }
   closeList();

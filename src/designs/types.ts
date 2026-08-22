@@ -11,15 +11,15 @@ export type Urgency = 'normal' | 'warn' | 'critical';
 export interface ExamViewModel {
   masterTitle: string;
   phase: ExamPhaseVM;
-  clock: string;            // HH:mm:ss
-  dateText: string;         // 北京时间 · 星期日 · 2026.06.07
+  clock: string; // HH:mm:ss
+  dateText: string; // 北京时间 · 星期日 · 2026.06.07
   currentName: string | null;
-  startHM: string | null;   // HH:mm
-  endHM: string | null;     // HH:mm
-  progressPct: number;      // 0 - 100
-  elapsedText: string;      // HH:mm:ss
-  remainingText: string;    // HH:mm:ss
-  countdownText: string;    // 距开考倒计时 HH:mm:ss
+  startHM: string | null; // HH:mm
+  endHM: string | null; // HH:mm
+  progressPct: number; // 0 - 100
+  elapsedText: string; // HH:mm:ss
+  remainingText: string; // HH:mm:ss
+  countdownText: string; // 距开考倒计时 HH:mm:ss
   nextName: string | null;
   nextStartHM: string | null;
   urgency: Urgency;

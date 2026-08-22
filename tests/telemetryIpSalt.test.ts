@@ -43,7 +43,7 @@ test('resolveIpSalt uses an optional environment override before the persistent 
 
 test('telemetry resolves the salt only after telemetry is eligible to relay', () => {
   assert.doesNotMatch(telemetrySource, /telemetryConfig\.ipSalt|const IP_SALT/);
-  const tokenIndex = telemetrySource.indexOf("if (!token)");
+  const tokenIndex = telemetrySource.indexOf('if (!token)');
   const saltIndex = telemetrySource.indexOf('await resolveIpSalt()');
   assert.ok(tokenIndex >= 0 && saltIndex > tokenIndex, 'salt must not be resolved before the relay credential check');
   assert.match(telemetrySource, /reason: 'privacy_config_unavailable'/);

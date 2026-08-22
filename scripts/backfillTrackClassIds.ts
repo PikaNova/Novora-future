@@ -1,7 +1,7 @@
-import { neon } from "@neondatabase/serverless";
-import type { MajorExam } from "../src/types/index.js";
-import type { SchoolClass } from "../src/types/school.js";
-import { recomputeMajorsTrackClassIds } from "../src/utils/trackClassIds.js";
+import { neon } from '@neondatabase/serverless';
+import type { MajorExam } from '../src/types/index.js';
+import type { SchoolClass } from '../src/types/school.js';
+import { recomputeMajorsTrackClassIds } from '../src/utils/trackClassIds.js';
 
 type ExamDataRow = {
   majors: unknown;
@@ -15,19 +15,17 @@ function asArray<T>(value: unknown): T[] {
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 }
 
 async function main() {
-  const commit = process.argv.includes("--commit");
+  const commit = process.argv.includes('--commit');
   const databaseUrl = process.env.BACKFILL_DATABASE_URL;
   if (!databaseUrl) {
-    throw new Error("BACKFILL_DATABASE_URL is required; DATABASE_URL is never used by this command.");
+    throw new Error('BACKFILL_DATABASE_URL is required; DATABASE_URL is never used by this command.');
   }
-  if (commit && process.env.BACKFILL_CONFIRM !== "novora-track-backfill") {
-    throw new Error("Set BACKFILL_CONFIRM=novora-track-backfill before using --commit.");
+  if (commit && process.env.BACKFILL_CONFIRM !== 'novora-track-backfill') {
+    throw new Error('Set BACKFILL_CONFIRM=novora-track-backfill before using --commit.');
   }
 
   const sql = neon(databaseUrl);
@@ -35,7 +33,7 @@ async function main() {
     SELECT majors, classes, initialization, updated_at FROM exam_data WHERE id = 1
   `) as unknown as ExamDataRow[];
   if (!rows.length) {
-    console.log("No exam_data row found. Nothing to do.");
+    console.log('No exam_data row found. Nothing to do.');
     return;
   }
 
@@ -47,7 +45,7 @@ async function main() {
     initialization.subjectTrackModeEnabled !== false,
   );
   if (!changes.length) {
-    console.log("No stale automatically generated track scopes found.");
+    console.log('No stale automatically generated track scopes found.');
     return;
   }
 
@@ -59,7 +57,7 @@ async function main() {
     );
   }
   if (!commit) {
-    console.log("Dry run only. Re-run with --commit and BACKFILL_CONFIRM=novora-track-backfill to write.");
+    console.log('Dry run only. Re-run with --commit and BACKFILL_CONFIRM=novora-track-backfill to write.');
     return;
   }
 
@@ -71,7 +69,7 @@ async function main() {
     RETURNING updated_at
   `;
   if (!saved.length) {
-    throw new Error("The exam data changed during the dry run. Re-run to avoid overwriting newer data.");
+    throw new Error('The exam data changed during the dry run. Re-run to avoid overwriting newer data.');
   }
   console.log(`Committed ${changes.length} track scope change(s).`);
 }

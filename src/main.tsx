@@ -44,15 +44,25 @@ installGlobalErrorReporting();
 if (import.meta.env.PROD) {
   registerPwa();
 } else if ('serviceWorker' in navigator) {
-  void navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister())).catch(() => {});
+  void navigator.serviceWorker
+    .getRegistrations()
+    .then((rs) => rs.forEach((r) => r.unregister()))
+    .catch(() => {});
 }
-window.addEventListener('load', () => window.setTimeout(() => { void reportPerformance(); }, 0), { once: true });
+window.addEventListener(
+  'load',
+  () =>
+    window.setTimeout(() => {
+      void reportPerformance();
+    }, 0),
+  { once: true },
+);
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ErrorBoundary>
       <App />
     </ErrorBoundary>
-    {import.meta.env.VITE_SPEED_INSIGHTS !== "false" && <SpeedInsights />}
-  </React.StrictMode>
+    {import.meta.env.VITE_SPEED_INSIGHTS !== 'false' && <SpeedInsights />}
+  </React.StrictMode>,
 );

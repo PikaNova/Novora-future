@@ -7,13 +7,13 @@ import { nowMs, parseZonedTime, getZonedParts, DISPLAY_TIME_ZONE } from '../util
 export interface AlertOverlayItem {
   key: string;
   state: AlertState;
-  tone: AlertState;       // 语义色取用
+  tone: AlertState; // 语义色取用
   label: string;
   title: string;
   subtext: string;
-  hero?: string;          // 静态主视觉文字（start/ended/next）
-  countdownTo?: number;   // 若设置，主视觉文字为到该时刻的倒计时
-  examLine: string;       // 科目 · 起—止
+  hero?: string; // 静态主视觉文字（start/ended/next）
+  countdownTo?: number; // 若设置，主视觉文字为到该时刻的倒计时
+  examLine: string; // 科目 · 起—止
 }
 
 interface DriverInput {
@@ -48,7 +48,10 @@ function examLineOf(exam: ExamItem | null, referenceExam?: ExamItem | null): str
 }
 
 /** 文案占位符替换。 */
-function fill(tpl: string, ctx: { subject: string; start: string; end: string; next: string; nextTime: string }): string {
+function fill(
+  tpl: string,
+  ctx: { subject: string; start: string; end: string; next: string; nextTime: string },
+): string {
   return (tpl || '')
     .replace(/\{subject\}/g, ctx.subject)
     .replace(/\{start\}/g, ctx.start)
@@ -58,7 +61,11 @@ function fill(tpl: string, ctx: { subject: string; start: string; end: string; n
 }
 
 const PHASE_TO_STATE: Record<NotifyPhase, AlertState> = {
-  before15: '15min', before5: '5min', started: 'start', ending15: 'end15', ended: 'ended',
+  before15: '15min',
+  before5: '5min',
+  started: 'start',
+  ending15: 'end15',
+  ended: 'ended',
 };
 
 /** 倒计时类状态（需要 countdownTo）。 */
@@ -80,8 +87,12 @@ export function useAlertOverlay(input: DriverInput): AlertOverlayItem | null {
     const start = exam ? hm(parseZonedTime(exam.startTime)) : '';
     const reference = referenceExam ? getZonedParts(parseZonedTime(referenceExam.endTime), DISPLAY_TIME_ZONE) : null;
     const target = exam ? getZonedParts(parseZonedTime(exam.startTime), DISPLAY_TIME_ZONE) : null;
-    const displayStart = reference && target && (reference.year !== target.year || reference.month !== target.month || reference.day !== target.day)
-      ? `${target.month}月${target.day}日 ${start}` : start;
+    const displayStart =
+      reference &&
+      target &&
+      (reference.year !== target.year || reference.month !== target.month || reference.day !== target.day)
+        ? `${target.month}月${target.day}日 ${start}`
+        : start;
     return {
       subject: exam?.name ?? '',
       start: displayStart,
@@ -91,35 +102,44 @@ export function useAlertOverlay(input: DriverInput): AlertOverlayItem | null {
     };
   }, []);
 
-  const makeBuiltIn = useCallback((state: AlertState, exam: ExamItem | null, keySuffix: string): AlertOverlayItem | null => {
-    const cfg: AlertStateConfig | undefined = inputRef.current.settings.states[state];
-    if (!cfg || !cfg.enabled) return null;
-    const mode = inputRef.current.settings.silentMode ?? 'all';
-    if (mode === 'keyOnly' && !['5min', 'start', 'ended', 'next'].includes(state)) return null;
-    if (mode === 'pauseUntilExamEnd') {
-      const ce = inputRef.current.currentExam;
-      if (ce) { const nv = nowMs(); const st = parseZonedTime(ce.startTime); const en = parseZonedTime(ce.endTime); if (nv >= st && nv < en) return null; }
-    }
-    const isNext = state === 'next';
-    const ctxExam = isNext ? inputRef.current.nextExam : exam;
-    const ctx = buildContext(ctxExam, isNext ? exam : null);
-    const item: AlertOverlayItem = {
-      key: `${exam?.id ?? 'na'}_${state}_${keySuffix}`,
-      state, tone: state,
-      label: cfg.label,
-      title: fill(cfg.title, ctx),
-      subtext: fill(cfg.subtext, ctx),
-      examLine: examLineOf(ctxExam, isNext ? exam : null),
-    };
-    if (COUNTDOWN_STATES.includes(state) && exam) {
-      item.countdownTo = state === 'end15' ? parseZonedTime(exam.endTime) : parseZonedTime(exam.startTime);
-    } else if (isNext) {
-      item.hero = inputRef.current.nextExam?.name ?? '';
-    } else {
-      item.hero = cfg.hero ?? '';
-    }
-    return item;
-  }, [buildContext]);
+  const makeBuiltIn = useCallback(
+    (state: AlertState, exam: ExamItem | null, keySuffix: string): AlertOverlayItem | null => {
+      const cfg: AlertStateConfig | undefined = inputRef.current.settings.states[state];
+      if (!cfg || !cfg.enabled) return null;
+      const mode = inputRef.current.settings.silentMode ?? 'all';
+      if (mode === 'keyOnly' && !['5min', 'start', 'ended', 'next'].includes(state)) return null;
+      if (mode === 'pauseUntilExamEnd') {
+        const ce = inputRef.current.currentExam;
+        if (ce) {
+          const nv = nowMs();
+          const st = parseZonedTime(ce.startTime);
+          const en = parseZonedTime(ce.endTime);
+          if (nv >= st && nv < en) return null;
+        }
+      }
+      const isNext = state === 'next';
+      const ctxExam = isNext ? inputRef.current.nextExam : exam;
+      const ctx = buildContext(ctxExam, isNext ? exam : null);
+      const item: AlertOverlayItem = {
+        key: `${exam?.id ?? 'na'}_${state}_${keySuffix}`,
+        state,
+        tone: state,
+        label: cfg.label,
+        title: fill(cfg.title, ctx),
+        subtext: fill(cfg.subtext, ctx),
+        examLine: examLineOf(ctxExam, isNext ? exam : null),
+      };
+      if (COUNTDOWN_STATES.includes(state) && exam) {
+        item.countdownTo = state === 'end15' ? parseZonedTime(exam.endTime) : parseZonedTime(exam.startTime);
+      } else if (isNext) {
+        item.hero = inputRef.current.nextExam?.name ?? '';
+      } else {
+        item.hero = cfg.hero ?? '';
+      }
+      return item;
+    },
+    [buildContext],
+  );
 
   const enqueue = useCallback((items: Array<AlertOverlayItem | null>) => {
     for (const it of items) {
@@ -131,18 +151,21 @@ export function useAlertOverlay(input: DriverInput): AlertOverlayItem | null {
     // 触发调度：用 pump 计数强制调度器 effect 重跑。
     // 注意：旧写法 setCurrent(c => c) 返回同一引用，React 会 bailout 不重渲染，
     // 导致空闲时（current === null）新入队的提醒永远不会弹出。
-    setPump(p => p + 1);
+    setPump((p) => p + 1);
   }, []);
 
   // 调度器：空闲且队列非空时弹出下一项
   useEffect(() => {
     if (current || queueRef.current.length === 0) return;
-    if (!inputRef.current.settings.enabled) { queueRef.current = []; return; }
+    if (!inputRef.current.settings.enabled) {
+      queueRef.current = [];
+      return;
+    }
     const next = queueRef.current.shift()!;
     setCurrent(next);
     const base = inputRef.current.settings.durationSec * 1000;
     // start / ended 适当停留更久
-    const dur = (next.state === 'start' || next.state === 'ended') ? Math.max(base, 10000) : base;
+    const dur = next.state === 'start' || next.state === 'ended' ? Math.max(base, 10000) : base;
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => setCurrent(null), dur);
   }, [current, pump]);
@@ -166,7 +189,9 @@ export function useAlertOverlay(input: DriverInput): AlertOverlayItem | null {
       const exam = inputRef.current.currentExam;
       if (!exam) return;
       if ((inputRef.current.settings.silentMode ?? 'all') === 'pauseUntilExamEnd') {
-        const nv = nowMs(); const st0 = parseZonedTime(exam.startTime); const en0 = parseZonedTime(exam.endTime);
+        const nv = nowMs();
+        const st0 = parseZonedTime(exam.startTime);
+        const en0 = parseZonedTime(exam.endTime);
         if (nv >= st0 && nv < en0) return;
       }
       const start = parseZonedTime(exam.startTime);
@@ -175,18 +200,21 @@ export function useAlertOverlay(input: DriverInput): AlertOverlayItem | null {
       for (const c of inputRef.current.settings.custom) {
         if (!c.enabled) continue;
         const off = c.offsetMin * 60000;
-        const trigger = c.anchor === 'beforeStart' ? start - off
-          : c.anchor === 'afterStart' ? start + off
-          : end - off;
+        const trigger = c.anchor === 'beforeStart' ? start - off : c.anchor === 'afterStart' ? start + off : end - off;
         if (!Number.isFinite(trigger)) continue;
         // key 包含时间段：管理员改时间后，新时间 = 新 key，firedRef 不会拦截，自定义提醒可重新触发。
         const key = `${exam.id}_${c.id}_${exam.startTime}_${exam.endTime}`;
         if (firedRef.current.has(key)) continue;
         if (now < trigger) continue;
-        if (now - trigger > 60000) { firedRef.current.add(key); continue; }
+        if (now - trigger > 60000) {
+          firedRef.current.add(key);
+          continue;
+        }
         const ctx = buildContext(exam);
         const item: AlertOverlayItem = {
-          key, state: c.tone, tone: c.tone,
+          key,
+          state: c.tone,
+          tone: c.tone,
           label: c.label,
           title: fill(c.title, ctx),
           subtext: fill(c.subtext, ctx),
@@ -203,10 +231,18 @@ export function useAlertOverlay(input: DriverInput): AlertOverlayItem | null {
 
   // 总开关关闭时立即清空
   useEffect(() => {
-    if (!settings.enabled && current) { setCurrent(null); queueRef.current = []; }
+    if (!settings.enabled && current) {
+      setCurrent(null);
+      queueRef.current = [];
+    }
   }, [settings.enabled, current]);
 
-  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
+  useEffect(
+    () => () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    },
+    [],
+  );
 
   return settings.enabled ? current : null;
 }

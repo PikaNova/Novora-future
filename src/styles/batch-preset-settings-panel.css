@@ -170,7 +170,10 @@
   color: rgba(235, 244, 250, 0.74);
   font-size: 12px;
   cursor: pointer;
-  transition: border-color 0.15s, background 0.15s, color 0.15s;
+  transition:
+    border-color 0.15s,
+    background 0.15s,
+    color 0.15s;
 }
 
 .batch-preset-subject:hover {
@@ -204,7 +207,9 @@
   font-size: 12px;
   white-space: nowrap;
   cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
 }
 
 .batch-preset-slot-time:hover {
@@ -255,7 +260,9 @@
   font-size: 12px;
   line-height: 1;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition:
+    background 0.15s,
+    color 0.15s;
 }
 
 .batch-preset-selected-chip button:hover {
@@ -263,61 +270,166 @@
   color: #fff;
 }
 /* ―― 自包含控件样式：设置页未加载 admin.css，避免输入框/按钮回退为浏览器默认白底 ―― */
-.batch-preset-panel .admin-input{padding:7px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);color:#eef4f9;font-size:13px;outline:none;transition:border-color .2s}
-.batch-preset-panel .admin-input:focus{border-color:#3498db}
-.batch-preset-panel .admin-input::placeholder{color:rgba(235,244,250,.45)}
-.batch-preset-panel .admin-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:6px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.06);color:#eef4f9;font-size:13px;cursor:pointer;white-space:nowrap;transition:background .2s,border-color .2s}
-.batch-preset-panel .admin-btn:hover{background:rgba(255,255,255,.12)}
-.batch-preset-panel .admin-btn:disabled{opacity:.5;cursor:not-allowed}
-.batch-preset-panel .admin-btn--primary{background:#3498db;border-color:#3498db;color:#fff;font-weight:600}
-.batch-preset-panel .admin-btn--primary:hover{background:#2980b9}
-@media(max-width:640px){.batch-preset-panel .admin-input{min-height:44px;font-size:16px}.batch-preset-panel .admin-btn{min-height:44px}}
-
+.batch-preset-panel .admin-input {
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  color: #eef4f9;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.batch-preset-panel .admin-input:focus {
+  border-color: #3498db;
+}
+.batch-preset-panel .admin-input::placeholder {
+  color: rgba(235, 244, 250, 0.45);
+}
+.batch-preset-panel .admin-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: #eef4f9;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 0.2s,
+    border-color 0.2s;
+}
+.batch-preset-panel .admin-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+.batch-preset-panel .admin-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.batch-preset-panel .admin-btn--primary {
+  background: #3498db;
+  border-color: #3498db;
+  color: #fff;
+  font-weight: 600;
+}
+.batch-preset-panel .admin-btn--primary:hover {
+  background: #2980b9;
+}
+@media (max-width: 640px) {
+  .batch-preset-panel .admin-input {
+    min-height: 44px;
+    font-size: 16px;
+  }
+  .batch-preset-panel .admin-btn {
+    min-height: 44px;
+  }
+}
 
 /* ―― 自包含按钮样式：设置页未加载 admin.css，补齐统一按钮外观 ―― */
-.batch-preset-panel .admin-order-btn{
-  width:28px;
-  height:28px;
-  flex:none;
-  background:rgba(255,255,255,.05);
-  border:1px solid rgba(255,255,255,.14);
-  border-radius:8px;
-  color:#eef4f9;
-  font-size:14px;
-  cursor:pointer;
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  transition:background .2s,border-color .2s;
+.batch-preset-panel .admin-order-btn {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  color: #eef4f9;
+  font-size: 14px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background 0.2s,
+    border-color 0.2s;
 }
-.batch-preset-panel .admin-order-btn:hover:not(:disabled){background:rgba(255,255,255,.12)}
-.batch-preset-panel .admin-order-btn:disabled{opacity:.3;cursor:not-allowed}
-.batch-preset-panel .admin-item-btn{
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  padding:6px 12px;
-  border-radius:8px;
-  border:1px solid rgba(255,255,255,.14);
-  background:rgba(255,255,255,.06);
-  color:#eef4f9;
-  font-size:13px;
-  cursor:pointer;
-  white-space:nowrap;
-  transition:background .2s,border-color .2s;
+.batch-preset-panel .admin-order-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
 }
-.batch-preset-panel .admin-item-btn:hover:not(:disabled){background:rgba(255,255,255,.12)}
-.batch-preset-panel .admin-item-btn:disabled{opacity:.5;cursor:not-allowed}
-.batch-preset-panel .admin-item-btn--delete{color:#ff8a7d;border-color:rgba(231,76,60,.35)}
-.batch-preset-panel .admin-item-btn--delete:hover:not(:disabled){background:rgba(231,76,60,.14)}
-@media(max-width:640px){
+.batch-preset-panel .admin-order-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+.batch-preset-panel .admin-item-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: #eef4f9;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 0.2s,
+    border-color 0.2s;
+}
+.batch-preset-panel .admin-item-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+}
+.batch-preset-panel .admin-item-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.batch-preset-panel .admin-item-btn--delete {
+  color: #ff8a7d;
+  border-color: rgba(231, 76, 60, 0.35);
+}
+.batch-preset-panel .admin-item-btn--delete:hover:not(:disabled) {
+  background: rgba(231, 76, 60, 0.14);
+}
+@media (max-width: 640px) {
   .batch-preset-panel .admin-order-btn,
-  .batch-preset-panel .admin-item-btn{min-height:44px}
+  .batch-preset-panel .admin-item-btn {
+    min-height: 44px;
+  }
 }
 
-.batch-preset-source{display:flex;gap:8px;margin-bottom:4px}
-.batch-preset-source button{flex:1;display:flex;flex-direction:column;gap:2px;padding:10px 12px;border:1px solid rgba(148,180,208,.24);border-radius:9px;background:rgba(255,255,255,.03);color:rgba(235,244,250,.7);font:inherit;font-size:13px;font-weight:700;cursor:pointer;text-align:left;transition:border-color .15s,background .15s}
-.batch-preset-source button span{font-size:11px;font-weight:500;color:rgba(235,244,250,.45)}
-.batch-preset-source button:hover{border-color:rgba(59,143,208,.55)}
-.batch-preset-source button.is-active{border-color:#3498db;background:rgba(52,152,219,.16);color:#eaf6ff}
-@media(max-width:640px){.batch-preset-source button{padding:9px 10px}}
+.batch-preset-source {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.batch-preset-source button {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid rgba(148, 180, 208, 0.24);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(235, 244, 250, 0.7);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+.batch-preset-source button span {
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(235, 244, 250, 0.45);
+}
+.batch-preset-source button:hover {
+  border-color: rgba(59, 143, 208, 0.55);
+}
+.batch-preset-source button.is-active {
+  border-color: #3498db;
+  background: rgba(52, 152, 219, 0.16);
+  color: #eaf6ff;
+}
+@media (max-width: 640px) {
+  .batch-preset-source button {
+    padding: 9px 10px;
+  }
+}

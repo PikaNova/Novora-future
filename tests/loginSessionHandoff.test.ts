@@ -11,9 +11,15 @@ const { loginAdmin } = await import('../src/services/examService.js');
 
 class MemoryStorage {
   private readonly values = new Map<string, string>();
-  getItem(key: string): string | null { return this.values.get(key) ?? null; }
-  setItem(key: string, value: string): void { this.values.set(key, value); }
-  removeItem(key: string): void { this.values.delete(key); }
+  getItem(key: string): string | null {
+    return this.values.get(key) ?? null;
+  }
+  setItem(key: string, value: string): void {
+    this.values.set(key, value);
+  }
+  removeItem(key: string): void {
+    this.values.delete(key);
+  }
 }
 
 test('first-login credential change uses the newly issued session token', async () => {
@@ -26,16 +32,31 @@ test('first-login credential change uses the newly issued session token', async 
   globalThis.fetch = async (input, init) => {
     const url = String(input);
     if (url === '/api/login') {
-      return new Response(JSON.stringify({
-        ok: true,
-        token: issuedToken,
-        expiresAt: Date.now() + 60_000,
-        user: { id: 7, username: 'custom-role-user', displayName: 'Custom role user', roleId: 'custom', roleName: 'Custom', permissions: [], scopes: [], mustChangePassword: true },
-      }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          token: issuedToken,
+          expiresAt: Date.now() + 60_000,
+          user: {
+            id: 7,
+            username: 'custom-role-user',
+            displayName: 'Custom role user',
+            roleId: 'custom',
+            roleName: 'Custom',
+            permissions: [],
+            scopes: [],
+            mustChangePassword: true,
+          },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      );
     }
     assert.equal(url, '/api/users');
     credentialChangeAuthorization = new Headers(init?.headers).get('Authorization') ?? '';
-    return new Response(JSON.stringify({ ok: true, username: 'custom-role-user' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify({ ok: true, username: 'custom-role-user' }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
   };
 
   try {

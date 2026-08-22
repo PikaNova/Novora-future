@@ -1,4 +1,11 @@
-import type { ExamItem, MajorExam, AlertState, AlertStateConfig, CustomReminder, AlertsSettings } from '../types/index.js';
+import type {
+  ExamItem,
+  MajorExam,
+  AlertState,
+  AlertStateConfig,
+  CustomReminder,
+  AlertsSettings,
+} from '../types/index.js';
 import type { DesignPolicy, ScheduleMode, WeeklyPlan, WeeklyConflictPolicy } from '../types/exam.js';
 import { DEFAULT_WEEKLY_CONFLICT_POLICY, ALL_SCHEDULE_MODES } from '../types/exam.js';
 import { logger } from './logger.js';
@@ -11,7 +18,12 @@ import type { TypographyFontId, TypographySettings } from './settings/typography
 import { DEFAULT_TYPOGRAPHY } from './settings/typography.js';
 import type { MotionMode } from './settings/motion.js';
 import { DEFAULT_MOTION_MODE } from './settings/motion.js';
-import type { MajorBatchSubjectGroup, MajorBatchTimeSlot, MajorBatchTimeGroup, MajorBatchSettings } from './settings/majorBatch.js';
+import type {
+  MajorBatchSubjectGroup,
+  MajorBatchTimeSlot,
+  MajorBatchTimeGroup,
+  MajorBatchSettings,
+} from './settings/majorBatch.js';
 import { DEFAULT_MAJOR_BATCH_SETTINGS, normalizeMajorBatchSettings } from './settings/majorBatch.js';
 import { DEFAULT_DESIGN_POLICY, normalizeDesignPolicy } from './settings/design.js';
 import type { InitializationState } from './settings/school.js';
@@ -23,11 +35,7 @@ import {
   normalizeSelectedClassId,
   normalizeInitialization,
 } from './settings/school.js';
-import {
-  normalizeWeeklyPlan,
-  normalizeConflictPolicy,
-  resolveActiveWeeklyPlanIdByClass,
-} from './settings/weekly.js';
+import { normalizeWeeklyPlan, normalizeConflictPolicy, resolveActiveWeeklyPlanIdByClass } from './settings/weekly.js';
 
 export type { AlertState, AlertStateConfig, CustomReminder, AlertsSettings } from '../types/index.js';
 
@@ -37,7 +45,12 @@ export type { TypographyFontId, TypographySettings } from './settings/typography
 export { DEFAULT_TYPOGRAPHY } from './settings/typography.js';
 export type { MotionMode } from './settings/motion.js';
 export { DEFAULT_MOTION_MODE } from './settings/motion.js';
-export type { MajorBatchSubjectGroup, MajorBatchTimeSlot, MajorBatchTimeGroup, MajorBatchSettings } from './settings/majorBatch.js';
+export type {
+  MajorBatchSubjectGroup,
+  MajorBatchTimeSlot,
+  MajorBatchTimeGroup,
+  MajorBatchSettings,
+} from './settings/majorBatch.js';
 export { DEFAULT_MAJOR_BATCH_SETTINGS, normalizeMajorBatchSettings } from './settings/majorBatch.js';
 export { DEFAULT_DESIGN_POLICY, normalizeDesignPolicy } from './settings/design.js';
 export type { InitializationState } from './settings/school.js';
@@ -108,11 +121,22 @@ export interface AppSettings {
 /** 六种内置提醒的默认文案（与效果图一致）。 */
 export const DEFAULT_ALERT_STATES: Record<AlertState, AlertStateConfig> = {
   '15min': { enabled: true, label: '准备', title: '距开考 15 分钟', subtext: '请尽快进入考场并对号入座' },
-  '5min':  { enabled: true, label: '即将开考', title: '距开考 5 分钟', subtext: '请停止交谈，检查证件与文具' },
-  'start': { enabled: true, label: '进行中', title: '开始考试', subtext: '请听从监考安排，开始作答', hero: '现在开始' },
-  'end15': { enabled: true, label: '注意', title: '本场剩余 15 分钟', subtext: '请抓紧作答，注意填涂答题卡' },
-  'ended': { enabled: true, label: '已结束', title: '本场考试结束', subtext: '请立即停笔，原地等待收卷', hero: '考试结束' },
-  'next':  { enabled: true, label: '下一科', title: '下一科目：{subject}', subtext: '{subject} {start} 开考 · 请提前到场候考' },
+  '5min': { enabled: true, label: '即将开考', title: '距开考 5 分钟', subtext: '请停止交谈，检查证件与文具' },
+  start: { enabled: true, label: '进行中', title: '开始考试', subtext: '请听从监考安排，开始作答', hero: '现在开始' },
+  end15: { enabled: true, label: '注意', title: '本场剩余 15 分钟', subtext: '请抓紧作答，注意填涂答题卡' },
+  ended: {
+    enabled: true,
+    label: '已结束',
+    title: '本场考试结束',
+    subtext: '请立即停笔，原地等待收卷',
+    hero: '考试结束',
+  },
+  next: {
+    enabled: true,
+    label: '下一科',
+    title: '下一科目：{subject}',
+    subtext: '{subject} {start} 开考 · 请提前到场候考',
+  },
 };
 
 export const DEFAULT_ALERTS: AlertsSettings = {
@@ -132,8 +156,8 @@ export function genReminderId(): string {
 export function normalizeAlerts(raw: unknown): AlertsSettings {
   const src = (raw ?? {}) as Partial<AlertsSettings>;
   const states = {} as Record<AlertState, AlertStateConfig>;
-  (Object.keys(DEFAULT_ALERT_STATES) as AlertState[]).forEach(k => {
-    states[k] = { ...DEFAULT_ALERT_STATES[k], ...((src.states?.[k]) ?? {}) };
+  (Object.keys(DEFAULT_ALERT_STATES) as AlertState[]).forEach((k) => {
+    states[k] = { ...DEFAULT_ALERT_STATES[k], ...(src.states?.[k] ?? {}) };
   });
   const custom: CustomReminder[] = Array.isArray(src.custom)
     ? src.custom.filter(Boolean).map((c, i) => ({
@@ -142,7 +166,9 @@ export function normalizeAlerts(raw: unknown): AlertsSettings {
         enabled: c.enabled !== false,
         anchor: c.anchor === 'afterStart' || c.anchor === 'beforeEnd' ? c.anchor : 'beforeStart',
         offsetMin: Number.isFinite(c.offsetMin) ? Math.max(0, Math.round(c.offsetMin)) : 10,
-        tone: (['15min','5min','start','end15','ended','next'] as AlertState[]).includes(c.tone) ? c.tone : '15min',
+        tone: (['15min', '5min', 'start', 'end15', 'ended', 'next'] as AlertState[]).includes(c.tone)
+          ? c.tone
+          : '15min',
         label: c.label || '提醒',
         title: c.title || '',
         subtext: c.subtext || '',
@@ -153,7 +179,9 @@ export function normalizeAlerts(raw: unknown): AlertsSettings {
     durationSec: Number.isFinite(src.durationSec) ? Math.min(20, Math.max(3, src.durationSec as number)) : 8,
     states,
     custom,
-    silentMode: (['all', 'keyOnly', 'pauseUntilExamEnd'] as const).includes(src.silentMode as never) ? (src.silentMode as 'all' | 'keyOnly' | 'pauseUntilExamEnd') : 'all',
+    silentMode: (['all', 'keyOnly', 'pauseUntilExamEnd'] as const).includes(src.silentMode as never)
+      ? (src.silentMode as 'all' | 'keyOnly' | 'pauseUntilExamEnd')
+      : 'all',
     updatedAt: Number(src.updatedAt ?? 0),
   };
 }
@@ -218,12 +246,14 @@ export function normalizeExam(raw: unknown): ExamSettings {
   // 旧版迁移：仅有 items/title 时，包装为单个大型考试。
   if (majors.length === 0) {
     const legacyItems = Array.isArray(src.items) ? src.items : [];
-    majors = [{
-      id: genMajorId(),
-      name: (src.title && src.title.trim()) || '2026年高考',
-      items: legacyItems,
-      order: 0,
-    }];
+    majors = [
+      {
+        id: genMajorId(),
+        name: (src.title && src.title.trim()) || '2026年高考',
+        items: legacyItems,
+        order: 0,
+      },
+    ];
   }
 
   majors = majors
@@ -234,7 +264,7 @@ export function normalizeExam(raw: unknown): ExamSettings {
       order: typeof m.order === 'number' ? m.order : i,
       targetGradeIds: Array.isArray(m.targetGradeIds) ? m.targetGradeIds.map(String).filter(Boolean) : [],
       targetClassIds: Array.isArray(m.targetClassIds) ? m.targetClassIds.map(String).filter(Boolean) : [],
-      source: m.source === 'quick' ? 'quick' as const : 'regular' as const,
+      source: m.source === 'quick' ? ('quick' as const) : ('regular' as const),
       temporary: m.temporary === true || m.source === 'quick',
       priorityOverSchedule: m.priorityOverSchedule === true,
       createdAt: Number.isFinite(m.createdAt) ? Number(m.createdAt) : undefined,
@@ -245,8 +275,8 @@ export function normalizeExam(raw: unknown): ExamSettings {
     .map((m, i) => ({ ...m, order: i }));
 
   let activeMajorId = src.activeMajorId || '';
-  if (!majors.some(m => m.id === activeMajorId)) activeMajorId = majors[0].id;
-  const active = majors.find(m => m.id === activeMajorId) ?? majors[0];
+  if (!majors.some((m) => m.id === activeMajorId)) activeMajorId = majors[0].id;
+  const active = majors.find((m) => m.id === activeMajorId) ?? majors[0];
 
   // ===== v1.24.0 周测字段 =====
   const scheduleMode: ScheduleMode = ALL_SCHEDULE_MODES.includes(src.scheduleMode as ScheduleMode)
@@ -258,18 +288,28 @@ export function normalizeExam(raw: unknown): ExamSettings {
     .sort((a, b) => a.order - b.order)
     .map((p, i) => ({ ...p, order: i }));
   let activeWeeklyPlanId: string | null = src.activeWeeklyPlanId ?? null;
-  if (activeWeeklyPlanId && !weeklyPlans.some(p => p.id === activeWeeklyPlanId)) activeWeeklyPlanId = null;
+  if (activeWeeklyPlanId && !weeklyPlans.some((p) => p.id === activeWeeklyPlanId)) activeWeeklyPlanId = null;
   if (!activeWeeklyPlanId && weeklyPlans.length) activeWeeklyPlanId = weeklyPlans[0].id;
   const grades = normalizeGrades(src.grades);
   const classes = normalizeClasses(src.classes, grades);
-  const activeWeeklyPlanIdByClassId = resolveActiveWeeklyPlanIdByClass(classes, weeklyPlans, src.activeWeeklyPlanIdByClassId);
+  const activeWeeklyPlanIdByClassId = resolveActiveWeeklyPlanIdByClass(
+    classes,
+    weeklyPlans,
+    src.activeWeeklyPlanIdByClassId,
+  );
   const selectedGradeId = normalizeSelectedGradeId(src.selectedGradeId, grades);
   const selectedClassId = normalizeSelectedClassId(src.selectedClassId, classes, selectedGradeId);
   const initialization = normalizeInitialization(src.initialization);
   base.designPolicy = normalizeDesignPolicy(src.designPolicy);
-  const rawPresets = (src.majorBatchPresets ?? {}) as { subjectGroups?: unknown; timeGroups?: unknown; updatedAt?: unknown };
+  const rawPresets = (src.majorBatchPresets ?? {}) as {
+    subjectGroups?: unknown;
+    timeGroups?: unknown;
+    updatedAt?: unknown;
+  };
   base.majorBatchPresets = {
-    subjectGroups: Array.isArray(rawPresets.subjectGroups) ? (rawPresets.subjectGroups as MajorBatchSubjectGroup[]) : [],
+    subjectGroups: Array.isArray(rawPresets.subjectGroups)
+      ? (rawPresets.subjectGroups as MajorBatchSubjectGroup[])
+      : [],
     timeGroups: Array.isArray(rawPresets.timeGroups) ? (rawPresets.timeGroups as MajorBatchTimeGroup[]) : [],
     updatedAt: Number(rawPresets.updatedAt ?? 0),
   };
@@ -335,12 +375,17 @@ export function updateAppSettings(partial: Partial<AppSettings> | ((c: AppSettin
       ...current,
       ...updates,
       general: updates.general
-        ? { ...current.general, ...updates.general,
+        ? {
+            ...current.general,
+            ...updates.general,
             timeSync: { ...current.general.timeSync, ...(updates.general.timeSync ?? {}) },
-            typography: { ...current.general.typography, ...(updates.general.typography ?? {}) } }
+            typography: { ...current.general.typography, ...(updates.general.typography ?? {}) },
+          }
         : current.general,
       exam: updates.exam ? normalizeExam({ ...current.exam, ...updates.exam }) : current.exam,
-      majorBatch: updates.majorBatch ? normalizeMajorBatchSettings({ ...current.majorBatch, ...updates.majorBatch }) : current.majorBatch,
+      majorBatch: updates.majorBatch
+        ? normalizeMajorBatchSettings({ ...current.majorBatch, ...updates.majorBatch })
+        : current.majorBatch,
       alerts: updates.alerts ? normalizeAlerts({ ...current.alerts, ...updates.alerts }) : current.alerts,
     };
     localStorage.setItem(APP_SETTINGS_KEY, JSON.stringify(next));
@@ -353,25 +398,25 @@ export function updateAppSettings(partial: Partial<AppSettings> | ((c: AppSettin
 }
 
 export function updateExamSettings(updates: Partial<ExamSettings>): void {
-  updateAppSettings(c => ({ exam: normalizeExam({ ...c.exam, ...updates }) }));
+  updateAppSettings((c) => ({ exam: normalizeExam({ ...c.exam, ...updates }) }));
 }
 
 export function updateMajorBatchSettings(updates: Partial<MajorBatchSettings>): void {
-  updateAppSettings(c => ({ majorBatch: normalizeMajorBatchSettings({ ...c.majorBatch, ...updates }) }));
+  updateAppSettings((c) => ({ majorBatch: normalizeMajorBatchSettings({ ...c.majorBatch, ...updates }) }));
 }
 
 export function updateAlertsSettings(updates: Partial<AlertsSettings>): void {
-  updateAppSettings(c => ({ alerts: normalizeAlerts({ ...c.alerts, ...updates }) }));
+  updateAppSettings((c) => ({ alerts: normalizeAlerts({ ...c.alerts, ...updates }) }));
 }
 
 export function updateMotionMode(mode: MotionMode): void {
-  updateAppSettings(c => ({ general: { ...c.general, motionMode: mode } }));
+  updateAppSettings((c) => ({ general: { ...c.general, motionMode: mode } }));
 }
 
 export function updateTimeSyncSettings(
-  updates: Partial<TimeSyncSettings> | ((c: TimeSyncSettings) => Partial<TimeSyncSettings>)
+  updates: Partial<TimeSyncSettings> | ((c: TimeSyncSettings) => Partial<TimeSyncSettings>),
 ): void {
-  updateAppSettings(c => {
+  updateAppSettings((c) => {
     const base = c.general.timeSync;
     const patch = typeof updates === 'function' ? updates(base) : updates;
     return { general: { ...c.general, timeSync: { ...base, ...patch } } };

@@ -38,11 +38,51 @@ export default function HelpTip({ title, children, label }: Props) {
     };
   }, [open]);
 
-  return <span className="help-tip">
-    <button ref={triggerRef} type="button" className="help-tip__trigger" aria-label={label || `查看${title}说明`} aria-expanded={open} onClick={event => { event.preventDefault(); event.stopPropagation(); setOpen(value => !value); }}>i</button>
-    {open && createPortal(<>
-      <button type="button" className="help-tip__backdrop" aria-label="关闭说明" onClick={event => { event.preventDefault(); event.stopPropagation(); setOpen(false); }} />
-      <span className="help-tip__panel" role="dialog" aria-label={title} style={position ? { top: position.top, left: position.left } : undefined} onClick={event => event.stopPropagation()}><strong>{title}</strong><span>{children}</span><button type="button" className="help-tip__close" onClick={() => setOpen(false)}>知道了</button></span>
-    </>, document.body)}
-  </span>;
+  return (
+    <span className="help-tip">
+      <button
+        ref={triggerRef}
+        type="button"
+        className="help-tip__trigger"
+        aria-label={label || `查看${title}说明`}
+        aria-expanded={open}
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          setOpen((value) => !value);
+        }}
+      >
+        i
+      </button>
+      {open &&
+        createPortal(
+          <>
+            <button
+              type="button"
+              className="help-tip__backdrop"
+              aria-label="关闭说明"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                setOpen(false);
+              }}
+            />
+            <span
+              className="help-tip__panel"
+              role="dialog"
+              aria-label={title}
+              style={position ? { top: position.top, left: position.left } : undefined}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <strong>{title}</strong>
+              <span>{children}</span>
+              <button type="button" className="help-tip__close" onClick={() => setOpen(false)}>
+                知道了
+              </button>
+            </span>
+          </>,
+          document.body,
+        )}
+    </span>
+  );
 }

@@ -30,7 +30,12 @@ export async function fetchAnnouncements(force = false): Promise<Announcement[]>
     const d = await r.json();
     const list: Announcement[] = Array.isArray(d?.announcements) ? d.announcements : [];
     // 客户端再次统一排序：置顶公告组在前，各组均按更新时间从新到旧。
-    list.sort((a, b) => Number(b.pinned) - Number(a.pinned) || Number(b.updated_at) - Number(a.updated_at) || Number(b.created_at) - Number(a.created_at));
+    list.sort(
+      (a, b) =>
+        Number(b.pinned) - Number(a.pinned) ||
+        Number(b.updated_at) - Number(a.updated_at) ||
+        Number(b.created_at) - Number(a.created_at),
+    );
     cache = { at: Date.now(), data: list };
     return list;
   } catch {

@@ -6,7 +6,7 @@ export function useRetryCountdown(lockedUntil: number | null): number {
 
   useEffect(() => {
     if (!lockedUntil) return;
-    const timer = globalThis.setInterval(() => forceRender(value => value + 1), 500);
+    const timer = globalThis.setInterval(() => forceRender((value) => value + 1), 500);
     return () => globalThis.clearInterval(timer);
   }, [lockedUntil]);
 

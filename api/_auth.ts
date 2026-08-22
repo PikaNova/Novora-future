@@ -75,7 +75,12 @@ const isCountRow = rowShape<{ count: number }>({ count: isNumberLike });
 const isUserIdRow = rowShape<{ id: DatabaseInt8 }>({ id: isDatabaseInt8 });
 const isAuthIdRow = rowShape<{ id: number }>({ id: isNumberLike });
 const isIpSaltRow = rowShape<{ ip_salt: string }>({ ip_salt: isString });
-const isGuestDeviceRow = rowShape<{ revoked: boolean; grade_id: string; class_id: string; is_management: boolean }>({ revoked: isBoolean, grade_id: isString, class_id: isString, is_management: isBoolean });
+const isGuestDeviceRow = rowShape<{ revoked: boolean; grade_id: string; class_id: string; is_management: boolean }>({
+  revoked: isBoolean,
+  grade_id: isString,
+  class_id: isString,
+  is_management: isBoolean,
+});
 const isGuestRoleNameRow = rowShape<{ name: string }>({ name: isString });
 const isAuthRow = rowShape<AuthRow>({
   password_hash: isString,
@@ -91,7 +96,10 @@ const isRecoveryHashSaltRow = rowShape<{ recovery_key_hash?: string | null; reco
   recovery_key_salt: isNullableString,
 });
 const isIdUsernameRow = rowShape<{ id: DatabaseInt8; username: string }>({ id: isDatabaseInt8, username: isString });
-const isCountOldestRow = rowShape<{ count: number; oldest: DatabaseInt8 }>({ count: isNumberLike, oldest: isDatabaseInt8 });
+const isCountOldestRow = rowShape<{ count: number; oldest: DatabaseInt8 }>({
+  count: isNumberLike,
+  oldest: isDatabaseInt8,
+});
 const isUserRow = rowShape<UserRow>({
   id: isDatabaseInt8,
   username: isString,
@@ -125,18 +133,96 @@ export function authSql() {
 }
 
 export const BUILTIN_ROLES: Array<{ id: string; name: string; description: string; permissions: Permission[] }> = [
-  { id: 'super_admin', name: '超级管理员', description: '拥有全校数据与全部系统权限，可管理用户、角色、部署及所有业务设置。', permissions: ['*'] },
-  { id: 'grade_admin', name: '年级管理员', description: '管理授权年级的考试、周测、班级、设备和下级用户，可批量创建该年级的班级管理员，并查看该年级完整运行总览。', permissions: ['overview.read', 'major.read', 'major.create', 'major.quick_create', 'major.edit', 'major.delete', 'major.import', 'major.export', 'weekly.read', 'weekly.create', 'weekly.edit', 'weekly.delete', 'weekly.copy', 'weekly.override', 'weekly.import', 'weekly.export', 'school.read', 'school.class_manage', 'device.read', 'device.bind', 'device.revoke', 'alerts.read', 'settings.read', 'user.read', 'user.create', 'user.edit', 'user.disable', 'user.delete', 'user.reset_password'] },
-  { id: 'class_admin', name: '班级管理员', description: '管理授权班级的周测、考试安排和绑定设备，可快速发布本班临时考试并修改自己的用户名与密码，不显示项目运行总览。', permissions: ['major.read', 'major.quick_create', 'weekly.read', 'weekly.create', 'weekly.edit', 'weekly.delete', 'weekly.copy', 'weekly.override', 'weekly.import', 'weekly.export', 'school.read', 'device.read', 'device.bind', 'device.revoke', 'alerts.read'] },
-  { id: 'viewer', name: '班级访客', description: '未登录设备可查看本班考试安排、周测与教室大屏，可导出核对，不修改任何数据。', permissions: ['major.read', 'major.export', 'weekly.read', 'weekly.export', 'school.read', 'device.read', 'alerts.read', 'settings.read'] },
+  {
+    id: 'super_admin',
+    name: '超级管理员',
+    description: '拥有全校数据与全部系统权限，可管理用户、角色、部署及所有业务设置。',
+    permissions: ['*'],
+  },
+  {
+    id: 'grade_admin',
+    name: '年级管理员',
+    description:
+      '管理授权年级的考试、周测、班级、设备和下级用户，可批量创建该年级的班级管理员，并查看该年级完整运行总览。',
+    permissions: [
+      'overview.read',
+      'major.read',
+      'major.create',
+      'major.quick_create',
+      'major.edit',
+      'major.delete',
+      'major.import',
+      'major.export',
+      'weekly.read',
+      'weekly.create',
+      'weekly.edit',
+      'weekly.delete',
+      'weekly.copy',
+      'weekly.override',
+      'weekly.import',
+      'weekly.export',
+      'school.read',
+      'school.class_manage',
+      'device.read',
+      'device.bind',
+      'device.revoke',
+      'alerts.read',
+      'settings.read',
+      'user.read',
+      'user.create',
+      'user.edit',
+      'user.disable',
+      'user.delete',
+      'user.reset_password',
+    ],
+  },
+  {
+    id: 'class_admin',
+    name: '班级管理员',
+    description:
+      '管理授权班级的周测、考试安排和绑定设备，可快速发布本班临时考试并修改自己的用户名与密码，不显示项目运行总览。',
+    permissions: [
+      'major.read',
+      'major.quick_create',
+      'weekly.read',
+      'weekly.create',
+      'weekly.edit',
+      'weekly.delete',
+      'weekly.copy',
+      'weekly.override',
+      'weekly.import',
+      'weekly.export',
+      'school.read',
+      'device.read',
+      'device.bind',
+      'device.revoke',
+      'alerts.read',
+    ],
+  },
+  {
+    id: 'viewer',
+    name: '班级访客',
+    description: '未登录设备可查看本班考试安排、周测与教室大屏，可导出核对，不修改任何数据。',
+    permissions: [
+      'major.read',
+      'major.export',
+      'weekly.read',
+      'weekly.export',
+      'school.read',
+      'device.read',
+      'alerts.read',
+      'settings.read',
+    ],
+  },
 ];
 
 export async function ensureAuthTables(): Promise<void> {
-  if (!setupPromise) setupPromise = (async () => {
-    const sql = authSql();
-    await sql.transaction(transaction => [
-      transaction`SELECT pg_advisory_xact_lock(${SCHEMA_MIGRATION_LOCK_ID})`,
-      transaction`CREATE TABLE IF NOT EXISTS app_auth (
+  if (!setupPromise)
+    setupPromise = (async () => {
+      const sql = authSql();
+      await sql.transaction((transaction) => [
+        transaction`SELECT pg_advisory_xact_lock(${SCHEMA_MIGRATION_LOCK_ID})`,
+        transaction`CREATE TABLE IF NOT EXISTS app_auth (
         id INTEGER PRIMARY KEY DEFAULT 1,
         password_hash TEXT NOT NULL,
         password_salt TEXT NOT NULL,
@@ -146,15 +232,15 @@ export async function ensureAuthTables(): Promise<void> {
         updated_at BIGINT NOT NULL,
         CHECK (id = 1)
       )`,
-      transaction`ALTER TABLE app_auth ADD COLUMN IF NOT EXISTS recovery_key_hash TEXT`,
-      transaction`ALTER TABLE app_auth ADD COLUMN IF NOT EXISTS recovery_key_salt TEXT`,
-      transaction`CREATE TABLE IF NOT EXISTS app_telemetry_config (
+        transaction`ALTER TABLE app_auth ADD COLUMN IF NOT EXISTS recovery_key_hash TEXT`,
+        transaction`ALTER TABLE app_auth ADD COLUMN IF NOT EXISTS recovery_key_salt TEXT`,
+        transaction`CREATE TABLE IF NOT EXISTS app_telemetry_config (
         id INTEGER PRIMARY KEY DEFAULT 1,
         ip_salt TEXT NOT NULL,
         created_at BIGINT NOT NULL,
         CHECK (id = 1)
       )`,
-      transaction`CREATE TABLE IF NOT EXISTS app_roles (
+        transaction`CREATE TABLE IF NOT EXISTS app_roles (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
         description TEXT NOT NULL DEFAULT '',
@@ -163,7 +249,7 @@ export async function ensureAuthTables(): Promise<void> {
         created_at BIGINT NOT NULL,
         updated_at BIGINT NOT NULL
       )`,
-      transaction`CREATE TABLE IF NOT EXISTS app_users (
+        transaction`CREATE TABLE IF NOT EXISTS app_users (
         id BIGSERIAL PRIMARY KEY,
         username TEXT NOT NULL,
         display_name TEXT NOT NULL,
@@ -177,8 +263,8 @@ export async function ensureAuthTables(): Promise<void> {
         created_at BIGINT NOT NULL,
         updated_at BIGINT NOT NULL
       )`,
-      transaction`CREATE UNIQUE INDEX IF NOT EXISTS idx_app_users_username_lower ON app_users (LOWER(username))`,
-      transaction`CREATE TABLE IF NOT EXISTS app_user_scopes (
+        transaction`CREATE UNIQUE INDEX IF NOT EXISTS idx_app_users_username_lower ON app_users (LOWER(username))`,
+        transaction`CREATE TABLE IF NOT EXISTS app_user_scopes (
         id BIGSERIAL PRIMARY KEY,
         user_id BIGINT NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
         scope_type TEXT NOT NULL,
@@ -186,7 +272,7 @@ export async function ensureAuthTables(): Promise<void> {
         class_id TEXT NOT NULL DEFAULT '',
         UNIQUE(user_id, scope_type, grade_id, class_id)
       )`,
-      transaction`CREATE TABLE IF NOT EXISTS app_audit_logs (
+        transaction`CREATE TABLE IF NOT EXISTS app_audit_logs (
         id BIGSERIAL PRIMARY KEY,
         user_id BIGINT,
         username TEXT NOT NULL DEFAULT '',
@@ -198,10 +284,10 @@ export async function ensureAuthTables(): Promise<void> {
         detail JSONB,
         created_at BIGINT NOT NULL
       )`,
-      transaction`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS email TEXT`,
-      transaction`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS email_bound_at BIGINT`,
-      transaction`CREATE UNIQUE INDEX IF NOT EXISTS idx_app_users_email ON app_users (email) WHERE email IS NOT NULL`,
-      transaction`CREATE TABLE IF NOT EXISTS email_verification_codes (
+        transaction`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS email TEXT`,
+        transaction`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS email_bound_at BIGINT`,
+        transaction`CREATE UNIQUE INDEX IF NOT EXISTS idx_app_users_email ON app_users (email) WHERE email IS NOT NULL`,
+        transaction`CREATE TABLE IF NOT EXISTS email_verification_codes (
         id BIGSERIAL PRIMARY KEY,
         email TEXT NOT NULL,
         purpose TEXT NOT NULL DEFAULT 'login',
@@ -211,9 +297,9 @@ export async function ensureAuthTables(): Promise<void> {
         created_at BIGINT NOT NULL,
         ip TEXT NOT NULL DEFAULT ''
       )`,
-      transaction`CREATE INDEX IF NOT EXISTS idx_email_codes_email ON email_verification_codes (email)`,
-      transaction`CREATE INDEX IF NOT EXISTS idx_email_codes_expires ON email_verification_codes (expires_at)`,
-      transaction`CREATE TABLE IF NOT EXISTS email_config (
+        transaction`CREATE INDEX IF NOT EXISTS idx_email_codes_email ON email_verification_codes (email)`,
+        transaction`CREATE INDEX IF NOT EXISTS idx_email_codes_expires ON email_verification_codes (expires_at)`,
+        transaction`CREATE TABLE IF NOT EXISTS email_config (
         id INTEGER PRIMARY KEY DEFAULT 1,
         smtp_host TEXT NOT NULL DEFAULT '',
         smtp_port INTEGER NOT NULL DEFAULT 465,
@@ -227,8 +313,8 @@ export async function ensureAuthTables(): Promise<void> {
         updated_at BIGINT NOT NULL DEFAULT 0,
         CHECK (id = 1)
       )`,
-      transaction`ALTER TABLE email_config ADD COLUMN IF NOT EXISTS init_bind_policy TEXT NOT NULL DEFAULT 'optional'`,
-      transaction`CREATE TABLE IF NOT EXISTS email_outbox (
+        transaction`ALTER TABLE email_config ADD COLUMN IF NOT EXISTS init_bind_policy TEXT NOT NULL DEFAULT 'optional'`,
+        transaction`CREATE TABLE IF NOT EXISTS email_outbox (
         id BIGSERIAL PRIMARY KEY,
         email TEXT NOT NULL,
         purpose TEXT NOT NULL DEFAULT 'login',
@@ -242,37 +328,49 @@ export async function ensureAuthTables(): Promise<void> {
         sent_at BIGINT,
         updated_at BIGINT NOT NULL
       )`,
-      transaction`CREATE INDEX IF NOT EXISTS idx_email_outbox_due ON email_outbox (status, next_attempt_at)`,
-      transaction`CREATE TABLE IF NOT EXISTS mail_throttle (
+        transaction`CREATE INDEX IF NOT EXISTS idx_email_outbox_due ON email_outbox (status, next_attempt_at)`,
+        transaction`CREATE TABLE IF NOT EXISTS mail_throttle (
         id INTEGER PRIMARY KEY DEFAULT 1,
         last_sent_at BIGINT NOT NULL DEFAULT 0,
         CHECK (id = 1)
       )`,
-    ]);
-    const now = Date.now();
-    await authSql()`INSERT INTO mail_throttle (id, last_sent_at) VALUES (1, 0) ON CONFLICT (id) DO NOTHING`;
-    await Promise.all(BUILTIN_ROLES.map(role => sql`INSERT INTO app_roles (id, name, description, permissions, built_in, created_at, updated_at)
+      ]);
+      const now = Date.now();
+      await authSql()`INSERT INTO mail_throttle (id, last_sent_at) VALUES (1, 0) ON CONFLICT (id) DO NOTHING`;
+      await Promise.all(
+        BUILTIN_ROLES.map(
+          (role) => sql`INSERT INTO app_roles (id, name, description, permissions, built_in, created_at, updated_at)
       VALUES (${role.id}, ${role.name}, ${role.description}, ${JSON.stringify(role.permissions)}::jsonb, TRUE, ${now}, ${now})
-      ON CONFLICT (id) DO UPDATE SET name=EXCLUDED.name, description=EXCLUDED.description, permissions=EXCLUDED.permissions, built_in=TRUE, updated_at=EXCLUDED.updated_at`));
-    // v1.32：精简旧内置角色。教务管理员降为全范围年级管理员，设备管理员迁移为巡考员（viewer）。
-    await sql`UPDATE app_users SET role_id='grade_admin', token_version=token_version+1, updated_at=${now} WHERE role_id='academic_admin'`;
-    await sql`UPDATE app_users SET role_id='viewer', token_version=token_version+1, updated_at=${now} WHERE role_id='device_admin'`;
-    await sql`DELETE FROM app_roles WHERE id IN ('academic_admin','device_admin') AND NOT EXISTS (SELECT 1 FROM app_users WHERE app_users.role_id=app_roles.id)`;
-    await sql`UPDATE app_roles SET name='班级访客', description='未登录设备可查看本班考试安排、周测与教室大屏，可导出核对，不修改任何数据。', updated_at=${now} WHERE id='viewer'`;
-    // 已经完成过旧版密码初始化的数据库可直接生成默认超级管理员，无需再次输入或重置数据。
-    const [legacyRowsRaw, userCountRowsRaw] = await Promise.all([
-      sql`SELECT password_hash, password_salt FROM app_auth WHERE id=1`,
-      sql`SELECT COUNT(*)::int AS count FROM app_users`,
-    ]);
-    const legacyRows = assertRows(legacyRowsRaw, isPasswordSaltRow, 'app_auth');
-    const userCountRows = assertRows(userCountRowsRaw, isCountRow, 'app_users');
-    if (legacyRows[0] && Number(userCountRows[0]?.count) === 0) {
-      const created = assertRows(await sql`INSERT INTO app_users (username, display_name, password_hash, password_salt, role_id, status, must_change_password, token_version, created_at, updated_at)
+      ON CONFLICT (id) DO UPDATE SET name=EXCLUDED.name, description=EXCLUDED.description, permissions=EXCLUDED.permissions, built_in=TRUE, updated_at=EXCLUDED.updated_at`,
+        ),
+      );
+      // v1.32：精简旧内置角色。教务管理员降为全范围年级管理员，设备管理员迁移为巡考员（viewer）。
+      await sql`UPDATE app_users SET role_id='grade_admin', token_version=token_version+1, updated_at=${now} WHERE role_id='academic_admin'`;
+      await sql`UPDATE app_users SET role_id='viewer', token_version=token_version+1, updated_at=${now} WHERE role_id='device_admin'`;
+      await sql`DELETE FROM app_roles WHERE id IN ('academic_admin','device_admin') AND NOT EXISTS (SELECT 1 FROM app_users WHERE app_users.role_id=app_roles.id)`;
+      await sql`UPDATE app_roles SET name='班级访客', description='未登录设备可查看本班考试安排、周测与教室大屏，可导出核对，不修改任何数据。', updated_at=${now} WHERE id='viewer'`;
+      // 已经完成过旧版密码初始化的数据库可直接生成默认超级管理员，无需再次输入或重置数据。
+      const [legacyRowsRaw, userCountRowsRaw] = await Promise.all([
+        sql`SELECT password_hash, password_salt FROM app_auth WHERE id=1`,
+        sql`SELECT COUNT(*)::int AS count FROM app_users`,
+      ]);
+      const legacyRows = assertRows(legacyRowsRaw, isPasswordSaltRow, 'app_auth');
+      const userCountRows = assertRows(userCountRowsRaw, isCountRow, 'app_users');
+      if (legacyRows[0] && Number(userCountRows[0]?.count) === 0) {
+        const created = assertRows(
+          await sql`INSERT INTO app_users (username, display_name, password_hash, password_salt, role_id, status, must_change_password, token_version, created_at, updated_at)
         VALUES ('admin', '超级管理员', ${legacyRows[0].password_hash}, ${legacyRows[0].password_salt}, 'super_admin', 'active', FALSE, 1, ${now}, ${now})
-        ON CONFLICT DO NOTHING RETURNING id`, isUserIdRow, 'app_users');
-      if (created[0]) await sql`INSERT INTO app_user_scopes (user_id, scope_type, grade_id, class_id) VALUES (${created[0].id}, 'all', '', '') ON CONFLICT DO NOTHING`;
-    }
-  })().catch(error => { setupPromise = null; throw error; });
+        ON CONFLICT DO NOTHING RETURNING id`,
+          isUserIdRow,
+          'app_users',
+        );
+        if (created[0])
+          await sql`INSERT INTO app_user_scopes (user_id, scope_type, grade_id, class_id) VALUES (${created[0].id}, 'all', '', '') ON CONFLICT DO NOTHING`;
+      }
+    })().catch((error) => {
+      setupPromise = null;
+      throw error;
+    });
   return setupPromise;
 }
 
@@ -290,11 +388,15 @@ export async function ensureTelemetryIpSalt(): Promise<string> {
       const generated = randomBytes(24).toString('base64url');
       await sql`INSERT INTO app_telemetry_config (id, ip_salt, created_at)
         VALUES (1, ${generated}, ${Date.now()}) ON CONFLICT (id) DO NOTHING`;
-      const rows = assertRows(await sql`SELECT ip_salt FROM app_telemetry_config WHERE id=1`, isIpSaltRow, 'app_telemetry_config');
+      const rows = assertRows(
+        await sql`SELECT ip_salt FROM app_telemetry_config WHERE id=1`,
+        isIpSaltRow,
+        'app_telemetry_config',
+      );
       const value = rows[0]?.ip_salt;
       if (!value) throw new Error('Telemetry IP salt is unavailable');
       return value;
-    })().catch(error => {
+    })().catch((error) => {
       telemetryIpSaltPromise = null;
       throw error;
     });
@@ -304,18 +406,22 @@ export async function ensureTelemetryIpSalt(): Promise<string> {
 
 async function config(): Promise<AuthRow | null> {
   await ensureAuthTables();
-  const rows = assertRows(await authSql()`SELECT password_hash, password_salt, token_secret, token_version FROM app_auth WHERE id = 1`, isAuthRow, 'app_auth');
+  const rows = assertRows(
+    await authSql()`SELECT password_hash, password_salt, token_secret, token_version FROM app_auth WHERE id = 1`,
+    isAuthRow,
+    'app_auth',
+  );
   return rows[0] ?? null;
 }
 
 export async function makePasswordHash(password: string): Promise<{ hash: string; salt: string }> {
   const salt = randomBytes(16).toString('base64url');
-  const key = await scrypt(password, salt, 64) as Buffer;
+  const key = (await scrypt(password, salt, 64)) as Buffer;
   return { hash: key.toString('base64url'), salt };
 }
 
 async function hashPassword(password: string, salt: string): Promise<string> {
-  const key = await scrypt(password, salt, 64) as Buffer;
+  const key = (await scrypt(password, salt, 64)) as Buffer;
   return key.toString('base64url');
 }
 
@@ -327,12 +433,20 @@ async function matches(password: string, hash: string, salt: string): Promise<bo
 
 export async function isAdminRecoveryConfigured(): Promise<boolean> {
   await ensureAuthTables();
-  const rows = assertRows(await authSql()`SELECT recovery_key_hash FROM app_auth WHERE id=1`, isRecoveryHashRow, 'app_auth');
+  const rows = assertRows(
+    await authSql()`SELECT recovery_key_hash FROM app_auth WHERE id=1`,
+    isRecoveryHashRow,
+    'app_auth',
+  );
   return !!rows[0]?.recovery_key_hash || LEGACY_ADMIN_RECOVERY_KEY.length >= 16;
 }
 
 async function recoveryKeyMatches(recoveryKey: string): Promise<boolean> {
-  const recoveryRows = assertRows(await authSql()`SELECT recovery_key_hash, recovery_key_salt FROM app_auth WHERE id=1`, isRecoveryHashSaltRow, 'app_auth');
+  const recoveryRows = assertRows(
+    await authSql()`SELECT recovery_key_hash, recovery_key_salt FROM app_auth WHERE id=1`,
+    isRecoveryHashSaltRow,
+    'app_auth',
+  );
   const stored = recoveryRows[0];
   if (stored?.recovery_key_hash && stored.recovery_key_salt) {
     return matches(recoveryKey, stored.recovery_key_hash, stored.recovery_key_salt);
@@ -345,13 +459,21 @@ async function recoveryKeyMatches(recoveryKey: string): Promise<boolean> {
   return false;
 }
 
-export async function recoverSuperAdmin(username: string, recoveryKey: string, nextPassword: string): Promise<{ ok: boolean; error?: string }> {
-  if (!await isAdminRecoveryConfigured()) return { ok: false, error: '当前项目尚未生成超级管理员恢复密钥' };
+export async function recoverSuperAdmin(
+  username: string,
+  recoveryKey: string,
+  nextPassword: string,
+): Promise<{ ok: boolean; error?: string }> {
+  if (!(await isAdminRecoveryConfigured())) return { ok: false, error: '当前项目尚未生成超级管理员恢复密钥' };
   if (nextPassword.length < 8) return { ok: false, error: '新密码至少需要 8 位' };
   await ensureAuthTables();
   const keyMatches = await recoveryKeyMatches(recoveryKey);
-  const rows = assertRows(await authSql()`SELECT id, username FROM app_users
-    WHERE LOWER(username)=LOWER(${username.trim().slice(0, 80)}) AND role_id='super_admin' AND status='active' LIMIT 1`, isIdUsernameRow, 'app_users');
+  const rows = assertRows(
+    await authSql()`SELECT id, username FROM app_users
+    WHERE LOWER(username)=LOWER(${username.trim().slice(0, 80)}) AND role_id='super_admin' AND status='active' LIMIT 1`,
+    isIdUsernameRow,
+    'app_users',
+  );
   if (!keyMatches || !rows[0]) return { ok: false, error: '恢复信息不正确' };
   const password = await makePasswordHash(nextPassword);
   await invalidateLegacySharedToken();
@@ -361,18 +483,27 @@ export async function recoverSuperAdmin(username: string, recoveryKey: string, n
   return { ok: true };
 }
 
-export async function repairSuperAdmin(username: string, recoveryKey: string, nextPassword: string): Promise<{ ok: boolean; error?: string; created?: boolean; retryAfterMs?: number }> {
-  if (!await isAdminRecoveryConfigured()) return { ok: false, error: '当前项目尚未生成超级管理员恢复密钥' };
+export async function repairSuperAdmin(
+  username: string,
+  recoveryKey: string,
+  nextPassword: string,
+): Promise<{ ok: boolean; error?: string; created?: boolean; retryAfterMs?: number }> {
+  if (!(await isAdminRecoveryConfigured())) return { ok: false, error: '当前项目尚未生成超级管理员恢复密钥' };
   if (nextPassword.length < 8) return { ok: false, error: '新密码至少需要 8 位' };
   const name = username.trim().slice(0, 80);
-  if (!/^[A-Za-z0-9._-]{3,40}$/.test(name)) return { ok: false, error: '用户名需为 3-40 位字母、数字、点、横线或下划线' };
+  if (!/^[A-Za-z0-9._-]{3,40}$/.test(name))
+    return { ok: false, error: '用户名需为 3-40 位字母、数字、点、横线或下划线' };
   await ensureAuthTables();
 
   const sql = authSql();
   const now = Date.now();
   const since = now - REPAIR_RATE_LIMIT_WINDOW_MS;
-  const recentFailures = assertRows(await sql`SELECT COUNT(*)::int AS count, COALESCE(MIN(created_at), 0) AS oldest FROM app_audit_logs
-    WHERE action='user.super_admin.repair.failed' AND created_at > ${since}`, isCountOldestRow, 'app_audit_logs');
+  const recentFailures = assertRows(
+    await sql`SELECT COUNT(*)::int AS count, COALESCE(MIN(created_at), 0) AS oldest FROM app_audit_logs
+    WHERE action='user.super_admin.repair.failed' AND created_at > ${since}`,
+    isCountOldestRow,
+    'app_audit_logs',
+  );
   if (Number(recentFailures[0]?.count) >= REPAIR_RATE_LIMIT_MAX_ATTEMPTS) {
     const retryAfterMs = Math.max(1_000, Number(recentFailures[0]?.oldest ?? 0) + REPAIR_RATE_LIMIT_WINDOW_MS - now);
     return { ok: false, error: `恢复尝试过于频繁，请 ${Math.ceil(retryAfterMs / 1000)} 秒后再试`, retryAfterMs };
@@ -381,12 +512,16 @@ export async function repairSuperAdmin(username: string, recoveryKey: string, ne
   const keyMatches = await recoveryKeyMatches(recoveryKey);
   if (!keyMatches) {
     await writeAudit(null, 'user.super_admin.repair.failed', 'user', '', { username: name });
-    await new Promise(resolve => setTimeout(resolve, 400));
+    await new Promise((resolve) => setTimeout(resolve, 400));
     return { ok: false, error: '恢复信息不正确' };
   }
 
   const password = await makePasswordHash(nextPassword);
-  const existing = assertRows(await sql`SELECT id FROM app_users WHERE LOWER(username)=LOWER(${name}) LIMIT 1`, isUserIdRow, 'app_users');
+  const existing = assertRows(
+    await sql`SELECT id FROM app_users WHERE LOWER(username)=LOWER(${name}) LIMIT 1`,
+    isUserIdRow,
+    'app_users',
+  );
   let userId: number;
   let created = false;
   if (existing[0]) {
@@ -395,8 +530,12 @@ export async function repairSuperAdmin(username: string, recoveryKey: string, ne
     await sql`UPDATE app_users SET role_id='super_admin', status='active', password_hash=${password.hash}, password_salt=${password.salt},
       must_change_password=TRUE, token_version=token_version+1, updated_at=${now} WHERE id=${userId}`;
   } else {
-    const insertedRows = assertRows(await sql`INSERT INTO app_users (username, display_name, password_hash, password_salt, role_id, status, must_change_password, token_version, created_at, updated_at)
-      VALUES (${name}, '超级管理员', ${password.hash}, ${password.salt}, 'super_admin', 'active', TRUE, 1, ${now}, ${now}) RETURNING id`, isUserIdRow, 'app_users');
+    const insertedRows = assertRows(
+      await sql`INSERT INTO app_users (username, display_name, password_hash, password_salt, role_id, status, must_change_password, token_version, created_at, updated_at)
+      VALUES (${name}, '超级管理员', ${password.hash}, ${password.salt}, 'super_admin', 'active', TRUE, 1, ${now}, ${now}) RETURNING id`,
+      isUserIdRow,
+      'app_users',
+    );
     userId = Number(insertedRows[0].id);
     created = true;
   }
@@ -409,12 +548,20 @@ export async function repairSuperAdmin(username: string, recoveryKey: string, ne
 /** 首次学校初始化时生成一次；数据库只保存加盐哈希，明文只返回给当前超级管理员。 */
 export async function ensureGeneratedRecoveryKey(): Promise<string | null> {
   await ensureAuthTables();
-  const rows = assertRows(await authSql()`SELECT recovery_key_hash FROM app_auth WHERE id=1`, isRecoveryHashRow, 'app_auth');
+  const rows = assertRows(
+    await authSql()`SELECT recovery_key_hash FROM app_auth WHERE id=1`,
+    isRecoveryHashRow,
+    'app_auth',
+  );
   if (rows[0]?.recovery_key_hash || LEGACY_ADMIN_RECOVERY_KEY.length >= 16) return null;
   const recoveryKey = `NVR-${randomBytes(24).toString('base64url')}`;
   const encoded = await makePasswordHash(recoveryKey);
-  const updated = assertRows(await authSql()`UPDATE app_auth SET recovery_key_hash=${encoded.hash}, recovery_key_salt=${encoded.salt}, updated_at=${Date.now()}
-    WHERE id=1 AND recovery_key_hash IS NULL RETURNING id`, isAuthIdRow, 'app_auth');
+  const updated = assertRows(
+    await authSql()`UPDATE app_auth SET recovery_key_hash=${encoded.hash}, recovery_key_salt=${encoded.salt}, updated_at=${Date.now()}
+    WHERE id=1 AND recovery_key_hash IS NULL RETURNING id`,
+    isAuthIdRow,
+    'app_auth',
+  );
   return updated[0] ? recoveryKey : null;
 }
 
@@ -440,13 +587,18 @@ async function ensureDefaultSuperAdmin(password: string): Promise<void> {
   if (Number(users[0]?.count) > 0) return;
   let auth = await config();
   if (!auth) auth = await bootstrapAuth(password);
-  if (!auth || !await matches(password, auth.password_hash, auth.password_salt)) return;
+  if (!auth || !(await matches(password, auth.password_hash, auth.password_salt))) return;
   const at = Date.now();
   await authSql()`INSERT INTO app_users (username, display_name, password_hash, password_salt, role_id, status, must_change_password, token_version, created_at, updated_at)
     VALUES ('admin', '超级管理员', ${auth.password_hash}, ${auth.password_salt}, 'super_admin', 'active', FALSE, 1, ${at}, ${at})
     ON CONFLICT DO NOTHING`;
-  const rows = assertRows(await authSql()`SELECT id FROM app_users WHERE LOWER(username)='admin' LIMIT 1`, isUserIdRow, 'app_users');
-  if (rows[0]) await authSql()`INSERT INTO app_user_scopes (user_id, scope_type, grade_id, class_id) VALUES (${rows[0].id}, 'all', '', '') ON CONFLICT DO NOTHING`;
+  const rows = assertRows(
+    await authSql()`SELECT id FROM app_users WHERE LOWER(username)='admin' LIMIT 1`,
+    isUserIdRow,
+    'app_users',
+  );
+  if (rows[0])
+    await authSql()`INSERT INTO app_user_scopes (user_id, scope_type, grade_id, class_id) VALUES (${rows[0].id}, 'all', '', '') ON CONFLICT DO NOTHING`;
 }
 
 function parsePermissions(value: unknown): Permission[] {
@@ -456,19 +608,35 @@ function parsePermissions(value: unknown): Permission[] {
 }
 
 async function actorFromUserRow(row: UserRow): Promise<AdminActor> {
-  const scopes = assertRows(await authSql()`SELECT scope_type, grade_id, class_id FROM app_user_scopes WHERE user_id=${row.id} ORDER BY id`, isScopeRow, 'app_user_scopes');
+  const scopes = assertRows(
+    await authSql()`SELECT scope_type, grade_id, class_id FROM app_user_scopes WHERE user_id=${row.id} ORDER BY id`,
+    isScopeRow,
+    'app_user_scopes',
+  );
   return {
-    id: Number(row.id), username: row.username, displayName: row.display_name,
-    roleId: row.role_id, roleName: row.role_name, permissions: parsePermissions(row.permissions),
-    scopes: scopes.map(scope => ({ type: scope.scope_type as AdminScope['type'], gradeId: scope.grade_id || '', classId: scope.class_id || '' })),
+    id: Number(row.id),
+    username: row.username,
+    displayName: row.display_name,
+    roleId: row.role_id,
+    roleName: row.role_name,
+    permissions: parsePermissions(row.permissions),
+    scopes: scopes.map((scope) => ({
+      type: scope.scope_type as AdminScope['type'],
+      gradeId: scope.grade_id || '',
+      classId: scope.class_id || '',
+    })),
     mustChangePassword: row.must_change_password === true,
   };
 }
 
 async function userById(id: number): Promise<UserRow | null> {
-  const rows = assertRows(await authSql()`SELECT u.id, u.username, u.display_name, u.password_hash, u.password_salt, u.role_id,
+  const rows = assertRows(
+    await authSql()`SELECT u.id, u.username, u.display_name, u.password_hash, u.password_salt, u.role_id,
       r.name AS role_name, r.permissions, u.status, u.must_change_password, u.token_version, u.email
-    FROM app_users u JOIN app_roles r ON r.id=u.role_id WHERE u.id=${id} LIMIT 1`, isUserRow, 'app_users/app_roles');
+    FROM app_users u JOIN app_roles r ON r.id=u.role_id WHERE u.id=${id} LIMIT 1`,
+    isUserRow,
+    'app_users/app_roles',
+  );
   return rows[0] ?? null;
 }
 
@@ -489,33 +657,58 @@ export function validateEmailFormat(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email ?? '').trim());
 }
 
-export async function issueTokenForUser(row: { id: number | bigint | string; token_version: number }): Promise<{ token: string; expiresAt: number } | null> {
+export async function issueTokenForUser(row: {
+  id: number | bigint | string;
+  token_version: number;
+}): Promise<{ token: string; expiresAt: number } | null> {
   await ensureAuthTables();
   const auth = await config();
   if (!auth) return null;
   const userId = Number(row.id);
   const expiresAt = Date.now() + TOKEN_TTL;
-  const token = Buffer.from(`${userId}.${expiresAt}.${row.token_version}.${signature(userId, expiresAt, row.token_version, auth.token_secret)}`).toString('base64url');
+  const token = Buffer.from(
+    `${userId}.${expiresAt}.${row.token_version}.${signature(userId, expiresAt, row.token_version, auth.token_secret)}`,
+  ).toString('base64url');
   return { token, expiresAt };
 }
 
-function guestSignature(instanceId: string, gradeId: string, classId: string, expiresAt: number, version: number, secret: string): string {
-  return createHmac('sha256', secret).update(`guest.${instanceId}.${gradeId}.${classId}.${expiresAt}.${version}`).digest('base64url');
+function guestSignature(
+  instanceId: string,
+  gradeId: string,
+  classId: string,
+  expiresAt: number,
+  version: number,
+  secret: string,
+): string {
+  return createHmac('sha256', secret)
+    .update(`guest.${instanceId}.${gradeId}.${classId}.${expiresAt}.${version}`)
+    .digest('base64url');
 }
 
-export async function issueGuestToken(instanceId: string, gradeId: string, classId: string): Promise<{ token: string; expiresAt: number } | null> {
+export async function issueGuestToken(
+  instanceId: string,
+  gradeId: string,
+  classId: string,
+): Promise<{ token: string; expiresAt: number } | null> {
   await ensureAuthTables();
   const auth = await config();
   if (!auth) return null;
   const expiresAt = Date.now() + GUEST_TOKEN_TTL;
   const version = auth.token_version;
   const sig = guestSignature(instanceId, gradeId, classId, expiresAt, version, auth.token_secret);
-  const token = Buffer.from(`g.${instanceId}.${gradeId}.${classId}.${expiresAt}.${version}.${sig}`).toString('base64url');
+  const token = Buffer.from(`g.${instanceId}.${gradeId}.${classId}.${expiresAt}.${version}.${sig}`).toString(
+    'base64url',
+  );
   return { token, expiresAt };
 }
 
 export type LoginAttemptRow = { action: string; created_at: DatabaseInt8 };
-export type LoginFailureAlert = { username: string; failureCount: number; windowStart: number; latestFailureAt: number };
+export type LoginFailureAlert = {
+  username: string;
+  failureCount: number;
+  windowStart: number;
+  latestFailureAt: number;
+};
 const isLoginAttemptRow = rowShape<LoginAttemptRow>({ action: isString, created_at: isDatabaseInt8 });
 const isLoginAttemptWithUsernameRow = rowShape<LoginAttemptRow & { username: string }>({
   action: isString,
@@ -532,7 +725,7 @@ export function evaluateLoginLockout(
   const windowMs = options.windowMs ?? LOGIN_LOCKOUT_WINDOW_MS;
   if (recentAttemptsDesc.length < maxFailures) return { locked: false, retryAfterMs: 0 };
   const window = recentAttemptsDesc.slice(0, maxFailures);
-  if (window.some(attempt => attempt.action === 'auth.login')) return { locked: false, retryAfterMs: 0 };
+  if (window.some((attempt) => attempt.action === 'auth.login')) return { locked: false, retryAfterMs: 0 };
   const oldest = window[maxFailures - 1];
   const unlockAt = Number(oldest.created_at) + windowMs;
   if (now >= unlockAt) return { locked: false, retryAfterMs: 0 };
@@ -542,9 +735,13 @@ export function evaluateLoginLockout(
 export async function checkLoginLockout(username: string): Promise<{ locked: boolean; retryAfterMs: number }> {
   await ensureAuthTables();
   const name = (username.trim() || 'admin').slice(0, 80);
-  const rows = assertRows(await authSql()`SELECT action, created_at FROM app_audit_logs
+  const rows = assertRows(
+    await authSql()`SELECT action, created_at FROM app_audit_logs
     WHERE LOWER(username)=LOWER(${name}) AND action IN ('auth.login','auth.login.failed')
-    ORDER BY created_at DESC LIMIT ${LOGIN_LOCKOUT_MAX_FAILURES}`, isLoginAttemptRow, 'app_audit_logs');
+    ORDER BY created_at DESC LIMIT ${LOGIN_LOCKOUT_MAX_FAILURES}`,
+    isLoginAttemptRow,
+    'app_audit_logs',
+  );
   return evaluateLoginLockout(rows, Date.now());
 }
 
@@ -559,14 +756,15 @@ export function evaluateLoginFailureAlerts(
   for (const row of recentAttemptsDesc) {
     const key = row.username.toLowerCase();
     const bucket = byUsername.get(key);
-    if (bucket) bucket.push(row); else byUsername.set(key, [row]);
+    if (bucket) bucket.push(row);
+    else byUsername.set(key, [row]);
   }
   const alerts: LoginFailureAlert[] = [];
   for (const rows of byUsername.values()) {
-    const successIndex = rows.findIndex(row => row.action === 'auth.login');
+    const successIndex = rows.findIndex((row) => row.action === 'auth.login');
     const failures = rows
       .slice(0, successIndex === -1 ? rows.length : successIndex)
-      .filter(row => row.action === 'auth.login.failed' && now - Number(row.created_at) <= windowMs);
+      .filter((row) => row.action === 'auth.login.failed' && now - Number(row.created_at) <= windowMs);
     if (failures.length < minFailures) continue;
     const newest = failures[0];
     const oldest = failures[failures.length - 1];
@@ -582,8 +780,12 @@ export function evaluateLoginFailureAlerts(
 
 export async function getRecentLoginFailureAlerts(): Promise<LoginFailureAlert[]> {
   await ensureAuthTables();
-  const rows = assertRows(await authSql()`SELECT username, action, created_at FROM app_audit_logs
-    WHERE action IN ('auth.login', 'auth.login.failed') ORDER BY created_at DESC LIMIT 500`, isLoginAttemptWithUsernameRow, 'app_audit_logs');
+  const rows = assertRows(
+    await authSql()`SELECT username, action, created_at FROM app_audit_logs
+    WHERE action IN ('auth.login', 'auth.login.failed') ORDER BY created_at DESC LIMIT 500`,
+    isLoginAttemptWithUsernameRow,
+    'app_audit_logs',
+  );
   return evaluateLoginFailureAlerts(rows, Date.now());
 }
 
@@ -597,14 +799,21 @@ async function recordFailedLoginAttempt(username: string): Promise<void> {
   }
 }
 
-export async function authenticateUser(username: string, password: string): Promise<{ actor: AdminActor; token: string; expiresAt: number; firstLogin: boolean } | null> {
+export async function authenticateUser(
+  username: string,
+  password: string,
+): Promise<{ actor: AdminActor; token: string; expiresAt: number; firstLogin: boolean } | null> {
   await ensureDefaultSuperAdmin(password);
   const name = (username.trim() || 'admin').slice(0, 80);
-  const rows = assertRows(await authSql()`SELECT u.id, u.username, u.display_name, u.password_hash, u.password_salt, u.role_id,
+  const rows = assertRows(
+    await authSql()`SELECT u.id, u.username, u.display_name, u.password_hash, u.password_salt, u.role_id,
       r.name AS role_name, r.permissions, u.status, u.must_change_password, u.token_version, u.email, u.last_login_at
-    FROM app_users u JOIN app_roles r ON r.id=u.role_id WHERE LOWER(u.username)=LOWER(${name}) LIMIT 1`, isUserRow, 'app_users/app_roles');
+    FROM app_users u JOIN app_roles r ON r.id=u.role_id WHERE LOWER(u.username)=LOWER(${name}) LIMIT 1`,
+    isUserRow,
+    'app_users/app_roles',
+  );
   const row = rows[0];
-  if (!row || row.status !== 'active' || !await matches(password, row.password_hash, row.password_salt)) {
+  if (!row || row.status !== 'active' || !(await matches(password, row.password_hash, row.password_salt))) {
     await recordFailedLoginAttempt(name);
     return null;
   }
@@ -612,7 +821,9 @@ export async function authenticateUser(username: string, password: string): Prom
   if (!auth) return null;
   const expiresAt = Date.now() + TOKEN_TTL;
   const userId = Number(row.id);
-  const token = Buffer.from(`${userId}.${expiresAt}.${row.token_version}.${signature(userId, expiresAt, row.token_version, auth.token_secret)}`).toString('base64url');
+  const token = Buffer.from(
+    `${userId}.${expiresAt}.${row.token_version}.${signature(userId, expiresAt, row.token_version, auth.token_secret)}`,
+  ).toString('base64url');
   const firstLogin = row.last_login_at == null;
   await authSql()`UPDATE app_users SET last_login_at=${Date.now()} WHERE id=${row.id}`;
   return { actor: await actorFromUserRow(row), token, expiresAt, firstLogin };
@@ -626,7 +837,10 @@ export function isLegacySharedTokenVersionCurrent(tokenVersion: number, currentA
   return tokenVersion === currentAuthTokenVersion;
 }
 
-export function isUserTokenVersionCurrent(row: { status: string; token_version: number } | null | undefined, tokenVersion: number): boolean {
+export function isUserTokenVersionCurrent(
+  row: { status: string; token_version: number } | null | undefined,
+  tokenVersion: number,
+): boolean {
   return row?.status === 'active' && row.token_version === tokenVersion;
 }
 
@@ -643,16 +857,42 @@ export async function getActor(token: string | undefined): Promise<AdminActor | 
       const guestExpiresAt = Number(parts[4]);
       const guestVersion = Number(parts[5]);
       const guestReceived = parts[6];
-      if (!Number.isFinite(guestExpiresAt) || !Number.isFinite(guestVersion) || !isTokenNotExpired(guestExpiresAt, Date.now()) || guestVersion !== auth.token_version) return null;
-      const expectedGuest = guestSignature(guestInstanceId, guestGradeId, guestClassId, guestExpiresAt, guestVersion, auth.token_secret);
-      const guestA = Buffer.from(guestReceived || ''); const guestB = Buffer.from(expectedGuest);
+      if (
+        !Number.isFinite(guestExpiresAt) ||
+        !Number.isFinite(guestVersion) ||
+        !isTokenNotExpired(guestExpiresAt, Date.now()) ||
+        guestVersion !== auth.token_version
+      )
+        return null;
+      const expectedGuest = guestSignature(
+        guestInstanceId,
+        guestGradeId,
+        guestClassId,
+        guestExpiresAt,
+        guestVersion,
+        auth.token_secret,
+      );
+      const guestA = Buffer.from(guestReceived || '');
+      const guestB = Buffer.from(expectedGuest);
       if (guestA.length !== guestB.length || !timingSafeEqual(guestA, guestB)) return null;
-      const deviceRows = assertRows(await authSql()`SELECT revoked, grade_id, class_id, is_management FROM device_instances WHERE instance_id=${guestInstanceId} LIMIT 1`, isGuestDeviceRow, 'device_instances');
+      const deviceRows = assertRows(
+        await authSql()`SELECT revoked, grade_id, class_id, is_management FROM device_instances WHERE instance_id=${guestInstanceId} LIMIT 1`,
+        isGuestDeviceRow,
+        'device_instances',
+      );
       const guestDevice = deviceRows[0];
       if (!guestDevice || guestDevice.revoked !== false || guestDevice.is_management === true) return null;
       if (String(guestDevice.grade_id) !== guestGradeId || String(guestDevice.class_id) !== guestClassId) return null;
-      const roleNameRows = assertRows(await authSql()`SELECT name FROM app_roles WHERE id='viewer' LIMIT 1`, isGuestRoleNameRow, 'app_roles');
-      const rolePermRows = assertRows(await authSql()`SELECT permissions FROM app_roles WHERE id='viewer' LIMIT 1`, rowShape<{ permissions: unknown }>({ permissions: (_value: unknown): _value is unknown => true }), 'app_roles');
+      const roleNameRows = assertRows(
+        await authSql()`SELECT name FROM app_roles WHERE id='viewer' LIMIT 1`,
+        isGuestRoleNameRow,
+        'app_roles',
+      );
+      const rolePermRows = assertRows(
+        await authSql()`SELECT permissions FROM app_roles WHERE id='viewer' LIMIT 1`,
+        rowShape<{ permissions: unknown }>({ permissions: (_value: unknown): _value is unknown => true }),
+        'app_roles',
+      );
       return {
         id: 0,
         username: guestInstanceId,
@@ -664,23 +904,38 @@ export async function getActor(token: string | undefined): Promise<AdminActor | 
         mustChangePassword: false,
       };
     }
-    let userId: number; let expiresAt: number; let version: number; let received: string;
+    let userId: number;
+    let expiresAt: number;
+    let version: number;
+    let received: string;
     if (parts.length === 4) {
-      [userId, expiresAt, version] = parts.slice(0, 3).map(Number); received = parts[3];
-      if (!Number.isFinite(userId) || !Number.isFinite(version) || !isTokenNotExpired(expiresAt, Date.now())) return null;
+      [userId, expiresAt, version] = parts.slice(0, 3).map(Number);
+      received = parts[3];
+      if (!Number.isFinite(userId) || !Number.isFinite(version) || !isTokenNotExpired(expiresAt, Date.now()))
+        return null;
       const expected = signature(userId, expiresAt, version, auth.token_secret);
-      const a = Buffer.from(received || ''); const b = Buffer.from(expected);
+      const a = Buffer.from(received || '');
+      const b = Buffer.from(expected);
       if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
     } else if (parts.length === 3) {
       // v1.29.1 and earlier shared admin tokens map to the default admin account.
       // Their version is global, so security-sensitive user changes invalidate
       // every legacy shared token through invalidateLegacySharedToken().
-      [expiresAt, version] = parts.slice(0, 2).map(Number); received = parts[2];
-      if (!isTokenNotExpired(expiresAt, Date.now()) || !isLegacySharedTokenVersionCurrent(version, auth.token_version)) return null;
-      const legacyExpected = createHmac('sha256', auth.token_secret).update(`${expiresAt}.${version}`).digest('base64url');
-      const a = Buffer.from(received || ''); const b = Buffer.from(legacyExpected);
+      [expiresAt, version] = parts.slice(0, 2).map(Number);
+      received = parts[2];
+      if (!isTokenNotExpired(expiresAt, Date.now()) || !isLegacySharedTokenVersionCurrent(version, auth.token_version))
+        return null;
+      const legacyExpected = createHmac('sha256', auth.token_secret)
+        .update(`${expiresAt}.${version}`)
+        .digest('base64url');
+      const a = Buffer.from(received || '');
+      const b = Buffer.from(legacyExpected);
       if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
-      const adminRows = assertRows(await authSql()`SELECT id FROM app_users WHERE LOWER(username)='admin' LIMIT 1`, isUserIdRow, 'app_users');
+      const adminRows = assertRows(
+        await authSql()`SELECT id FROM app_users WHERE LOWER(username)='admin' LIMIT 1`,
+        isUserIdRow,
+        'app_users',
+      );
       userId = Number(adminRows[0]?.id);
     } else return null;
     const row = await userById(userId);
@@ -710,37 +965,64 @@ export function canAccessClass(actor: AdminActor, gradeId: string, classId: stri
   return sharedCanAccessClass(actor, gradeId, classId);
 }
 
-export async function requireActor(req: VercelRequest, res: VercelResponse, permission?: Permission, allowPasswordChange = false): Promise<AdminActor | null> {
+export async function requireActor(
+  req: VercelRequest,
+  res: VercelResponse,
+  permission?: Permission,
+  allowPasswordChange = false,
+): Promise<AdminActor | null> {
   const actor = await getActor(extractBearer(req.headers.authorization));
-  if (!actor) { res.status(401).json({ ok: false, code: 'AUTH_EXPIRED', error: '登录状态已失效，请重新登录' }); return null; }
-  if (actor.mustChangePassword && !allowPasswordChange) { res.status(403).json({ ok: false, error: '请先修改初始密码', code: 'PASSWORD_CHANGE_REQUIRED' }); return null; }
-  if (permission && !hasPermission(actor, permission)) { res.status(403).json({ ok: false, code: 'PERMISSION_DENIED', error: '当前账号没有执行此操作的权限', permission }); return null; }
+  if (!actor) {
+    res.status(401).json({ ok: false, code: 'AUTH_EXPIRED', error: '登录状态已失效，请重新登录' });
+    return null;
+  }
+  if (actor.mustChangePassword && !allowPasswordChange) {
+    res.status(403).json({ ok: false, error: '请先修改初始密码', code: 'PASSWORD_CHANGE_REQUIRED' });
+    return null;
+  }
+  if (permission && !hasPermission(actor, permission)) {
+    res.status(403).json({ ok: false, code: 'PERMISSION_DENIED', error: '当前账号没有执行此操作的权限', permission });
+    return null;
+  }
   return actor;
 }
 
-export async function changeOwnPassword(actorId: number, currentPassword: string, nextPassword: string): Promise<{ ok: boolean; error?: string }> {
+export async function changeOwnPassword(
+  actorId: number,
+  currentPassword: string,
+  nextPassword: string,
+): Promise<{ ok: boolean; error?: string }> {
   if (nextPassword.length < 8) return { ok: false, error: '新密码至少需要 8 位' };
   const row = await userById(actorId);
   if (!row) return { ok: false, error: '账号不存在' };
-  if (!row.must_change_password && !await matches(currentPassword, row.password_hash, row.password_salt)) return { ok: false, error: '当前密码不正确' };
-  if (row.must_change_password && row.role_id === 'class_admin') return { ok: false, error: '班级管理员首次登录必须同时设置新的用户名和密码' };
+  if (!row.must_change_password && !(await matches(currentPassword, row.password_hash, row.password_salt)))
+    return { ok: false, error: '当前密码不正确' };
+  if (row.must_change_password && row.role_id === 'class_admin')
+    return { ok: false, error: '班级管理员首次登录必须同时设置新的用户名和密码' };
   const { hash, salt } = await makePasswordHash(nextPassword);
   await invalidateLegacySharedToken();
   await authSql()`UPDATE app_users SET password_hash=${hash}, password_salt=${salt}, must_change_password=FALSE, token_version=token_version+1, updated_at=${Date.now()} WHERE id=${actorId}`;
   return { ok: true };
 }
 
-export async function changeOwnUsername(actorId: number, currentPassword: string, nextUsername: string): Promise<{ ok: boolean; error?: string; oldUsername?: string }> {
+export async function changeOwnUsername(
+  actorId: number,
+  currentPassword: string,
+  nextUsername: string,
+): Promise<{ ok: boolean; error?: string; oldUsername?: string }> {
   const username = nextUsername.trim();
-  if (!/^[A-Za-z0-9._-]{3,40}$/.test(username)) return { ok: false, error: '用户名需为 3-40 位字母、数字、点、横线或下划线' };
+  if (!/^[A-Za-z0-9._-]{3,40}$/.test(username))
+    return { ok: false, error: '用户名需为 3-40 位字母、数字、点、横线或下划线' };
   const row = await userById(actorId);
-  if (!row || !await matches(currentPassword, row.password_hash, row.password_salt)) return { ok: false, error: '当前密码不正确' };
+  if (!row || !(await matches(currentPassword, row.password_hash, row.password_salt)))
+    return { ok: false, error: '当前密码不正确' };
   try {
     await invalidateLegacySharedToken();
     await authSql()`UPDATE app_users SET username=${username}, token_version=token_version+1, updated_at=${Date.now()} WHERE id=${actorId}`;
     return { ok: true, oldUsername: row.username };
   } catch (error) {
-    if (/unique/i.test(error instanceof Error ? error.message : String(error))) return { ok: false, error: '用户名已存在' };
+    if (/unique/i.test(error instanceof Error ? error.message : String(error)))
+      return { ok: false, error: '用户名已存在' };
     throw error;
   }
 }
@@ -754,37 +1036,67 @@ async function initBindPolicyForced(): Promise<boolean> {
       'email_config',
     );
     return rows[0]?.init_bind_policy === 'force';
-  } catch { return false; }
+  } catch {
+    return false;
+  }
 }
 
-export async function changeOwnCredentials(actorId: number, currentPassword: string, nextUsername: string, nextPassword: string): Promise<{ ok: boolean; error?: string; oldUsername?: string; username?: string }> {
+export async function changeOwnCredentials(
+  actorId: number,
+  currentPassword: string,
+  nextUsername: string,
+  nextPassword: string,
+): Promise<{ ok: boolean; error?: string; oldUsername?: string; username?: string }> {
   const username = nextUsername.trim();
-  if (!/^[A-Za-z0-9._-]{3,40}$/.test(username)) return { ok: false, error: '用户名需为 3-40 位字母、数字、点、横线或下划线' };
+  if (!/^[A-Za-z0-9._-]{3,40}$/.test(username))
+    return { ok: false, error: '用户名需为 3-40 位字母、数字、点、横线或下划线' };
   const row = await userById(actorId);
-  if (!row || !await matches(currentPassword, row.password_hash, row.password_salt)) return { ok: false, error: '当前密码不正确' };
-  if (row.must_change_password && row.role_id === 'class_admin' && username.toLowerCase() === row.username.toLowerCase()) return { ok: false, error: '班级管理员首次登录必须设置新的用户名' };
-  if (row.must_change_password && nextPassword.length < 8) return { ok: false, error: '首次登录必须设置至少 8 位的新密码' };
-  if (row.must_change_password && !row.email && await initBindPolicyForced()) return { ok: false, error: '当前系统要求初始化时必须先绑定邮箱，请返回登录页完成绑定' };
+  if (!row || !(await matches(currentPassword, row.password_hash, row.password_salt)))
+    return { ok: false, error: '当前密码不正确' };
+  if (
+    row.must_change_password &&
+    row.role_id === 'class_admin' &&
+    username.toLowerCase() === row.username.toLowerCase()
+  )
+    return { ok: false, error: '班级管理员首次登录必须设置新的用户名' };
+  if (row.must_change_password && nextPassword.length < 8)
+    return { ok: false, error: '首次登录必须设置至少 8 位的新密码' };
+  if (row.must_change_password && !row.email && (await initBindPolicyForced()))
+    return { ok: false, error: '当前系统要求初始化时必须先绑定邮箱，请返回登录页完成绑定' };
   if (nextPassword && nextPassword.length < 8) return { ok: false, error: '新密码至少需要 8 位' };
-  if (!nextPassword && username.toLowerCase() === row.username.toLowerCase()) return { ok: false, error: '用户名和密码均未修改' };
-  const password = nextPassword ? await makePasswordHash(nextPassword) : { hash: row.password_hash, salt: row.password_salt };
+  if (!nextPassword && username.toLowerCase() === row.username.toLowerCase())
+    return { ok: false, error: '用户名和密码均未修改' };
+  const password = nextPassword
+    ? await makePasswordHash(nextPassword)
+    : { hash: row.password_hash, salt: row.password_salt };
   try {
     await invalidateLegacySharedToken();
     await authSql()`UPDATE app_users SET username=${username}, password_hash=${password.hash}, password_salt=${password.salt},
       must_change_password=${nextPassword ? false : row.must_change_password}, token_version=token_version+1, updated_at=${Date.now()} WHERE id=${actorId}`;
     return { ok: true, oldUsername: row.username, username };
   } catch (error) {
-    if (/unique/i.test(error instanceof Error ? error.message : String(error))) return { ok: false, error: '用户名已存在' };
+    if (/unique/i.test(error instanceof Error ? error.message : String(error)))
+      return { ok: false, error: '用户名已存在' };
     throw error;
   }
 }
 
-export async function writeAudit(actor: AdminActor | null, action: string, resourceType: string, resourceId = '', detail: unknown = null, gradeId = '', classId = ''): Promise<void> {
+export async function writeAudit(
+  actor: AdminActor | null,
+  action: string,
+  resourceType: string,
+  resourceId = '',
+  detail: unknown = null,
+  gradeId = '',
+  classId = '',
+): Promise<void> {
   try {
     await ensureAuthTables();
     await authSql()`INSERT INTO app_audit_logs (user_id, username, action, resource_type, resource_id, grade_id, class_id, detail, created_at)
       VALUES (${actor?.id ?? null}, ${actor?.username ?? ''}, ${action}, ${resourceType}, ${resourceId}, ${gradeId}, ${classId}, ${detail == null ? null : JSON.stringify(detail)}::jsonb, ${Date.now()})`;
-  } catch { /* 审计失败不能让业务操作产生第二次提交。 */ }
+  } catch {
+    /* 审计失败不能让业务操作产生第二次提交。 */
+  }
 }
 
 export async function isPasswordRequired(): Promise<boolean> {
@@ -801,9 +1113,14 @@ export async function generateToken(): Promise<{ token: string; expiresAt: numbe
   throw new Error('generateToken requires a user; use authenticateUser');
 }
 
-export async function changePassword(currentPassword: string, nextPassword: string): Promise<{ ok: boolean; error?: string }> {
+export async function changePassword(
+  currentPassword: string,
+  nextPassword: string,
+): Promise<{ ok: boolean; error?: string }> {
   const login = await authenticateUser('admin', currentPassword);
-  return login ? changeOwnPassword(login.actor.id, currentPassword, nextPassword) : { ok: false, error: '当前密码不正确' };
+  return login
+    ? changeOwnPassword(login.actor.id, currentPassword, nextPassword)
+    : { ok: false, error: '当前密码不正确' };
 }
 
 export function extractBearer(authHeader: string | undefined): string | undefined {

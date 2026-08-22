@@ -103,7 +103,7 @@ test('updateAppSettings: persists a shallow merge and re-normalizes the alerts d
 test('updateAppSettings: accepts an updater function seeded with the current settings', () => {
   resetStorage();
   updateAppSettings({ hasVisited: false });
-  updateAppSettings(current => ({ hasVisited: !current.hasVisited }));
+  updateAppSettings((current) => ({ hasVisited: !current.hasVisited }));
   assert.equal(getAppSettings().hasVisited, true);
 });
 
@@ -137,6 +137,6 @@ test('updateTimeSyncSettings: supports both a partial patch and an updater funct
   resetStorage();
   updateTimeSyncSettings({ enabled: false });
   assert.equal(getAppSettings().general.timeSync.enabled, false);
-  updateTimeSyncSettings(current => ({ manualOffsetMs: current.manualOffsetMs + 100 }));
+  updateTimeSyncSettings((current) => ({ manualOffsetMs: current.manualOffsetMs + 100 }));
   assert.equal(getAppSettings().general.timeSync.manualOffsetMs, 100);
 });

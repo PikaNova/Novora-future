@@ -67,7 +67,10 @@ span.class-management__track-tag {
   color: rgba(255, 255, 255, 0.85);
   font-size: 13px;
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    color 0.15s ease;
 }
 
 .class-management__track-options button:hover {

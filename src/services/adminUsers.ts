@@ -52,7 +52,11 @@ export class AdminApiError extends Error {
   retryAfterMs?: number;
   constructor(message: string, field?: string, code?: string, requestId?: string, retryAfterMs?: number) {
     super(`${message}${requestId ? `（请求 ID：${requestId}）` : ''}`);
-    this.name = 'AdminApiError'; this.field = field; this.code = code; this.requestId = requestId; this.retryAfterMs = retryAfterMs;
+    this.name = 'AdminApiError';
+    this.field = field;
+    this.code = code;
+    this.requestId = requestId;
+    this.retryAfterMs = retryAfterMs;
   }
 }
 
@@ -60,14 +64,29 @@ async function request(path: string, init: RequestInit = {}, bearerToken?: strin
   const authToken = bearerToken ?? token();
   const response = await fetch(path, {
     ...init,
-    headers: { 'Content-Type': 'application/json', ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}), ...(init.headers || {}) },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+      ...(init.headers || {}),
+    },
   });
   const data = await response.json().catch(() => null);
-  if (!response.ok || !data?.ok) throw new AdminApiError(data?.error || `HTTP ${response.status}`, data?.field, data?.code, data?.requestId || response.headers.get('X-Request-Id') || undefined, data?.retryAfterMs);
+  if (!response.ok || !data?.ok)
+    throw new AdminApiError(
+      data?.error || `HTTP ${response.status}`,
+      data?.field,
+      data?.code,
+      data?.requestId || response.headers.get('X-Request-Id') || undefined,
+      data?.retryAfterMs,
+    );
   return data;
 }
 
-export async function fetchUserManagement(): Promise<{ users: ManagedUser[]; roles: ManagedRole[]; permissions: string[] }> {
+export async function fetchUserManagement(): Promise<{
+  users: ManagedUser[];
+  roles: ManagedRole[];
+  permissions: string[];
+}> {
   return request('/api/users');
 }
 
@@ -77,34 +96,75 @@ export async function saveManagedUser(input: Record<string, unknown>): Promise<M
 }
 
 export async function resetManagedUserPassword(id: number, password: string): Promise<void> {
-  await request('/api/users', { method: 'POST', body: JSON.stringify({ resource: 'users', action: 'reset-password', id, password }) });
+  await request('/api/users', {
+    method: 'POST',
+    body: JSON.stringify({ resource: 'users', action: 'reset-password', id, password }),
+  });
 }
 
 export async function deleteManagedUser(id: number): Promise<ManagedUser[]> {
-  const data = await request('/api/users', { method: 'POST', body: JSON.stringify({ resource: 'users', action: 'delete', id }) });
+  const data = await request('/api/users', {
+    method: 'POST',
+    body: JSON.stringify({ resource: 'users', action: 'delete', id }),
+  });
   return data.users || [];
 }
 
 export async function changeOwnPassword(currentPassword: string, newPassword: string): Promise<void> {
-  await request('/api/users', { method: 'POST', body: JSON.stringify({ resource: 'users', action: 'change-own-password', currentPassword, newPassword }) });
+  await request('/api/users', {
+    method: 'POST',
+    body: JSON.stringify({ resource: 'users', action: 'change-own-password', currentPassword, newPassword }),
+  });
 }
 
 export async function changeOwnUsername(currentPassword: string, username: string): Promise<void> {
-  await request('/api/users', { method: 'POST', body: JSON.stringify({ resource: 'users', action: 'change-own-username', currentPassword, username }) });
+  await request('/api/users', {
+    method: 'POST',
+    body: JSON.stringify({ resource: 'users', action: 'change-own-username', currentPassword, username }),
+  });
 }
 
-export async function changeOwnCredentials(currentPassword: string, username: string, newPassword: string, bearerToken?: string): Promise<string> {
-  const data = await request('/api/users', { method: 'POST', body: JSON.stringify({ resource: 'users', action: 'change-own-credentials', currentPassword, username, newPassword }) }, bearerToken);
+export async function changeOwnCredentials(
+  currentPassword: string,
+  username: string,
+  newPassword: string,
+  bearerToken?: string,
+): Promise<string> {
+  const data = await request(
+    '/api/users',
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        resource: 'users',
+        action: 'change-own-credentials',
+        currentPassword,
+        username,
+        newPassword,
+      }),
+    },
+    bearerToken,
+  );
   return String(data.username || username);
 }
 
-export async function saveManagedRole(input: { id?: string; name: string; description: string; permissions: string[] }): Promise<ManagedRole[]> {
-  const data = await request('/api/users', { method: 'POST', body: JSON.stringify({ resource: 'roles', action: 'save', ...input }) });
+export async function saveManagedRole(input: {
+  id?: string;
+  name: string;
+  description: string;
+  permissions: string[];
+}): Promise<ManagedRole[]> {
+  const data = await request('/api/users', {
+    method: 'POST',
+    body: JSON.stringify({ resource: 'roles', action: 'save', ...input }),
+  });
   return data.roles || [];
 }
 
 export async function deleteManagedRole(id: string): Promise<ManagedRole[]> {
-  const data = await request('/api/users', { method: 'POST', body: JSON.stringify({ resource: 'roles', action: 'delete', id }) });
+  const data = await request('/api/users', {
+    method: 'POST',
+    body: JSON.stringify({ resource: 'roles', action: 'delete', id }),
+  });
   return data.roles || [];
 }
 

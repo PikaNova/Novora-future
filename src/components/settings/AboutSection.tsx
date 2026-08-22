@@ -1,18 +1,17 @@
-import { Info } from "lucide-react";
-import Mascot from "../Mascot";
-import { APP_VERSION } from "../../services/telemetry";
-import { useAboutSettings } from "../../hooks/settings/useAboutSettings";
+import { Info } from 'lucide-react';
+import Mascot from '../Mascot';
+import { APP_VERSION } from '../../services/telemetry';
+import { useAboutSettings } from '../../hooks/settings/useAboutSettings';
 
-const AUTHOR_NAME = "PikaNova";
-const REPOSITORY_URL = "https://docs.pikachu2026.space/guide/12-maintenance";
+const AUTHOR_NAME = 'PikaNova';
+const REPOSITORY_URL = 'https://docs.pikachu2026.space/guide/12-maintenance';
 
 /**
  * 设置页“关于”卡片（含作者水印页脚）。
  * 从 SettingsPage.tsx 提取，行为与原页面完全一致。
  */
 export default function AboutSection() {
-  const { readmeOpen, readmeHtml, toggleReadme, openReadmeInNewTab } =
-    useAboutSettings();
+  const { readmeOpen, readmeHtml, toggleReadme, openReadmeInNewTab } = useAboutSettings();
 
   return (
     <>
@@ -32,28 +31,18 @@ export default function AboutSection() {
               作者：<b>{AUTHOR_NAME}</b>
             </div>
             <div>
-              GitHub：{" "}
-              <a
-                className="set-about__link"
-                href={REPOSITORY_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
+              GitHub：{' '}
+              <a className="set-about__link" href={REPOSITORY_URL} target="_blank" rel="noopener noreferrer">
                 PikaNova/Novora
               </a>
             </div>
-            <div className="set-note">
-              React + Vite + Vercel Serverless · Neon Postgres
-            </div>
+            <div className="set-note">React + Vite + Vercel Serverless · Neon Postgres</div>
           </div>
           <div className="set-about__actions">
             <button className="set-btn" onClick={toggleReadme}>
-              {readmeOpen ? "收起 README" : "查看 README"}
+              {readmeOpen ? '收起 README' : '查看 README'}
             </button>
-            <button
-              className="set-btn set-btn--desktop-only"
-              onClick={openReadmeInNewTab}
-            >
+            <button className="set-btn set-btn--desktop-only" onClick={openReadmeInNewTab}>
               在新标签页打开 README.md
             </button>
           </div>
@@ -62,12 +51,7 @@ export default function AboutSection() {
             <span>彩蛋：开发者偷偷塞的吉祥物，每次打开会换一位。</span>
           </div>
         </div>
-        {readmeOpen && (
-          <div
-            className="set-readme md-body"
-            dangerouslySetInnerHTML={{ __html: readmeHtml }}
-          />
-        )}
+        {readmeOpen && <div className="set-readme md-body" dangerouslySetInnerHTML={{ __html: readmeHtml }} />}
       </section>
       <footer className="set-author-watermark">Made by {AUTHOR_NAME}</footer>
     </>

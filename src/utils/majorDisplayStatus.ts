@@ -1,7 +1,7 @@
-import type { ExamItem, MajorExam } from "../types";
-import type { SchoolClass } from "../types/school";
+import type { ExamItem, MajorExam } from '../types';
+import type { SchoolClass } from '../types/school';
 
-export type QuickMajorDisplayTone = "temporary" | "formal" | "pending" | "clear";
+export type QuickMajorDisplayTone = 'temporary' | 'formal' | 'pending' | 'clear';
 
 export interface QuickMajorDisplayStatus {
   tone: QuickMajorDisplayTone;
@@ -76,9 +76,7 @@ export function getQuickMajorDisplayStatus(
   const overlappingFormalItems = majors
     .filter((major) => major.id !== quickMajor.id && !major.temporary && majorScopesOverlap(quickMajor, major, classes))
     .flatMap((major) =>
-      major.items
-        .filter((item) => item.enabled && overlaps(quickItem, item))
-        .map((item) => ({ major, item })),
+      major.items.filter((item) => item.enabled && overlaps(quickItem, item)).map((item) => ({ major, item })),
     )
     .sort((left, right) => byStartTime(left.item, right.item));
 
@@ -88,46 +86,44 @@ export function getQuickMajorDisplayStatus(
   if (currentFormal) {
     if (quickMajor.priorityOverSchedule) {
       return {
-        tone: "temporary",
-        label: "当前显示：临时统一考试",
+        tone: 'temporary',
+        label: '当前显示：临时统一考试',
         detail: `覆盖：${currentFormal.major.name}`,
         conflict: true,
       };
     }
     return {
-      tone: "formal",
+      tone: 'formal',
       label: `当前显示：${currentFormal.major.name}`,
-      detail: "未开启覆盖，临时考试暂不显示",
+      detail: '未开启覆盖，临时考试暂不显示',
       conflict: true,
     };
   }
 
   if (quickRunning) {
     return {
-      tone: overlappingFormalItems.length ? "temporary" : "clear",
+      tone: overlappingFormalItems.length ? 'temporary' : 'clear',
       label: `当前显示：${quickItem.name}`,
-      detail: overlappingFormalItems.length
-        ? "未到重叠时段"
-        : "无正式考试冲突",
+      detail: overlappingFormalItems.length ? '未到重叠时段' : '无正式考试冲突',
       conflict: overlappingFormalItems.length > 0,
     };
   }
 
   if (overlappingFormalItems.length) {
     const winner = quickMajor.priorityOverSchedule
-      ? "临时统一考试"
+      ? '临时统一考试'
       : `正式大型考试「${overlappingFormalItems[0].major.name}」`;
     return {
-      tone: "pending",
+      tone: 'pending',
       label: `冲突预告：将显示${winner}`,
-      detail: "等待重叠时段",
+      detail: '等待重叠时段',
       conflict: true,
     };
   }
 
   return {
-    tone: "pending",
-    label: "等待显示：临时统一考试",
+    tone: 'pending',
+    label: '等待显示：临时统一考试',
     detail: `下一场：${quickItem.name}`,
     conflict: false,
   };

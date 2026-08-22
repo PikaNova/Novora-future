@@ -4,7 +4,10 @@ import { logger } from './logger';
 export type TimeSyncProvider = 'httpDate' | 'timeApi' | 'ntp';
 
 export interface TimeSyncSampleResult {
-  offsetMs: number; rttMs: number; serverEpochMs: number; measuredAt: number;
+  offsetMs: number;
+  rttMs: number;
+  serverEpochMs: number;
+  measuredAt: number;
 }
 
 export interface TimeSyncRunResult extends TimeSyncSampleResult {
@@ -43,13 +46,22 @@ function parseTimeApiBody(body: unknown): number {
   throw new Error('No recognizable time field');
 }
 
-async function measureOnce(opts: { provider: TimeSyncProvider; url: string; timeoutMs: number }): Promise<TimeSyncSampleResult> {
+async function measureOnce(opts: {
+  provider: TimeSyncProvider;
+  url: string;
+  timeoutMs: number;
+}): Promise<TimeSyncSampleResult> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), opts.timeoutMs);
   try {
     const t0 = Date.now();
     if (opts.provider === 'httpDate') {
-      const resp = await fetch(opts.url, { method: 'GET', cache: 'no-store', credentials: 'omit', signal: controller.signal });
+      const resp = await fetch(opts.url, {
+        method: 'GET',
+        cache: 'no-store',
+        credentials: 'omit',
+        signal: controller.signal,
+      });
       const dateHeader = resp.headers.get('Date');
       const t1 = Date.now();
       if (!dateHeader) throw new Error('Missing Date header');
@@ -63,10 +75,14 @@ async function measureOnce(opts: { provider: TimeSyncProvider; url: string; time
     const serverEpochMs = parseTimeApiBody(body);
     const rttMs = Math.max(0, t1 - t0);
     return { offsetMs: Math.round(serverEpochMs - (t0 + t1) / 2), rttMs, serverEpochMs, measuredAt: t1 };
-  } finally { clearTimeout(timeout); }
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
-export function getTimeSyncSettings() { return getAppSettings().general.timeSync; }
+export function getTimeSyncSettings() {
+  return getAppSettings().general.timeSync;
+}
 
 export async function syncTime(): Promise<TimeSyncRunResult> {
   const s = getTimeSyncSettings();
@@ -75,8 +91,12 @@ export async function syncTime(): Promise<TimeSyncRunResult> {
   // Parallel sampling avoids turning three trans-Pacific RTTs into a sequential wait.
   // The median rejects a single delayed response without discarding a stable last-known offset.
   const collect = async (provider: TimeSyncProvider, url: string, count: number) => {
-    const settled = await Promise.allSettled(Array.from({ length: count }, () => measureOnce({ provider, url, timeoutMs: 5_000 })));
-    return settled.filter((r): r is PromiseFulfilledResult<TimeSyncSampleResult> => r.status === 'fulfilled').map(r => r.value);
+    const settled = await Promise.allSettled(
+      Array.from({ length: count }, () => measureOnce({ provider, url, timeoutMs: 5_000 })),
+    );
+    return settled
+      .filter((r): r is PromiseFulfilledResult<TimeSyncSampleResult> => r.status === 'fulfilled')
+      .map((r) => r.value);
   };
   let samples = await collect(s.provider, primaryUrl, 3);
   // Redundant same-origin fallback: when /api/time is unavailable, use Vercel's Date header.
@@ -86,7 +106,13 @@ export async function syncTime(): Promise<TimeSyncRunResult> {
   }
   if (samples.length === 0) throw new Error('All time sources unavailable; keeping last successful offset');
   const fastest = [...samples].sort((a, b) => a.rttMs - b.rttMs).slice(0, Math.min(3, samples.length));
-  return { offsetMs: median(fastest.map(x => x.offsetMs)), rttMs: fastest[0].rttMs, serverEpochMs: fastest[0].serverEpochMs, measuredAt: fastest[0].measuredAt, samples };
+  return {
+    offsetMs: median(fastest.map((x) => x.offsetMs)),
+    rttMs: fastest[0].rttMs,
+    serverEpochMs: fastest[0].serverEpochMs,
+    measuredAt: fastest[0].measuredAt,
+    samples,
+  };
 }
 let managerStop: (() => void) | null = null;
 
@@ -97,7 +123,10 @@ export function startTimeSyncManager(): () => void {
   let stopped = false;
 
   const schedule = () => {
-    if (timer) { window.clearInterval(timer); timer = null; }
+    if (timer) {
+      window.clearInterval(timer);
+      timer = null;
+    }
     const s = getTimeSyncSettings();
     if (!s.enabled || !s.autoSyncEnabled) return;
     const ms = clampInt(s.autoSyncIntervalSec, 10, 7 * 24 * 3600) * 1000;
@@ -120,13 +149,17 @@ export function startTimeSyncManager(): () => void {
       updateTimeSyncSettings({ lastError: msg });
       window.dispatchEvent(new CustomEvent('timeSync:updated'));
       logger.warn(`校时失败(${reason}): ${msg}`);
-    } finally { syncing = false; }
+    } finally {
+      syncing = false;
+    }
   };
 
   const onSyncNow = () => void persist('manual');
   const onReschedule = () => schedule();
   const onOnline = () => void persist('online');
-  const onVisible = () => { if (document.visibilityState === 'visible') void persist('visible'); };
+  const onVisible = () => {
+    if (document.visibilityState === 'visible') void persist('visible');
+  };
   window.addEventListener('timeSync:syncNow', onSyncNow as EventListener);
   window.addEventListener('timeSync:reschedule', onReschedule as EventListener);
   window.addEventListener('online', onOnline);
@@ -137,7 +170,10 @@ export function startTimeSyncManager(): () => void {
   managerStop = () => {
     if (stopped) return;
     stopped = true;
-    if (timer) { window.clearInterval(timer); timer = null; }
+    if (timer) {
+      window.clearInterval(timer);
+      timer = null;
+    }
     window.removeEventListener('timeSync:syncNow', onSyncNow as EventListener);
     window.removeEventListener('timeSync:reschedule', onReschedule as EventListener);
     window.removeEventListener('online', onOnline);

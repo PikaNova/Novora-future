@@ -23,7 +23,10 @@ test('retry countdown exposes a future deadline on the first rerender', () => {
   });
 
   assert.ok(observed[firstLockedRender] >= 4, `expected an immediate countdown, got ${observed[firstLockedRender]}`);
-  assert.ok(!observed.slice(firstLockedRender).includes(0), 'the new deadline must not render as expired before its effect runs');
+  assert.ok(
+    !observed.slice(firstLockedRender).includes(0),
+    'the new deadline must not render as expired before its effect runs',
+  );
 
   act(() => renderer.unmount());
 });

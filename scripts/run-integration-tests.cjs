@@ -42,7 +42,8 @@ function runTestsWithTransientRetry() {
     process.stdout.write(output);
     if (result.error) throw result.error;
     if (result.status === 0) return;
-    const transientDisconnect = /Error connecting to database: fetch failed|SocketError: other side closed|ECONNRESET|ETIMEDOUT/.test(output);
+    const transientDisconnect =
+      /Error connecting to database: fetch failed|SocketError: other side closed|ECONNRESET|ETIMEDOUT/.test(output);
     if (attempt === 1 && transientDisconnect) {
       console.warn('Transient Neon transport disconnect detected; retrying the full isolated integration suite once.');
       continue;

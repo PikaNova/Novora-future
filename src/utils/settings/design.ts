@@ -13,7 +13,7 @@ export function normalizeDesignPolicy(raw: unknown): DesignPolicy {
   const rules: DesignAssignmentRule[] = Array.isArray(src.rules)
     ? src.rules.filter((rule): rule is DesignAssignmentRule => !!rule && typeof rule.designId === 'string')
     : [];
-  const schoolRule = [...rules].reverse().find(rule => rule.scope === 'school');
+  const schoolRule = [...rules].reverse().find((rule) => rule.scope === 'school');
   return {
     rules: schoolRule ? [schoolRule] : rules,
     updatedAt: Number(src.updatedAt ?? 0),

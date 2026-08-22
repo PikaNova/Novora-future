@@ -17,8 +17,14 @@ test('device scope: a grade administrator receives only their grade and its clas
     permissions: ['device.read'],
     scopes: [{ type: 'grade', gradeId: 'g1' }],
   });
-  assert.deepEqual(scope.grades.map((item) => item.id), ['g1']);
-  assert.deepEqual(scope.classes.map((item) => item.id), ['c1', 'c2']);
+  assert.deepEqual(
+    scope.grades.map((item) => item.id),
+    ['g1'],
+  );
+  assert.deepEqual(
+    scope.classes.map((item) => item.id),
+    ['c1', 'c2'],
+  );
   assert.equal(deviceIsInScope({ gradeId: 'g2', classId: 'c3' }, scope), false);
 });
 
@@ -27,8 +33,14 @@ test('device scope: a class administrator receives only their assigned class', (
     permissions: ['device.read'],
     scopes: [{ type: 'class', gradeId: 'g1', classId: 'c2' }],
   });
-  assert.deepEqual(scope.grades.map((item) => item.id), ['g1']);
-  assert.deepEqual(scope.classes.map((item) => item.id), ['c2']);
+  assert.deepEqual(
+    scope.grades.map((item) => item.id),
+    ['g1'],
+  );
+  assert.deepEqual(
+    scope.classes.map((item) => item.id),
+    ['c2'],
+  );
   assert.equal(deviceIsInScope({ gradeId: 'g1', classId: 'c1' }, scope), false);
 });
 

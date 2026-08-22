@@ -235,9 +235,7 @@ export function runQueued<T>(
           reject(error);
         }
       },
-      cancel: opts.supersededValue !== undefined
-        ? () => resolve(opts.supersededValue as T)
-        : undefined,
+      cancel: opts.supersededValue !== undefined ? () => resolve(opts.supersededValue as T) : undefined,
     });
     businessQueue.sort((a, b) => a.priority - b.priority);
     notifyListeners();

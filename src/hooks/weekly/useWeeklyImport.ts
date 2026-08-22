@@ -1,21 +1,11 @@
-import { useState } from "react";
-import type {
-  IsoWeekday,
-  WeeklyExamItem,
-  WeeklyPlan,
-  WeeklyWeekType,
-} from "../../types/exam";
-import {
-  genWeeklyItemId,
-  genWeeklyOverrideId,
-  genWeeklyPlanId,
-  normalizeWeeklyPlan,
-} from "../../utils/weeklySchedule";
-import { HM_RE, padHM, sortWeeklyItems } from "../../utils/settings/weekly";
-import { notify } from "../../services/notify";
-import type { ClassPickerOption } from "../../components/ClassMultiPicker";
+import { useState } from 'react';
+import type { IsoWeekday, WeeklyExamItem, WeeklyPlan, WeeklyWeekType } from '../../types/exam';
+import { genWeeklyItemId, genWeeklyOverrideId, genWeeklyPlanId, normalizeWeeklyPlan } from '../../utils/weeklySchedule';
+import { HM_RE, padHM, sortWeeklyItems } from '../../utils/settings/weekly';
+import { notify } from '../../services/notify';
+import type { ClassPickerOption } from '../../components/ClassMultiPicker';
 
-export type WeeklyImportStep = "paste" | "preview" | "targets";
+export type WeeklyImportStep = 'paste' | 'preview' | 'targets';
 
 export interface WeeklyImportSummary {
   itemCount: number;
@@ -57,51 +47,44 @@ export function useWeeklyImport({
   onSavePlans,
 }: UseWeeklyImportArgs) {
   const [importOpen, setImportOpen] = useState(false);
-  const [importText, setImportText] = useState("");
-  const [importError, setImportError] = useState("");
+  const [importText, setImportText] = useState('');
+  const [importError, setImportError] = useState('');
   const [importClassIds, setImportClassIds] = useState<string[]>([]);
-  const [importStep, setImportStep] = useState<WeeklyImportStep>("paste");
+  const [importStep, setImportStep] = useState<WeeklyImportStep>('paste');
   const [importSummary, setImportSummary] = useState<WeeklyImportSummary | null>(null);
   const [importExcludedIndexes, setImportExcludedIndexes] = useState<number[]>([]);
 
   const openImport = () => {
-    setImportText("");
-    setImportError("");
+    setImportText('');
+    setImportError('');
     setImportSummary(null);
-    setImportStep("paste");
+    setImportStep('paste');
     setImportClassIds(selectedClassId ? [selectedClassId] : []);
     setImportOpen(true);
   };
 
   const closeImport = (clearText = false) => {
     setImportOpen(false);
-    setImportError("");
+    setImportError('');
     setImportClassIds([]);
-    setImportStep("paste");
+    setImportStep('paste');
     setImportSummary(null);
     setImportExcludedIndexes([]);
-    if (clearText) setImportText("");
+    if (clearText) setImportText('');
   };
 
   const validateImportJson = () => {
-    setImportError("");
+    setImportError('');
     try {
       const source = JSON.parse(importText);
-      const importedPlan =
-        source?.plan && typeof source.plan === "object" ? source.plan : source;
-      const list = Array.isArray(importedPlan)
-        ? importedPlan
-        : importedPlan?.items;
+      const importedPlan = source?.plan && typeof source.plan === 'object' ? source.plan : source;
+      const list = Array.isArray(importedPlan) ? importedPlan : importedPlan?.items;
       if (!Array.isArray(list)) {
-        throw new Error("JSON \u5fc5\u987b\u662f\u5468\u6d4b\u6570\u7ec4\uff0c\u6216\u5305\u542b items \u6570\u7ec4");
+        throw new Error('JSON \u5fc5\u987b\u662f\u5468\u6d4b\u6570\u7ec4\uff0c\u6216\u5305\u542b items \u6570\u7ec4');
       }
       const invalidIndex = list.findIndex((raw: unknown) => {
         const item = raw as Record<string, unknown>;
-        return (
-          !item?.name ||
-          !HM_RE.test(String(item.startTime ?? "")) ||
-          !HM_RE.test(String(item.endTime ?? ""))
-        );
+        return !item?.name || !HM_RE.test(String(item.startTime ?? '')) || !HM_RE.test(String(item.endTime ?? ''));
       });
       if (invalidIndex >= 0) {
         throw new Error(
@@ -120,47 +103,45 @@ export function useWeeklyImport({
           weekday,
           startTime,
           endTime,
-          warning: !item.endNextDay && endTime <= startTime ? "\u7ed3\u675f\u65f6\u95f4\u4e0d\u665a\u4e8e\u5f00\u59cb\u65f6\u95f4" : undefined,
+          warning:
+            !item.endNextDay && endTime <= startTime
+              ? '\u7ed3\u675f\u65f6\u95f4\u4e0d\u665a\u4e8e\u5f00\u59cb\u65f6\u95f4'
+              : undefined,
         };
       });
-      const warnings = previewItems.flatMap((item, index) => item.warning ? [`\u7b2c ${index + 1} \u9879\uff1a${item.warning}`] : []);
+      const warnings = previewItems.flatMap((item, index) =>
+        item.warning ? [`\u7b2c ${index + 1} \u9879\uff1a${item.warning}`] : [],
+      );
       setImportSummary({
         itemCount: list.length,
-        planName:
-          typeof importedPlan?.name === "string"
-            ? importedPlan.name
-            : undefined,
+        planName: typeof importedPlan?.name === 'string' ? importedPlan.name : undefined,
         items: previewItems,
         warnings,
       });
       setImportExcludedIndexes([]);
-      setImportStep("preview");
+      setImportStep('preview');
     } catch (error) {
-      setImportError(error instanceof Error ? error.message : "JSON \u683c\u5f0f\u9519\u8bef");
+      setImportError(error instanceof Error ? error.message : 'JSON \u683c\u5f0f\u9519\u8bef');
     }
   };
 
   const importJson = () => {
     if (!activePlan) return;
-    setImportError("");
+    setImportError('');
     try {
       const source = JSON.parse(importText);
-      const targets = importClassIds.length
-        ? importClassIds
-        : [selectedClassId];
-      if (!targets.length) throw new Error("\u8bf7\u81f3\u5c11\u9009\u62e9\u4e00\u4e2a\u76ee\u6807\u73ed\u7ea7");
-      if (source?.plan && typeof source.plan === "object") {
+      const targets = importClassIds.length ? importClassIds : [selectedClassId];
+      if (!targets.length) throw new Error('\u8bf7\u81f3\u5c11\u9009\u62e9\u4e00\u4e2a\u76ee\u6807\u73ed\u7ea7');
+      if (source?.plan && typeof source.plan === 'object') {
         const imported = normalizeWeeklyPlan(source.plan, weeklyPlans.length);
         const includedItems = imported.items.filter((_, index) => !importExcludedIndexes.includes(index));
         const importedPlans = targets.map((classId, offset) => {
           const target = pickerOptions.find((item) => item.id === classId)!;
-          const idMap = new Map(
-            includedItems.map((item) => [item.id, genWeeklyItemId()]),
-          );
+          const idMap = new Map(includedItems.map((item) => [item.id, genWeeklyItemId()]));
           return {
             ...imported,
             id: genWeeklyPlanId(),
-            name: `${target.className} \u00b7 ${imported.name.replace(/\uff08\u5bfc\u5165\uff09$/u, "")}`,
+            name: `${target.className} \u00b7 ${imported.name.replace(/\uff08\u5bfc\u5165\uff09$/u, '')}`,
             gradeId: target.gradeId,
             classId,
             order: weeklyPlans.length + offset,
@@ -173,19 +154,14 @@ export function useWeeklyImport({
               .filter((item) => idMap.has(item.sourceItemId))
               .map((item) => ({
                 ...item,
-                id: genWeeklyOverrideId(
-                  idMap.get(item.sourceItemId)!,
-                  item.date,
-                ),
+                id: genWeeklyOverrideId(idMap.get(item.sourceItemId)!, item.date),
                 sourceItemId: idMap.get(item.sourceItemId)!,
               })),
           };
         });
         const nextActive = {
           ...activeWeeklyPlanIdByClassId,
-          ...Object.fromEntries(
-            importedPlans.map((plan) => [plan.classId, plan.id]),
-          ),
+          ...Object.fromEntries(importedPlans.map((plan) => [plan.classId, plan.id])),
         };
         onSavePlans(
           [...weeklyPlans, ...importedPlans],
@@ -195,24 +171,24 @@ export function useWeeklyImport({
           nextActive,
         );
         closeImport(true);
-        notify("success", `\u5df2\u5411 ${importedPlans.length} \u4e2a\u73ed\u7ea7\u5bfc\u5165\u72ec\u7acb\u8ba1\u5212\u3002`);
+        notify(
+          'success',
+          `\u5df2\u5411 ${importedPlans.length} \u4e2a\u73ed\u7ea7\u5bfc\u5165\u72ec\u7acb\u8ba1\u5212\u3002`,
+        );
         return;
       }
       const list = Array.isArray(source) ? source : source.items;
       if (!Array.isArray(list))
-        throw new Error("JSON \u5fc5\u987b\u662f\u5468\u6d4b\u6570\u7ec4\uff0c\u6216\u5305\u542b items \u6570\u7ec4");
-      const nextItems: WeeklyExamItem[] = list.filter((_: unknown, index: number) => !importExcludedIndexes.includes(index)).map(
-        (raw: unknown, index: number) => {
+        throw new Error('JSON \u5fc5\u987b\u662f\u5468\u6d4b\u6570\u7ec4\uff0c\u6216\u5305\u542b items \u6570\u7ec4');
+      const nextItems: WeeklyExamItem[] = list
+        .filter((_: unknown, index: number) => !importExcludedIndexes.includes(index))
+        .map((raw: unknown, index: number) => {
           const row = raw as Record<string, unknown>;
-          const weekday = ([1, 2, 3, 4, 5, 6, 7] as number[]).includes(
-            row.weekday as number,
-          )
+          const weekday = ([1, 2, 3, 4, 5, 6, 7] as number[]).includes(row.weekday as number)
             ? (row.weekday as IsoWeekday)
             : 1;
           if (!row.name || !row.startTime || !row.endTime)
-            throw new Error(
-              `\u7b2c ${index + 1} \u9879\u7f3a\u5c11 name\u3001startTime \u6216 endTime`,
-            );
+            throw new Error(`\u7b2c ${index + 1} \u9879\u7f3a\u5c11 name\u3001startTime \u6216 endTime`);
           return {
             id: String(row.id ?? genWeeklyItemId()),
             name: String(row.name),
@@ -221,29 +197,26 @@ export function useWeeklyImport({
             endTime: padHM(String(row.endTime)),
             endNextDay: !!row.endNextDay,
             enabled: row.enabled !== false,
-            order: typeof row.order === "number" ? row.order : index,
-            location:
-              typeof row.location === "string" ? row.location : undefined,
-            note: typeof row.note === "string" ? row.note : undefined,
-            weekType: (["all", "a", "b"] as WeeklyWeekType[]).includes(
-              row.weekType as WeeklyWeekType,
-            )
+            order: typeof row.order === 'number' ? row.order : index,
+            location: typeof row.location === 'string' ? row.location : undefined,
+            note: typeof row.note === 'string' ? row.note : undefined,
+            weekType: (['all', 'a', 'b'] as WeeklyWeekType[]).includes(row.weekType as WeeklyWeekType)
               ? (row.weekType as WeeklyWeekType)
-              : "all",
+              : 'all',
           };
-        },
-      );
+        });
       const targetPlanIds = new Set(
         targets
           .map(
             (classId) =>
-              activeWeeklyPlanIdByClassId[classId] ??
-              weeklyPlans.find((plan) => plan.classId === classId)?.id,
+              activeWeeklyPlanIdByClassId[classId] ?? weeklyPlans.find((plan) => plan.classId === classId)?.id,
           )
           .filter(Boolean),
       );
       if (targetPlanIds.size !== targets.length)
-        throw new Error("\u90e8\u5206\u76ee\u6807\u73ed\u7ea7\u5c1a\u65e0\u5468\u6d4b\u8ba1\u5212\uff0c\u8bf7\u5148\u6279\u91cf\u65b0\u5efa\u8ba1\u5212");
+        throw new Error(
+          '\u90e8\u5206\u76ee\u6807\u73ed\u7ea7\u5c1a\u65e0\u5468\u6d4b\u8ba1\u5212\uff0c\u8bf7\u5148\u6279\u91cf\u65b0\u5efa\u8ba1\u5212',
+        );
       const plans = weeklyPlans.map((plan) =>
         targetPlanIds.has(plan.id)
           ? {
@@ -260,9 +233,9 @@ export function useWeeklyImport({
       );
       onSavePlans(plans, activePlan.id, selectedClassId, true);
       closeImport(true);
-      notify("success", `\u5df2\u5411 ${targets.length} \u4e2a\u73ed\u7ea7\u5bfc\u5165\u5468\u6d4b\u9879\u76ee\u3002`);
+      notify('success', `\u5df2\u5411 ${targets.length} \u4e2a\u73ed\u7ea7\u5bfc\u5165\u5468\u6d4b\u9879\u76ee\u3002`);
     } catch (error) {
-      setImportError(error instanceof Error ? error.message : "JSON \u683c\u5f0f\u9519\u8bef");
+      setImportError(error instanceof Error ? error.message : 'JSON \u683c\u5f0f\u9519\u8bef');
     }
   };
 
@@ -281,12 +254,12 @@ export function useWeeklyImport({
           2,
         ),
       ],
-      { type: "application/json;charset=utf-8" },
+      { type: 'application/json;charset=utf-8' },
     );
     const url = URL.createObjectURL(file);
-    const link = document.createElement("a");
+    const link = document.createElement('a');
     link.href = url;
-    link.download = `${activePlan.name || "weekly"}-${new Date().toISOString().slice(0, 10)}.json`;
+    link.download = `${activePlan.name || 'weekly'}-${new Date().toISOString().slice(0, 10)}.json`;
     document.body.appendChild(link);
     link.click();
     link.remove();

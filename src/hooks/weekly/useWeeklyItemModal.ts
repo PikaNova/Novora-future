@@ -4,9 +4,7 @@
  */
 import { useState, useEffect } from 'react';
 import type { WeeklyPlan, WeeklyExamItem } from '../../types/exam';
-import {
-  genWeeklyItemId,
-} from '../../utils/weeklySchedule';
+import { genWeeklyItemId } from '../../utils/weeklySchedule';
 import { HM_RE, padHM, sortWeeklyItems } from '../../utils/settings/weekly';
 
 export type ItemEdit = Omit<WeeklyExamItem, 'id' | 'order'> & { id?: string };
@@ -16,12 +14,7 @@ interface UseItemModalArgs {
   activePlan: WeeklyPlan | null;
   selectedClassId: string;
   items: WeeklyExamItem[];
-  onSavePlans: (
-    plans: WeeklyPlan[],
-    activeId: string | null,
-    classId: string,
-    immediate?: boolean,
-  ) => void;
+  onSavePlans: (plans: WeeklyPlan[], activeId: string | null, classId: string, immediate?: boolean) => void;
   setLastDeleted: React.Dispatch<React.SetStateAction<import('./useWeeklyPlanModal').LastDeleted>>;
 }
 
@@ -44,7 +37,7 @@ export function useWeeklyItemModal({
 
   useEffect(() => {
     if (editing) setItemWizardStep(0);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing !== null]);
 
   const openWeeklyTimeFlow = () => {
@@ -56,9 +49,7 @@ export function useWeeklyItemModal({
 
   const cancelWeeklyTimeFlow = () => {
     setEditing((item) =>
-      item
-        ? { ...item, startTime: weeklyTimeFlowInitialStart, endTime: weeklyTimeFlowInitialEnd }
-        : item,
+      item ? { ...item, startTime: weeklyTimeFlowInitialStart, endTime: weeklyTimeFlowInitialEnd } : item,
     );
     setWeeklyTimeFlowOpen(false);
   };
@@ -66,7 +57,10 @@ export function useWeeklyItemModal({
   const commitItemModal = () => {
     if (!editing || !activePlan) return;
     const name = editing.name.trim();
-    if (!name) { setEditError('请输入周测名称'); return; }
+    if (!name) {
+      setEditError('请输入周测名称');
+      return;
+    }
     if (!HM_RE.test(editing.startTime) || !HM_RE.test(editing.endTime)) {
       setEditError('请输入正确的时间（HH:mm）');
       return;
@@ -80,9 +74,7 @@ export function useWeeklyItemModal({
     let nextItems: WeeklyExamItem[];
     if (editing.id) {
       nextItems = items.map((x) =>
-        x.id === editing.id
-          ? { ...x, ...editing, startTime: start, endTime: end, id: x.id, order: x.order }
-          : x,
+        x.id === editing.id ? { ...x, ...editing, startTime: start, endTime: end, id: x.id, order: x.order } : x,
       );
     } else {
       nextItems = [
@@ -103,9 +95,7 @@ export function useWeeklyItemModal({
       ];
     }
     nextItems = sortWeeklyItems(nextItems);
-    const plans = weeklyPlans.map((p) =>
-      p.id === activePlan.id ? { ...p, items: nextItems } : p,
-    );
+    const plans = weeklyPlans.map((p) => (p.id === activePlan.id ? { ...p, items: nextItems } : p));
     onSavePlans(plans, activePlan.id, selectedClassId, true);
     setEditing(null);
     setEditError('');
@@ -115,9 +105,7 @@ export function useWeeklyItemModal({
     if (!activePlan) return;
     const index = items.findIndex((x) => x.id === item.id);
     const nextItems = items.filter((x) => x.id !== item.id);
-    const plans = weeklyPlans.map((p) =>
-      p.id === activePlan.id ? { ...p, items: nextItems } : p,
-    );
+    const plans = weeklyPlans.map((p) => (p.id === activePlan.id ? { ...p, items: nextItems } : p));
     onSavePlans(plans, activePlan.id, selectedClassId, true);
     setLastDeleted({ kind: 'item', item, index, planId: activePlan.id });
     setDeleteTarget(null);
@@ -125,12 +113,8 @@ export function useWeeklyItemModal({
 
   const toggleItemEnabled = (item: WeeklyExamItem) => {
     if (!activePlan) return;
-    const nextItems = items.map((x) =>
-      x.id === item.id ? { ...x, enabled: !x.enabled } : x,
-    );
-    const plans = weeklyPlans.map((p) =>
-      p.id === activePlan.id ? { ...p, items: nextItems } : p,
-    );
+    const nextItems = items.map((x) => (x.id === item.id ? { ...x, enabled: !x.enabled } : x));
+    const plans = weeklyPlans.map((p) => (p.id === activePlan.id ? { ...p, items: nextItems } : p));
     onSavePlans(plans, activePlan.id, selectedClassId, true);
   };
 

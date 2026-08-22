@@ -1,26 +1,14 @@
-import { Check, X } from "lucide-react";
-import type { CSSProperties, ReactNode } from "react";
+import { Check, X } from 'lucide-react';
+import type { CSSProperties, ReactNode } from 'react';
 
 type Step = {
   label: string;
   hint?: string;
 };
 
-export function AdminWorkflowClose({
-  onClick,
-  label = "关闭窗口",
-}: {
-  onClick: () => void;
-  label?: string;
-}) {
+export function AdminWorkflowClose({ onClick, label = '关闭窗口' }: { onClick: () => void; label?: string }) {
   return (
-    <button
-      type="button"
-      className="admin-workflow-close"
-      onClick={onClick}
-      aria-label={label}
-      title={label}
-    >
+    <button type="button" className="admin-workflow-close" onClick={onClick} aria-label={label} title={label}>
       <X aria-hidden="true" />
     </button>
   );
@@ -36,16 +24,23 @@ export default function AdminWizardSteps({
   summary?: ReactNode;
 }) {
   return (
-    <aside className="admin-wizard-steps" aria-label="操作步骤" style={{ "--admin-wizard-step-count": steps.length } as CSSProperties}>
+    <aside
+      className="admin-wizard-steps"
+      aria-label="操作步骤"
+      style={{ '--admin-wizard-step-count': steps.length } as CSSProperties}
+    >
       <div className="admin-wizard-steps__list">
         {steps.map((step, index) => (
           <div
             key={step.label}
-            className={index === active ? "is-active" : index < active ? "is-done" : ""}
-            aria-current={index === active ? "step" : undefined}
+            className={index === active ? 'is-active' : index < active ? 'is-done' : ''}
+            aria-current={index === active ? 'step' : undefined}
           >
             <i>{index < active ? <Check aria-hidden="true" /> : index + 1}</i>
-            <span><strong>{step.label}</strong>{step.hint && <small>{step.hint}</small>}</span>
+            <span>
+              <strong>{step.label}</strong>
+              {step.hint && <small>{step.hint}</small>}
+            </span>
           </div>
         ))}
       </div>

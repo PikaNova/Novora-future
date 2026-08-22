@@ -1,9 +1,5 @@
-import {
-  hasAllScope,
-  hasPermission,
-  type PermissionSubject,
-} from "../shared/permissionRules.js";
-import type { SchoolClass, SchoolGrade } from "../types/school.js";
+import { hasAllScope, hasPermission, type PermissionSubject } from '../shared/permissionRules.js';
+import type { SchoolClass, SchoolGrade } from '../types/school.js';
 
 export type UserManagementPermissionFlags = {
   canReadUsers: boolean;
@@ -19,13 +15,13 @@ export function computeUserManagementPermissionFlags(
   current: PermissionSubject | null | undefined,
 ): UserManagementPermissionFlags {
   return {
-    canReadUsers: hasPermission(current, "user.read"),
-    canCreateUser: hasPermission(current, "user.create"),
-    canEditUser: hasPermission(current, "user.edit"),
-    canResetPassword: hasPermission(current, "user.reset_password"),
-    canDeleteUser: hasPermission(current, "user.delete"),
-    canManageRoles: hasPermission(current, "role.manage"),
-    canReadAudit: hasPermission(current, "audit.read"),
+    canReadUsers: hasPermission(current, 'user.read'),
+    canCreateUser: hasPermission(current, 'user.create'),
+    canEditUser: hasPermission(current, 'user.edit'),
+    canResetPassword: hasPermission(current, 'user.reset_password'),
+    canDeleteUser: hasPermission(current, 'user.delete'),
+    canManageRoles: hasPermission(current, 'role.manage'),
+    canReadAudit: hasPermission(current, 'audit.read'),
   };
 }
 
@@ -41,16 +37,12 @@ export function computeUserManagementScopeAccess<TRole extends DelegableRoleLike
   const visibleGradeIds = new Set(
     canAssignAll
       ? grades.map((item) => item.id)
-      : (current?.scopes ?? [])
-          .filter((scope) => scope.type === "grade")
-          .map((scope) => scope.gradeId),
+      : (current?.scopes ?? []).filter((scope) => scope.type === 'grade').map((scope) => scope.gradeId),
   );
   const visibleClassIds = new Set(
     canAssignAll
       ? classes.map((item) => item.id)
-      : (current?.scopes ?? [])
-          .filter((scope) => scope.type === "class")
-          .map((scope) => scope.classId),
+      : (current?.scopes ?? []).filter((scope) => scope.type === 'class').map((scope) => scope.classId),
   );
   classes.forEach((item) => {
     if (visibleGradeIds.has(item.gradeId)) visibleClassIds.add(item.id);
@@ -59,8 +51,8 @@ export function computeUserManagementScopeAccess<TRole extends DelegableRoleLike
   const visibleClasses = classes.filter((item) => visibleClassIds.has(item.id));
   const delegableRoles = roles.filter(
     (role) =>
-      current?.permissions.includes("*") ||
-      (!role.permissions.includes("*") &&
+      current?.permissions.includes('*') ||
+      (!role.permissions.includes('*') &&
         role.permissions.every((permission) => current?.permissions.includes(permission))),
   );
   return {

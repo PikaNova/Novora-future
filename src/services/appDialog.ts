@@ -17,7 +17,7 @@ export const APP_DIALOG_EVENT = 'novora:app-dialog';
 
 function openDialog(options: AppDialogOptions): Promise<boolean> {
   if (typeof window === 'undefined') return Promise.resolve(false);
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     const detail: AppDialogRequest = {
       tone: 'info',
       confirmLabel: '确定',

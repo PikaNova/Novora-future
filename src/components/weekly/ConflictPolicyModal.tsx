@@ -1,10 +1,10 @@
-import React from "react";
-import AdminModalPortal from "../AdminModalPortal";
-import HelpTip from "../HelpTip";
-import InlineSelect from "../InlineSelect";
-import { ALL_CONFLICT_SCOPES, type WeeklyConflictPolicy } from "../../types/exam";
-import { useBackdropDismiss } from "../../hooks/useBackdropDismiss";
-import { SCOPE_LABEL } from "./weeklyShared";
+import React from 'react';
+import AdminModalPortal from '../AdminModalPortal';
+import HelpTip from '../HelpTip';
+import InlineSelect from '../InlineSelect';
+import { ALL_CONFLICT_SCOPES, type WeeklyConflictPolicy } from '../../types/exam';
+import { useBackdropDismiss } from '../../hooks/useBackdropDismiss';
+import { SCOPE_LABEL } from './weeklyShared';
 
 interface ConflictPolicyModalProps {
   backdropProps: ReturnType<typeof useBackdropDismiss>;
@@ -24,10 +24,7 @@ export default function ConflictPolicyModal({
   if (!policyOpen) return null;
 
   return (
-    <AdminModalPortal
-      className="admin-modal-overlay"
-      {...backdropProps(() => setPolicyOpen(false))}
-    >
+    <AdminModalPortal className="admin-modal-overlay" {...backdropProps(() => setPolicyOpen(false))}>
       <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
         <h2 className="admin-modal__title">大型考试冲突处理</h2>
         <div className="admin-form">
@@ -35,12 +32,7 @@ export default function ConflictPolicyModal({
             <input
               type="checkbox"
               checked={weeklyConflictPolicy.enabled}
-              onChange={(e) =>
-                onConflictPolicyChange(
-                  { ...weeklyConflictPolicy, enabled: e.target.checked },
-                  true,
-                )
-              }
+              onChange={(e) => onConflictPolicyChange({ ...weeklyConflictPolicy, enabled: e.target.checked }, true)}
             />
             启用冲突自动处理（仅自动模式下生效）
           </label>
@@ -58,7 +50,7 @@ export default function ConflictPolicyModal({
                 onConflictPolicyChange(
                   {
                     ...weeklyConflictPolicy,
-                    scope: value as WeeklyConflictPolicy["scope"],
+                    scope: value as WeeklyConflictPolicy['scope'],
                   },
                   true,
                 )
@@ -69,7 +61,7 @@ export default function ConflictPolicyModal({
               }))}
             />
           </label>
-          {weeklyConflictPolicy.scope === "time-overlap" && (
+          {weeklyConflictPolicy.scope === 'time-overlap' && (
             <>
               <label className="admin-label">
                 开考前缓冲（分钟）
@@ -83,10 +75,7 @@ export default function ConflictPolicyModal({
                     onConflictPolicyChange(
                       {
                         ...weeklyConflictPolicy,
-                        bufferBeforeMinutes: Math.max(
-                          0,
-                          Number(e.target.value) || 0,
-                        ),
+                        bufferBeforeMinutes: Math.max(0, Number(e.target.value) || 0),
                       },
                       true,
                     )
@@ -105,10 +94,7 @@ export default function ConflictPolicyModal({
                     onConflictPolicyChange(
                       {
                         ...weeklyConflictPolicy,
-                        bufferAfterMinutes: Math.max(
-                          0,
-                          Number(e.target.value) || 0,
-                        ),
+                        bufferAfterMinutes: Math.max(0, Number(e.target.value) || 0),
                       },
                       true,
                     )
@@ -118,10 +104,7 @@ export default function ConflictPolicyModal({
             </>
           )}
           <div className="admin-form-actions">
-            <button
-              className="admin-btn admin-btn--primary"
-              onClick={() => setPolicyOpen(false)}
-            >
+            <button className="admin-btn admin-btn--primary" onClick={() => setPolicyOpen(false)}>
               完成
             </button>
           </div>

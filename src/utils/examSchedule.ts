@@ -9,7 +9,8 @@ export function sortExamItemsByTime<T extends ExamItem>(items: T[]): T[] {
     const bTime = parseZonedTime(b.startTime);
     if (Number.isFinite(aTime) && Number.isFinite(bTime) && aTime !== bTime) return aTime - bTime;
     if (a.startTime !== b.startTime) return a.startTime.localeCompare(b.startTime);
-    const aEnd = parseZonedTime(a.endTime); const bEnd = parseZonedTime(b.endTime);
+    const aEnd = parseZonedTime(a.endTime);
+    const bEnd = parseZonedTime(b.endTime);
     if (Number.isFinite(aEnd) && Number.isFinite(bEnd) && aEnd !== bEnd) return aEnd - bEnd;
     return a.id.localeCompare(b.id);
   });

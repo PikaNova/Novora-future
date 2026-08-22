@@ -10,14 +10,18 @@ export type NoticeOptions = {
 
 export function notify(tone: NoticeTone, message: string, title?: string, options: NoticeOptions = {}) {
   if (typeof window === 'undefined') return;
-  window.dispatchEvent(new CustomEvent(NOTICE_EVENT, { detail: {
-    id: options.id ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-    tone,
-    message,
-    title,
-    variant: options.variant,
-    durationMs: options.durationMs,
-  } }));
+  window.dispatchEvent(
+    new CustomEvent(NOTICE_EVENT, {
+      detail: {
+        id: options.id ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        tone,
+        message,
+        title,
+        variant: options.variant,
+        durationMs: options.durationMs,
+      },
+    }),
+  );
 }
 
 export function dismissNotice(id: string) {

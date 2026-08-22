@@ -1,8 +1,8 @@
 // api/_exams/routes/dashboardRoutes.ts
-import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { requireActor } from "../../_auth.js";
-import { hasAllScope } from "../../../src/shared/permissionRules.js";
-import { database, ensureTableOnce, missingRelation } from "../db.js";
+import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { requireActor } from '../../_auth.js';
+import { hasAllScope } from '../../../src/shared/permissionRules.js';
+import { database, ensureTableOnce, missingRelation } from '../db.js';
 import {
   aggregateStats,
   buildGradeDistribution,
@@ -20,7 +20,7 @@ import {
   type DashboardDevice,
   type DashboardGrade,
   type DashboardMajor,
-} from "../dashboard.js";
+} from '../dashboard.js';
 
 type ExamRowLite = {
   majors?: unknown;
@@ -29,12 +29,8 @@ type ExamRowLite = {
   updated_at?: number | string | null;
 };
 
-export async function handleDashboard(
-  req: VercelRequest,
-  res: VercelResponse,
-  startedAt: number,
-): Promise<void> {
-  const actor = await requireActor(req, res, "overview.read");
+export async function handleDashboard(req: VercelRequest, res: VercelResponse, startedAt: number): Promise<void> {
+  const actor = await requireActor(req, res, 'overview.read');
   if (!actor) return;
   const sql = database();
   const selectRow = async (): Promise<ExamRowLite[]> =>
@@ -60,20 +56,22 @@ export async function handleDashboard(
   const devices = scopedDevices(deviceRows, actor, classes);
   const deviceStats = classifyDevices(devices, now);
   const updatedAt = Number(row.updated_at ?? 0);
-  res.setHeader("Server-Timing", "app;dur=" + (Date.now() - startedAt));
+  res.setHeader('Server-Timing', 'app;dur=' + (Date.now() - startedAt));
   res.status(200).json({
     ok: true,
     scopeLabel: dashboardScopeLabel(actor, grades),
-    isAllScope:
-      actor.permissions.includes("*") ||
-      actor.scopes.some(scope => scope.type === "all"),
+    isAllScope: actor.permissions.includes('*') || actor.scopes.some((scope) => scope.type === 'all'),
     stats: { ...aggregateStats(items, now), ...deviceStats },
     ongoing: buildOngoing(items, now),
     upcoming: buildUpcoming(items, now),
     recentEnded: buildRecentEnded(items, now),
     subjectDistribution: buildSubjectDistribution(items, now),
     onlineDevices: buildOnlineDevices(devices, classes, now),
-    gradeDistribution: buildGradeDistribution(items, grades, hasAllScope(actor) ? undefined : actorVisibleGradeIds(actor, grades)),
+    gradeDistribution: buildGradeDistribution(
+      items,
+      grades,
+      hasAllScope(actor) ? undefined : actorVisibleGradeIds(actor, grades),
+    ),
     updatedAt,
   });
 }

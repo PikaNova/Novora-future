@@ -48,7 +48,17 @@ test('normalizeAlerts: merges partial per-state overrides onto defaults instead 
 test('normalizeAlerts: sanitizes custom reminders and rejects invalid enum-like fields', () => {
   const alerts = normalizeAlerts({
     custom: [
-      { id: 'c1', name: '自定义A', enabled: false, anchor: 'afterStart', offsetMin: 30, tone: 'ended', label: '提示', title: 'T', subtext: 'S' },
+      {
+        id: 'c1',
+        name: '自定义A',
+        enabled: false,
+        anchor: 'afterStart',
+        offsetMin: 30,
+        tone: 'ended',
+        label: '提示',
+        title: 'T',
+        subtext: 'S',
+      },
       { anchor: 'not-a-real-anchor', offsetMin: -5, tone: 'not-a-real-tone' },
       null,
       false,
@@ -100,12 +110,23 @@ test('normalizeExam: sorts multiple majors by order and mirrors the active one',
   const exam = normalizeExam({
     activeMajorId: 'm2',
     majors: [
-      { id: 'm2', name: '二模', order: 1, items: [{ id: 'i1', name: '数学', startTime: '2026-05-01T09:00', endTime: '2026-05-01T11:00' }] },
+      {
+        id: 'm2',
+        name: '二模',
+        order: 1,
+        items: [{ id: 'i1', name: '数学', startTime: '2026-05-01T09:00', endTime: '2026-05-01T11:00' }],
+      },
       { id: 'm1', name: '一模', order: 0, items: [] },
     ],
   });
-  assert.deepEqual(exam.majors.map(m => m.id), ['m1', 'm2']);
-  assert.deepEqual(exam.majors.map(m => m.order), [0, 1]);
+  assert.deepEqual(
+    exam.majors.map((m) => m.id),
+    ['m1', 'm2'],
+  );
+  assert.deepEqual(
+    exam.majors.map((m) => m.order),
+    [0, 1],
+  );
   assert.equal(exam.activeMajorId, 'm2');
   assert.equal(exam.title, '二模');
   assert.equal(exam.items[0].name, '数学');
@@ -157,7 +178,11 @@ test('normalizeExam: drops an activeWeeklyPlanId that does not match any plan, t
 // ---------- settings/school ----------
 
 test('normalizeGrades: filters falsy entries and fills defaults', () => {
-  const grades = normalizeGrades([{ id: 'g1', name: '高一' }, null, { id: 'g2', name: '高二', order: 5, enabled: false }]);
+  const grades = normalizeGrades([
+    { id: 'g1', name: '高一' },
+    null,
+    { id: 'g2', name: '高二', order: 5, enabled: false },
+  ]);
   assert.deepEqual(grades, [
     { id: 'g1', name: '高一', order: 0, enabled: true },
     { id: 'g2', name: '高二', order: 5, enabled: false },
@@ -266,7 +291,10 @@ test('normalizeWeeklyPlan: normalizes times, clamps repeat interval, and preserv
   assert.equal(plan.anchorDate, '2026-01-01');
   assert.equal(plan.weekMode, 'ab');
   // item order from the input array is preserved (no implicit re-sort by weekday/time)
-  assert.deepEqual(plan.items.map(i => i.id), ['i2', 'i1']);
+  assert.deepEqual(
+    plan.items.map((i) => i.id),
+    ['i2', 'i1'],
+  );
   assert.equal(plan.items[0].startTime, '09:05');
   assert.equal(plan.items[1].startTime, '19:00');
   assert.deepEqual(plan.excludedDates, ['2026-02-01']);
@@ -292,7 +320,12 @@ test('normalizeConflictPolicy: clamps buffers and rejects an unknown scope', () 
   assert.equal(defaults.scope, 'whole-day');
   assert.equal(defaults.bufferBeforeMinutes, 0);
 
-  const custom = normalizeConflictPolicy({ enabled: false, scope: 'time-overlap', bufferBeforeMinutes: 15.6, bufferAfterMinutes: -5 });
+  const custom = normalizeConflictPolicy({
+    enabled: false,
+    scope: 'time-overlap',
+    bufferBeforeMinutes: 15.6,
+    bufferAfterMinutes: -5,
+  });
   assert.equal(custom.enabled, false);
   assert.equal(custom.scope, 'time-overlap');
   assert.equal(custom.bufferBeforeMinutes, 16);
@@ -364,7 +397,16 @@ test('normalizeMajorBatchSettings: dedupes subjects, drops empty-subject groups,
       { name: '空科目组', subjects: [] },
     ],
     timeGroups: [
-      { id: 't1', name: '标准时间', slots: [{ start: '08:00', end: '10:00' }, { start: 'bad', end: '11:00' }], updatedAt: 5, order: 0 },
+      {
+        id: 't1',
+        name: '标准时间',
+        slots: [
+          { start: '08:00', end: '10:00' },
+          { start: 'bad', end: '11:00' },
+        ],
+        updatedAt: 5,
+        order: 0,
+      },
     ],
   });
   assert.equal(settings.subjectGroups.length, 2);

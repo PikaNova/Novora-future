@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
@@ -10,17 +10,35 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="theme-color" content="#111827" />
-    <link rel="preload" href="/fonts/source-han-sc-standard-subset.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="/fonts/source-han-sc-standard-subset.woff2" as="font" type="font/woff2" crossorigin />
     <style>
       :root {
         --font-ui: 'Inter', system-ui, sans-serif;
         --font-mono: 'JetBrains Mono', 'Cascadia Code', 'SF Mono', 'Consolas', ui-monospace, monospace;
       }
-      *, *::before, *::after { box-sizing: border-box; }
-      html, body { margin: 0; padding: 0; width: 100%; height: 100%; }
-      body { background: #0d0d0d; color: #f0f0f0; }
-      body.lock-scroll { overflow: hidden; }
-      #root { width: 100%; height: 100%; }
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+      }
+      body {
+        background: #0d0d0d;
+        color: #f0f0f0;
+      }
+      body.lock-scroll {
+        overflow: hidden;
+      }
+      #root {
+        width: 100%;
+        height: 100%;
+      }
     </style>
   </head>
   <body>

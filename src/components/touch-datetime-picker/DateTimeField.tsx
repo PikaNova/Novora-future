@@ -1,125 +1,131 @@
-import { useEffect, useRef, useState } from "react"
-import { DateTimePicker } from "./DateTimePicker"
-import { SelectionPreview } from "./SelectionPreview"
-import { parseNaive, partsToNaive, partsToNaiveDate, formatDateCN, weekdayCN, pad2 } from "./utils"
-import type { AnchorRect, CompactPlacement, DateTimeParts, Density, Mode, PreviewConfig, WeekdayConfig } from "./types"
-import "./DateTimeField.css"
+import { useEffect, useRef, useState } from 'react';
+import { DateTimePicker } from './DateTimePicker';
+import { SelectionPreview } from './SelectionPreview';
+import { parseNaive, partsToNaive, partsToNaiveDate, formatDateCN, weekdayCN, pad2 } from './utils';
+import type { AnchorRect, CompactPlacement, DateTimeParts, Density, Mode, PreviewConfig, WeekdayConfig } from './types';
+import './DateTimeField.css';
 
-const DATE_TIME_PICKER_OPEN_EVENT = "novora:datetime-picker-open"
-let dateTimePickerIdSeed = 0
+const DATE_TIME_PICKER_OPEN_EVENT = 'novora:datetime-picker-open';
+let dateTimePickerIdSeed = 0;
 
 export interface DateTimeFieldProps {
   // 与 <input type="datetime-local"> 相同的字符串契约："YYYY-MM-DDTHH:mm"
-  value: string
-  onChange: (v: string) => void
-  mode?: Mode
-  density?: Density
-  placeholder?: string
-  disabled?: boolean
-  id?: string
-  name?: string // 提供时渲染隐藏 input，兼容原生表单提交
-  className?: string
-  title?: string
-  hourRange?: [number, number]
-  yearRange?: [number, number]
-  weekStartsOn?: 0 | 1
-  weekday?: WeekdayConfig
-  preview?: PreviewConfig | false
-  theme?: "auto" | "light" | "dark"
-  validate?: (v: DateTimeParts) => string | null
-  showFieldPreview?: boolean // 框下实时预览，默认开
-  compactPlacement?: CompactPlacement
+  value: string;
+  onChange: (v: string) => void;
+  mode?: Mode;
+  density?: Density;
+  placeholder?: string;
+  disabled?: boolean;
+  id?: string;
+  name?: string; // 提供时渲染隐藏 input，兼容原生表单提交
+  className?: string;
+  title?: string;
+  hourRange?: [number, number];
+  yearRange?: [number, number];
+  weekStartsOn?: 0 | 1;
+  weekday?: WeekdayConfig;
+  preview?: PreviewConfig | false;
+  theme?: 'auto' | 'light' | 'dark';
+  validate?: (v: DateTimeParts) => string | null;
+  showFieldPreview?: boolean; // 框下实时预览，默认开
+  compactPlacement?: CompactPlacement;
 }
 
 function nowParts(): DateTimeParts {
-  const d = new Date()
-  return { year: d.getFullYear(), month: d.getMonth() + 1, day: d.getDate(), hour: d.getHours(), minute: d.getMinutes() }
+  const d = new Date();
+  return {
+    year: d.getFullYear(),
+    month: d.getMonth() + 1,
+    day: d.getDate(),
+    hour: d.getHours(),
+    minute: d.getMinutes(),
+  };
 }
 
 function parseFieldValue(value: string, mode: Mode): DateTimeParts | null {
-  if (!value) return null
-  if (mode === "date") return parseNaive(`${value}T00:00`)
-  if (mode === "time") {
-    const today = nowParts()
-    return parseNaive(`${today.year}-${pad2(today.month)}-${pad2(today.day)}T${value}`)
+  if (!value) return null;
+  if (mode === 'date') return parseNaive(`${value}T00:00`);
+  if (mode === 'time') {
+    const today = nowParts();
+    return parseNaive(`${today.year}-${pad2(today.month)}-${pad2(today.day)}T${value}`);
   }
-  return parseNaive(value)
+  return parseNaive(value);
 }
 
 function serializeFieldValue(value: DateTimeParts, mode: Mode): string {
-  if (mode === "date") return partsToNaiveDate(value)
-  if (mode === "time") return `${pad2(value.hour)}:${pad2(value.minute)}`
-  return partsToNaive(value)
+  if (mode === 'date') return partsToNaiveDate(value);
+  if (mode === 'time') return `${pad2(value.hour)}:${pad2(value.minute)}`;
+  return partsToNaive(value);
 }
 
 function fieldText(v: DateTimeParts, mode: Mode): string {
-  if (mode === "date") return formatDateCN(v) + " " + weekdayCN(v)
-  if (mode === "time") return pad2(v.hour) + ":" + pad2(v.minute)
-  return formatDateCN(v) + " " + pad2(v.hour) + ":" + pad2(v.minute)
+  if (mode === 'date') return formatDateCN(v) + ' ' + weekdayCN(v);
+  if (mode === 'time') return pad2(v.hour) + ':' + pad2(v.minute);
+  return formatDateCN(v) + ' ' + pad2(v.hour) + ':' + pad2(v.minute);
 }
 
 export function DateTimeField(props: DateTimeFieldProps) {
   const {
     value,
     onChange,
-    mode = "datetime",
-    placeholder = "请选择",
+    mode = 'datetime',
+    placeholder = '请选择',
     disabled,
     id,
     name,
     className,
     preview,
     showFieldPreview = true,
-    compactPlacement = "right",
-  } = props
+    compactPlacement = 'right',
+  } = props;
 
-  const parsed = parseFieldValue(value, mode)
-  const [open, setOpen] = useState(false)
-  const [draftPreview, setDraftPreview] = useState<DateTimeParts | null>(null)
-  const btnRef = useRef<HTMLButtonElement | null>(null)
-  const pickerIdRef = useRef(0)
-  const openedValueRef = useRef(value)
-  const [rect, setRect] = useState<AnchorRect | undefined>(undefined)
-  if (pickerIdRef.current === 0) pickerIdRef.current = ++dateTimePickerIdSeed
+  const parsed = parseFieldValue(value, mode);
+  const [open, setOpen] = useState(false);
+  const [draftPreview, setDraftPreview] = useState<DateTimeParts | null>(null);
+  const btnRef = useRef<HTMLButtonElement | null>(null);
+  const pickerIdRef = useRef(0);
+  const openedValueRef = useRef(value);
+  const [rect, setRect] = useState<AnchorRect | undefined>(undefined);
+  if (pickerIdRef.current === 0) pickerIdRef.current = ++dateTimePickerIdSeed;
 
-  const display = parsed ? fieldText(parsed, mode) : ""
-  const previewValue = draftPreview ?? parsed
+  const display = parsed ? fieldText(parsed, mode) : '';
+  const previewValue = draftPreview ?? parsed;
 
   useEffect(() => {
     const closeOtherPicker = (event: Event) => {
-      const detail = (event as CustomEvent<{ id?: number }>).detail
+      const detail = (event as CustomEvent<{ id?: number }>).detail;
       if (detail?.id !== pickerIdRef.current) {
-        setOpen(false)
-        setDraftPreview(null)
+        setOpen(false);
+        setDraftPreview(null);
       }
-    }
-    window.addEventListener(DATE_TIME_PICKER_OPEN_EVENT, closeOtherPicker)
-    return () => window.removeEventListener(DATE_TIME_PICKER_OPEN_EVENT, closeOtherPicker)
-  }, [])
+    };
+    window.addEventListener(DATE_TIME_PICKER_OPEN_EVENT, closeOtherPicker);
+    return () => window.removeEventListener(DATE_TIME_PICKER_OPEN_EVENT, closeOtherPicker);
+  }, []);
 
   useEffect(() => {
-    if (!open) return
+    if (!open) return;
     const updateAnchor = () => {
-      const next = btnRef.current?.getBoundingClientRect()
-      if (next) setRect({ top: next.top, left: next.left, width: next.width, height: next.height })
-    }
-    updateAnchor()
-    window.addEventListener("resize", updateAnchor)
-    window.addEventListener("scroll", updateAnchor, true)
+      const next = btnRef.current?.getBoundingClientRect();
+      if (next) setRect({ top: next.top, left: next.left, width: next.width, height: next.height });
+    };
+    updateAnchor();
+    window.addEventListener('resize', updateAnchor);
+    window.addEventListener('scroll', updateAnchor, true);
     return () => {
-      window.removeEventListener("resize", updateAnchor)
-      window.removeEventListener("scroll", updateAnchor, true)
-    }
-  }, [open])
+      window.removeEventListener('resize', updateAnchor);
+      window.removeEventListener('scroll', updateAnchor, true);
+    };
+  }, [open]);
 
   function openPicker() {
-    if (disabled) return
-    const r = btnRef.current?.getBoundingClientRect()
-    if (r) setRect({ top: r.top, left: r.left, width: r.width, height: r.height })
-    openedValueRef.current = value
-    setDraftPreview(parsed ?? nowParts())
-    window.dispatchEvent(new CustomEvent(DATE_TIME_PICKER_OPEN_EVENT, { detail: { id: pickerIdRef.current } }))
-    setOpen(true)
+    if (disabled) return;
+    const r = btnRef.current?.getBoundingClientRect();
+    if (r) setRect({ top: r.top, left: r.left, width: r.width, height: r.height });
+    openedValueRef.current = value;
+    setDraftPreview(parsed ?? nowParts());
+    window.dispatchEvent(new CustomEvent(DATE_TIME_PICKER_OPEN_EVENT, { detail: { id: pickerIdRef.current } }));
+    setOpen(true);
   }
 
   return (
@@ -129,12 +135,12 @@ export function DateTimeField(props: DateTimeFieldProps) {
         ref={btnRef}
         id={id}
         disabled={disabled}
-        className={"tdp-field" + (parsed ? "" : " is-empty")}
+        className={'tdp-field' + (parsed ? '' : ' is-empty')}
         onClick={openPicker}
       >
         <span className="tdp-field-text">{display || placeholder}</span>
         <span className="tdp-field-icon" aria-hidden="true">
-          {mode === "time" ? "🕐" : mode === "date" ? "📆" : "📅"}
+          {mode === 'time' ? '🕐' : mode === 'date' ? '📆' : '📅'}
         </span>
       </button>
       {name && <input type="hidden" name={name} value={value} />}
@@ -163,21 +169,21 @@ export function DateTimeField(props: DateTimeFieldProps) {
           anchorRect={rect}
           compactPlacement={compactPlacement}
           onChange={(v) => {
-            setDraftPreview(v)
-            onChange(serializeFieldValue(v, mode))
+            setDraftPreview(v);
+            onChange(serializeFieldValue(v, mode));
           }}
           onConfirm={(v) => {
-            setOpen(false)
-            setDraftPreview(v)
-            onChange(serializeFieldValue(v, mode))
+            setOpen(false);
+            setDraftPreview(v);
+            onChange(serializeFieldValue(v, mode));
           }}
           onCancel={() => {
-            setOpen(false)
-            setDraftPreview(parsed)
-            onChange(openedValueRef.current)
+            setOpen(false);
+            setDraftPreview(parsed);
+            onChange(openedValueRef.current);
           }}
         />
       )}
     </div>
-  )
+  );
 }

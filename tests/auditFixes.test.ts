@@ -3,18 +3,9 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 
-const permissionsSource = readFileSync(
-  path.join(process.cwd(), 'api/_exams/permissions.ts'),
-  'utf8',
-);
-const outboxSource = readFileSync(
-  path.join(process.cwd(), 'src/services/examOutbox.ts'),
-  'utf8',
-);
-const loginSource = readFileSync(
-  path.join(process.cwd(), 'api/login.ts'),
-  'utf8',
-);
+const permissionsSource = readFileSync(path.join(process.cwd(), 'api/_exams/permissions.ts'), 'utf8');
+const outboxSource = readFileSync(path.join(process.cwd(), 'src/services/examOutbox.ts'), 'utf8');
+const loginSource = readFileSync(path.join(process.cwd(), 'api/login.ts'), 'utf8');
 
 test('quick temporary major ownership has one shared permission predicate', () => {
   const definitions = permissionsSource.match(/const isOwnedQuickTemporaryMajor\s*=/g) ?? [];

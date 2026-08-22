@@ -21,9 +21,11 @@ export function resolveDeviceScope(
   const allScope = !actor || actor.permissions.includes('*') || actor.scopes.some((scope) => scope.type === 'all');
   const visibleClasses = allScope
     ? classes
-    : classes.filter((item) => actor!.scopes.some((scope) =>
-      scope.type === 'grade' ? scope.gradeId === item.gradeId : scope.type === 'class' && scope.classId === item.id,
-    ));
+    : classes.filter((item) =>
+        actor!.scopes.some((scope) =>
+          scope.type === 'grade' ? scope.gradeId === item.gradeId : scope.type === 'class' && scope.classId === item.id,
+        ),
+      );
   const classIds = new Set(visibleClasses.map((item) => item.id));
   const gradeIds = new Set(visibleClasses.map((item) => item.gradeId));
   return {
@@ -35,10 +37,7 @@ export function resolveDeviceScope(
   };
 }
 
-export function deviceIsInScope(
-  item: { gradeId?: string; classId?: string },
-  scope: DeviceScope,
-): boolean {
+export function deviceIsInScope(item: { gradeId?: string; classId?: string }, scope: DeviceScope): boolean {
   if (scope.allScope) return true;
   if (item.classId) return scope.classIds.has(item.classId);
   return !!item.gradeId && scope.gradeIds.has(item.gradeId);

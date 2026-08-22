@@ -84,10 +84,13 @@ test('equalHash rejects two empty strings', () => {
 });
 
 test('pluginCredentials accepts valid trimmed credentials', () => {
-  assert.deepEqual(pluginCredentials({
-    pluginInstanceId: '  device-001-abcdef  ',
-    clientSecret: `  ${'a'.repeat(32)}  `,
-  }), { instanceId: 'device-001-abcdef', secret: 'a'.repeat(32) });
+  assert.deepEqual(
+    pluginCredentials({
+      pluginInstanceId: '  device-001-abcdef  ',
+      clientSecret: `  ${'a'.repeat(32)}  `,
+    }),
+    { instanceId: 'device-001-abcdef', secret: 'a'.repeat(32) },
+  );
 });
 
 test('pluginCredentials rejects a short instance id', () => {
@@ -103,10 +106,13 @@ test('pluginCredentials rejects missing fields', () => {
 });
 
 test('pluginCredentials accepts uppercase hexadecimal secrets', () => {
-  assert.deepEqual(pluginCredentials({
-    pluginInstanceId: 'device-001-abcdef',
-    clientSecret: 'A'.repeat(32),
-  }), { instanceId: 'device-001-abcdef', secret: 'A'.repeat(32) });
+  assert.deepEqual(
+    pluginCredentials({
+      pluginInstanceId: 'device-001-abcdef',
+      clientSecret: 'A'.repeat(32),
+    }),
+    { instanceId: 'device-001-abcdef', secret: 'A'.repeat(32) },
+  );
 });
 
 test('classIslandApiMeta reports the declared version and capabilities', () => {
@@ -138,10 +144,10 @@ test('actorScopeLabel treats wildcard permission as all scope', () => {
 });
 
 test('actorScopeLabel resolves a grade scope name', () => {
-  assert.equal(actorScopeLabel(
-    makeActor({ scopes: [{ type: 'grade', gradeId: 'grade-1' } as any] }),
-    makePayload(),
-  ), 'Grade 3');
+  assert.equal(
+    actorScopeLabel(makeActor({ scopes: [{ type: 'grade', gradeId: 'grade-1' } as any] }), makePayload()),
+    'Grade 3',
+  );
 });
 
 test('actorScopeLabel includes both names for a class scope', () => {
@@ -160,19 +166,32 @@ test('actorScopeLabel uses a non-empty fallback when scopes are absent', () => {
 });
 
 test('actorScopeLabel supports multiple scopes', () => {
-  const label = actorScopeLabel(makeActor({ scopes: [
-    { type: 'grade', gradeId: 'grade-1' } as any,
-    { type: 'class', gradeId: 'grade-1', classId: 'class-1' } as any,
-  ] }), makePayload());
+  const label = actorScopeLabel(
+    makeActor({
+      scopes: [
+        { type: 'grade', gradeId: 'grade-1' } as any,
+        { type: 'class', gradeId: 'grade-1', classId: 'class-1' } as any,
+      ],
+    }),
+    makePayload(),
+  );
   assert.ok(label.includes('Grade 3'));
   assert.ok(label.includes('Class 1'));
 });
 
 test('resolvePluginExams includes an enabled active major item', () => {
-  const result = resolvePluginExams(payloadWithMajor({
-    id: 'item-1', name: 'Language', startTime: '2099-01-01T09:00',
-    endTime: '2099-01-01T11:00', enabled: true, order: 0,
-  }), 'grade-1', 'class-1');
+  const result = resolvePluginExams(
+    payloadWithMajor({
+      id: 'item-1',
+      name: 'Language',
+      startTime: '2099-01-01T09:00',
+      endTime: '2099-01-01T11:00',
+      enabled: true,
+      order: 0,
+    }),
+    'grade-1',
+    'class-1',
+  );
   assert.equal(result.length, 1);
   assert.equal(result[0]!.name, 'Language');
   assert.equal(result[0]!.kind, 'major');
@@ -180,17 +199,33 @@ test('resolvePluginExams includes an enabled active major item', () => {
 });
 
 test('resolvePluginExams excludes disabled items in the active window', () => {
-  const result = resolvePluginExams(payloadWithMajor({
-    id: 'item-1', name: 'Language', startTime: '2099-01-01T09:00',
-    endTime: '2099-01-01T11:00', enabled: false, order: 0,
-  }), 'grade-1', 'class-1');
+  const result = resolvePluginExams(
+    payloadWithMajor({
+      id: 'item-1',
+      name: 'Language',
+      startTime: '2099-01-01T09:00',
+      endTime: '2099-01-01T11:00',
+      enabled: false,
+      order: 0,
+    }),
+    'grade-1',
+    'class-1',
+  );
   assert.equal(result.length, 0);
 });
 
 test('resolvePluginExams excludes items that ended more than two minutes ago', () => {
-  const result = resolvePluginExams(payloadWithMajor({
-    id: 'item-1', name: 'Language', startTime: '2020-01-01T09:00',
-    endTime: '2020-01-01T11:00', enabled: true, order: 0,
-  }), 'grade-1', 'class-1');
+  const result = resolvePluginExams(
+    payloadWithMajor({
+      id: 'item-1',
+      name: 'Language',
+      startTime: '2020-01-01T09:00',
+      endTime: '2020-01-01T11:00',
+      enabled: true,
+      order: 0,
+    }),
+    'grade-1',
+    'class-1',
+  );
   assert.equal(result.length, 0);
 });

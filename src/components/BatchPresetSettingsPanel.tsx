@@ -1,19 +1,19 @@
-import { useEffect, useRef, useState } from "react";
-import { Clock3 } from "lucide-react";
-import Mascot from "./Mascot";
-import TimeRangePickerModal from "./TimeRangePickerModal";
-import { COMMON_EXAM_SUBJECTS, normalizeSubjectList, normalizeSubjectName } from "../data/subjects";
-import type { MajorBatchSubjectGroup, MajorBatchTimeGroup, MajorBatchTimeSlot } from "../utils/appSettings";
+import { useEffect, useRef, useState } from 'react';
+import { Clock3 } from 'lucide-react';
+import Mascot from './Mascot';
+import TimeRangePickerModal from './TimeRangePickerModal';
+import { COMMON_EXAM_SUBJECTS, normalizeSubjectList, normalizeSubjectName } from '../data/subjects';
+import type { MajorBatchSubjectGroup, MajorBatchTimeGroup, MajorBatchTimeSlot } from '../utils/appSettings';
 import {
   APP_SETTINGS_CHANGED_EVENT,
   getAppSettings,
   updateExamSettings,
   updateMajorBatchSettings,
-} from "../utils/appSettings";
-import { fetchExamsFromServer, saveMajorBatchPresets } from "../services/examService";
-import { notify } from "../services/notify";
-import { confirmDialog } from "../services/appDialog";
-import "../styles/batch-preset-settings-panel.css";
+} from '../utils/appSettings';
+import { fetchExamsFromServer, saveMajorBatchPresets } from '../services/examService';
+import { notify } from '../services/notify';
+import { confirmDialog } from '../services/appDialog';
+import '../styles/batch-preset-settings-panel.css';
 
 function makeSubjectGroupId() {
   return `batch_subject_group_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
@@ -42,15 +42,15 @@ export default function BatchPresetSettingsPanel({ canEdit }: { canEdit: boolean
     () => getAppSettings().exam.majorBatchPresets.timeGroups,
   );
 
-  const [newSubjectName, setNewSubjectName] = useState("");
-  const [customSubjectName, setCustomSubjectName] = useState("");
+  const [newSubjectName, setNewSubjectName] = useState('');
+  const [customSubjectName, setCustomSubjectName] = useState('');
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
 
-  const [newTimeName, setNewTimeName] = useState("");
+  const [newTimeName, setNewTimeName] = useState('');
   const [timeEditRow, setTimeEditRow] = useState<string | null>(null);
   const timeEditAnchorRef = useRef<HTMLButtonElement | null>(null);
   const [draftSlots, setDraftSlots] = useState<DraftSlot[]>([
-    { key: makeSlotKey(), start: "08:30", end: "09:30", dayOffset: 0 },
+    { key: makeSlotKey(), start: '08:30', end: '09:30', dayOffset: 0 },
   ]);
 
   useEffect(() => {
@@ -60,19 +60,28 @@ export default function BatchPresetSettingsPanel({ canEdit }: { canEdit: boolean
       setTimeGroups(settings.timeGroups);
     };
     window.addEventListener(APP_SETTINGS_CHANGED_EVENT, sync);
-    window.addEventListener("storage", sync);
+    window.addEventListener('storage', sync);
     return () => {
       window.removeEventListener(APP_SETTINGS_CHANGED_EVENT, sync);
-      window.removeEventListener("storage", sync);
+      window.removeEventListener('storage', sync);
     };
   }, []);
 
   useEffect(() => {
-    void fetchExamsFromServer().then((payload) => {
-      if (payload?.majorBatchPresets) {
-        updateExamSettings({ majorBatchPresets: { subjectGroups: (payload.majorBatchPresets.subjectGroups ?? []) as MajorBatchSubjectGroup[], timeGroups: (payload.majorBatchPresets.timeGroups ?? []) as MajorBatchTimeGroup[], updatedAt: Number(payload.majorBatchPresets.updatedAt ?? 0) }, updatedAt: payload.updatedAt });
-      }
-    }).catch(() => {});
+    void fetchExamsFromServer()
+      .then((payload) => {
+        if (payload?.majorBatchPresets) {
+          updateExamSettings({
+            majorBatchPresets: {
+              subjectGroups: (payload.majorBatchPresets.subjectGroups ?? []) as MajorBatchSubjectGroup[],
+              timeGroups: (payload.majorBatchPresets.timeGroups ?? []) as MajorBatchTimeGroup[],
+              updatedAt: Number(payload.majorBatchPresets.updatedAt ?? 0),
+            },
+            updatedAt: payload.updatedAt,
+          });
+        }
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -80,7 +89,12 @@ export default function BatchPresetSettingsPanel({ canEdit }: { canEdit: boolean
     const localGroups = (local.subjectGroups ?? []).filter((group) => group.subjects.length > 0);
     const localTimeGroups = (local.timeGroups ?? []).filter((group) => group.slots.length > 0);
     if (!localGroups.length && !localTimeGroups.length) return;
-    const names = [...localGroups.map((group) => '科目组：' + group.name), ...localTimeGroups.map((group) => '时间组：' + group.name)].slice(0, 12).join('、');
+    const names = [
+      ...localGroups.map((group) => '科目组：' + group.name),
+      ...localTimeGroups.map((group) => '时间组：' + group.name),
+    ]
+      .slice(0, 12)
+      .join('、');
     void confirmDialog({
       title: '导入本机预设到学校云端',
       message: '检测到本机保存的旧预设，导入后将全校共享（按名称去重）：' + names + '。确认导入？',
@@ -88,13 +102,18 @@ export default function BatchPresetSettingsPanel({ canEdit }: { canEdit: boolean
       if (!ok) return;
       const current = getAppSettings().exam.majorBatchPresets;
       const seen = new Set<string>();
-      const mergeGroups = (base: MajorBatchSubjectGroup[] | MajorBatchTimeGroup[], extra: Array<MajorBatchSubjectGroup | MajorBatchTimeGroup>, kind: string) => {
+      const mergeGroups = (
+        base: MajorBatchSubjectGroup[] | MajorBatchTimeGroup[],
+        extra: Array<MajorBatchSubjectGroup | MajorBatchTimeGroup>,
+        kind: string,
+      ) => {
         const merged = [...base];
         for (const item of extra) {
           const key = item.name.trim();
           if (!key || seen.has(kind + key)) continue;
           seen.add(kind + key);
-          if (!merged.some((group) => group.name.trim() === key)) merged.push({ ...item, order: merged.length } as MajorBatchSubjectGroup & MajorBatchTimeGroup);
+          if (!merged.some((group) => group.name.trim() === key))
+            merged.push({ ...item, order: merged.length } as MajorBatchSubjectGroup & MajorBatchTimeGroup);
         }
         return merged;
       };
@@ -104,7 +123,14 @@ export default function BatchPresetSettingsPanel({ canEdit }: { canEdit: boolean
       };
       void saveMajorBatchPresets(next)
         .then((saved) => {
-          updateExamSettings({ majorBatchPresets: { subjectGroups: saved.subjectGroups as MajorBatchSubjectGroup[], timeGroups: saved.timeGroups as MajorBatchTimeGroup[], updatedAt: saved.updatedAt }, updatedAt: saved.updatedAt });
+          updateExamSettings({
+            majorBatchPresets: {
+              subjectGroups: saved.subjectGroups as MajorBatchSubjectGroup[],
+              timeGroups: saved.timeGroups as MajorBatchTimeGroup[],
+              updatedAt: saved.updatedAt,
+            },
+            updatedAt: saved.updatedAt,
+          });
           updateMajorBatchSettings({ subjectGroups: [], timeGroups: [] });
           setSubjectGroups(saved.subjectGroups as MajorBatchSubjectGroup[]);
           setTimeGroups(saved.timeGroups as MajorBatchTimeGroup[]);
@@ -118,12 +144,21 @@ export default function BatchPresetSettingsPanel({ canEdit }: { canEdit: boolean
     if (patch.subjectGroups) setSubjectGroups(patch.subjectGroups);
     if (patch.timeGroups) setTimeGroups(patch.timeGroups);
     const next = {
-        subjectGroups: patch.subjectGroups ?? subjectGroups,
-        timeGroups: patch.timeGroups ?? timeGroups,
-      };
-      void saveMajorBatchPresets(next)
-        .then((saved) => updateExamSettings({ majorBatchPresets: { subjectGroups: saved.subjectGroups as MajorBatchSubjectGroup[], timeGroups: saved.timeGroups as MajorBatchTimeGroup[], updatedAt: saved.updatedAt }, updatedAt: saved.updatedAt }))
-        .catch((error) => notify('error', error instanceof Error ? error.message : '学校预设保存失败'));
+      subjectGroups: patch.subjectGroups ?? subjectGroups,
+      timeGroups: patch.timeGroups ?? timeGroups,
+    };
+    void saveMajorBatchPresets(next)
+      .then((saved) =>
+        updateExamSettings({
+          majorBatchPresets: {
+            subjectGroups: saved.subjectGroups as MajorBatchSubjectGroup[],
+            timeGroups: saved.timeGroups as MajorBatchTimeGroup[],
+            updatedAt: saved.updatedAt,
+          },
+          updatedAt: saved.updatedAt,
+        }),
+      )
+      .catch((error) => notify('error', error instanceof Error ? error.message : '学校预设保存失败'));
   };
 
   const moveSubjectGroup = (id: string, direction: -1 | 1) => {
@@ -171,29 +206,26 @@ export default function BatchPresetSettingsPanel({ canEdit }: { canEdit: boolean
     };
     const nextGroups = [...subjectGroups, next];
     commit({ subjectGroups: nextGroups });
-    setNewSubjectName("");
+    setNewSubjectName('');
     setSelectedSubjects([]);
   };
   const addCustomSubject = () => {
     const subject = normalizeSubjectName(customSubjectName.trim());
     if (!subject) return;
     setSelectedSubjects((value) => (value.includes(subject) ? value : [...value, subject]));
-    setCustomSubjectName("");
+    setCustomSubjectName('');
   };
   const toggleSubject = (subject: string) => {
     setSelectedSubjects((value) =>
-      value.includes(subject)
-        ? value.filter((item) => item !== subject)
-        : [...value, subject],
+      value.includes(subject) ? value.filter((item) => item !== subject) : [...value, subject],
     );
   };
-
 
   const addSlotRow = () => {
     const last = draftSlots[draftSlots.length - 1];
     setDraftSlots((rows) => [
       ...rows,
-      { key: makeSlotKey(), start: last?.start ?? "08:30", end: last?.end ?? "09:30", dayOffset: last?.dayOffset ?? 0 },
+      { key: makeSlotKey(), start: last?.start ?? '08:30', end: last?.end ?? '09:30', dayOffset: last?.dayOffset ?? 0 },
     ]);
   };
 
@@ -222,20 +254,25 @@ export default function BatchPresetSettingsPanel({ canEdit }: { canEdit: boolean
     };
     const nextGroups = [...timeGroups, next];
     commit({ timeGroups: nextGroups });
-    setNewTimeName("");
-    setDraftSlots([{ key: makeSlotKey(), start: "08:30", end: "09:30", dayOffset: 0 }]);
+    setNewTimeName('');
+    setDraftSlots([{ key: makeSlotKey(), start: '08:30', end: '09:30', dayOffset: 0 }]);
   };
 
   return (
     <div className="batch-preset-panel">
-      <div className="batch-preset-source"><span className="batch-preset-source__single">学校预设 · 全校共享</span></div>
+      <div className="batch-preset-source">
+        <span className="batch-preset-source__single">学校预设 · 全校共享</span>
+      </div>
       <section className="batch-preset-section">
         <div className="batch-preset-section__head">
           <strong>常用科目组</strong>
           <span>用于批量添加分考试时快速选择科目组合，与批量添加弹窗中的设置共享</span>
         </div>
         {subjectGroups.length === 0 ? (
-          <p className="set-note"><Mascot className="mascot-inline" size={28} alt="" />暂无自定义科目组，可在下方创建。</p>
+          <p className="set-note">
+            <Mascot className="mascot-inline" size={28} alt="" />
+            暂无自定义科目组，可在下方创建。
+          </p>
         ) : (
           <ul className="batch-preset-list">
             {subjectGroups.map((item, index) => (
@@ -299,7 +336,7 @@ export default function BatchPresetSettingsPanel({ canEdit }: { canEdit: boolean
                     type="button"
                     key={subject}
                     aria-pressed={selected}
-                    className={`batch-preset-subject${selected ? " is-selected" : ""}`}
+                    className={`batch-preset-subject${selected ? ' is-selected' : ''}`}
                     onClick={() => toggleSubject(subject)}
                   >
                     {subject}
@@ -326,7 +363,7 @@ export default function BatchPresetSettingsPanel({ canEdit }: { canEdit: boolean
                 value={customSubjectName}
                 onChange={(event) => setCustomSubjectName(event.target.value)}
                 onKeyDown={(event) => {
-                  if (event.key === "Enter") {
+                  if (event.key === 'Enter') {
                     event.preventDefault();
                     addCustomSubject();
                   }
@@ -351,7 +388,10 @@ export default function BatchPresetSettingsPanel({ canEdit }: { canEdit: boolean
           <span>用于批量添加分考试时快速选择场次安排，与批量添加弹窗中的设置共享</span>
         </div>
         {timeGroups.length === 0 ? (
-          <p className="set-note"><Mascot className="mascot-inline" size={28} alt="" />暂无自定义时间组，可在下方创建。</p>
+          <p className="set-note">
+            <Mascot className="mascot-inline" size={28} alt="" />
+            暂无自定义时间组，可在下方创建。
+          </p>
         ) : (
           <ul className="batch-preset-list">
             {timeGroups.map((item, index) => (
@@ -361,7 +401,7 @@ export default function BatchPresetSettingsPanel({ canEdit }: { canEdit: boolean
                   <div className="batch-preset-chips">
                     {item.slots.map((slot, slotIndex) => (
                       <span key={slotIndex} className="batch-preset-chip">
-                        {slot.dayOffset ? `第${slot.dayOffset + 1}天 ` : ""}
+                        {slot.dayOffset ? `第${slot.dayOffset + 1}天 ` : ''}
                         {slot.start}–{slot.end}
                       </span>
                     ))}
@@ -453,26 +493,27 @@ export default function BatchPresetSettingsPanel({ canEdit }: { canEdit: boolean
           </div>
         )}
       </section>
-      {timeEditRow && (() => {
-        const row = draftSlots.find((item) => item.key === timeEditRow);
-        if (!row) return null;
-        return (
-          <TimeRangePickerModal
-            open
-            mode="time"
-            title="设置场次时间"
-            startValue={row.start}
-            endValue={row.end}
-            anchorRef={timeEditAnchorRef}
-            allowCrossDay={false}
-            onCancel={() => setTimeEditRow(null)}
-            onConfirm={(start, end) => {
-              updateSlotRow(timeEditRow, { start, end });
-              setTimeEditRow(null);
-            }}
-          />
-        );
-      })()}
+      {timeEditRow &&
+        (() => {
+          const row = draftSlots.find((item) => item.key === timeEditRow);
+          if (!row) return null;
+          return (
+            <TimeRangePickerModal
+              open
+              mode="time"
+              title="设置场次时间"
+              startValue={row.start}
+              endValue={row.end}
+              anchorRef={timeEditAnchorRef}
+              allowCrossDay={false}
+              onCancel={() => setTimeEditRow(null)}
+              onConfirm={(start, end) => {
+                updateSlotRow(timeEditRow, { start, end });
+                setTimeEditRow(null);
+              }}
+            />
+          );
+        })()}
     </div>
   );
 }

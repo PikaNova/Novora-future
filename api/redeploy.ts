@@ -35,7 +35,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const hookRes = await fetch(hookUrl, { method: 'POST' });
       const text = await hookRes.text();
       let job: unknown = null;
-      try { job = text ? JSON.parse(text) : null; } catch { job = { raw: text.slice(0, 500) }; }
+      try {
+        job = text ? JSON.parse(text) : null;
+      } catch {
+        job = { raw: text.slice(0, 500) };
+      }
       if (!hookRes.ok) {
         res.status(502).json({ ok: false, error: `Deploy Hook 返回 ${hookRes.status}`, job });
         return;

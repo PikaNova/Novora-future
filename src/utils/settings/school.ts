@@ -11,19 +11,21 @@ export interface SeoSettings {
 }
 
 export const DEFAULT_SEO_SETTINGS: SeoSettings = {
-  titleSuffix: "",
-  description: "",
-  keywords: "",
-  siteUrl: "",
+  titleSuffix: '',
+  description: '',
+  keywords: '',
+  siteUrl: '',
 };
 
 export function normalizeSeoSettings(raw: unknown): SeoSettings {
-  const src = (raw && typeof raw === "object" ? raw : {}) as Partial<SeoSettings>;
+  const src = (raw && typeof raw === 'object' ? raw : {}) as Partial<SeoSettings>;
   return {
-    titleSuffix: String(src.titleSuffix ?? "").trim(),
-    description: String(src.description ?? "").trim(),
-    keywords: String(src.keywords ?? "").trim(),
-    siteUrl: String(src.siteUrl ?? "").trim().replace(/\/+$/, ""),
+    titleSuffix: String(src.titleSuffix ?? '').trim(),
+    description: String(src.description ?? '').trim(),
+    keywords: String(src.keywords ?? '').trim(),
+    siteUrl: String(src.siteUrl ?? '')
+      .trim()
+      .replace(/\/+$/, ''),
   };
 }
 
@@ -73,15 +75,15 @@ export function normalizeClasses(raw: unknown, grades: SchoolGrade[]): SchoolCla
       enabled: item.enabled !== false,
       track: Array.isArray(item.track) ? normalizeSubjectList(item.track.map(String)) : undefined,
     }))
-    .filter(item => grades.some(grade => grade.id === item.gradeId));
+    .filter((item) => grades.some((grade) => grade.id === item.gradeId));
 }
 
 export function normalizeSelectedGradeId(raw: unknown, grades: SchoolGrade[]): string {
-  return grades.some(grade => grade.id === raw) ? String(raw) : '';
+  return grades.some((grade) => grade.id === raw) ? String(raw) : '';
 }
 
 export function normalizeSelectedClassId(raw: unknown, classes: SchoolClass[], selectedGradeId: string): string {
-  return classes.some(item => item.id === raw && item.gradeId === selectedGradeId) ? String(raw) : '';
+  return classes.some((item) => item.id === raw && item.gradeId === selectedGradeId) ? String(raw) : '';
 }
 
 export function normalizeInitialization(raw: unknown): InitializationState {

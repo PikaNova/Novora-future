@@ -1,13 +1,7 @@
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type CSSProperties,
-} from "react";
-import type { NavigateFunction } from "react-router-dom";
-import { adminCan, type AdminUserContext } from "../../services/examService";
-import type { AdminTab } from "../../types/exam";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
+import type { NavigateFunction } from 'react-router-dom';
+import { adminCan, type AdminUserContext } from '../../services/examService';
+import type { AdminTab } from '../../types/exam';
 
 export const ADMIN_NAV: Array<{
   id: AdminTab;
@@ -15,13 +9,13 @@ export const ADMIN_NAV: Array<{
   mobileLabel: string;
   permission: string;
 }> = [
-  { id: "overview", label: "仪表盘", mobileLabel: "仪表盘", permission: "overview.read" },
-  { id: "dashboard", label: "数据大屏", mobileLabel: "大屏", permission: "overview.read" },
-  { id: "major", label: "大型考试", mobileLabel: "考试", permission: "major.read" },
-  { id: "weekly", label: "周测计划", mobileLabel: "周测", permission: "weekly.read" },
-  { id: "classes", label: "年级与班级", mobileLabel: "班级", permission: "school.read" },
-  { id: "devices", label: "设备管理", mobileLabel: "设备", permission: "device.read" },
-  { id: "users", label: "用户与权限", mobileLabel: "用户", permission: "user.read" },
+  { id: 'overview', label: '仪表盘', mobileLabel: '仪表盘', permission: 'overview.read' },
+  { id: 'dashboard', label: '数据大屏', mobileLabel: '大屏', permission: 'overview.read' },
+  { id: 'major', label: '大型考试', mobileLabel: '考试', permission: 'major.read' },
+  { id: 'weekly', label: '周测计划', mobileLabel: '周测', permission: 'weekly.read' },
+  { id: 'classes', label: '年级与班级', mobileLabel: '班级', permission: 'school.read' },
+  { id: 'devices', label: '设备管理', mobileLabel: '设备', permission: 'device.read' },
+  { id: 'users', label: '用户与权限', mobileLabel: '用户', permission: 'user.read' },
 ];
 
 // Owns admin-shell navigation concerns: which tab is active, the "more" menu
@@ -35,7 +29,7 @@ export function useAdminModals(params: {
 }) {
   const { adminUser, defaultTab, navigate, locationSearch } = params;
   const [adminTab, setAdminTab] = useState<AdminTab>(defaultTab);
-  const [deniedModule, setDeniedModule] = useState("");
+  const [deniedModule, setDeniedModule] = useState('');
   const [moreOpen, setMoreOpen] = useState(false);
   const [moreMenuStyle, setMoreMenuStyle] = useState<CSSProperties>({});
   const moreTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -50,15 +44,10 @@ export function useAdminModals(params: {
     const above = rect.top - edge;
     const openUp = below < Math.min(estimatedHeight, 180) && above > below;
     setMoreMenuStyle({
-      position: "fixed",
+      position: 'fixed',
       width,
-      left: Math.max(
-        edge,
-        Math.min(rect.right - width, window.innerWidth - width - edge),
-      ),
-      ...(openUp
-        ? { bottom: window.innerHeight - rect.top + 8 }
-        : { top: rect.bottom + 8 }),
+      left: Math.max(edge, Math.min(rect.right - width, window.innerWidth - width - edge)),
+      ...(openUp ? { bottom: window.innerHeight - rect.top + 8 } : { top: rect.bottom + 8 }),
       maxHeight: `${Math.max(160, (openUp ? above : below) - 8)}px`,
     });
   }, []);
@@ -66,74 +55,64 @@ export function useAdminModals(params: {
   useEffect(() => {
     if (!moreOpen) return;
     placeMoreMenu();
-    window.addEventListener("resize", placeMoreMenu);
-    window.addEventListener("scroll", placeMoreMenu, true);
+    window.addEventListener('resize', placeMoreMenu);
+    window.addEventListener('scroll', placeMoreMenu, true);
     return () => {
-      window.removeEventListener("resize", placeMoreMenu);
-      window.removeEventListener("scroll", placeMoreMenu, true);
+      window.removeEventListener('resize', placeMoreMenu);
+      window.removeEventListener('scroll', placeMoreMenu, true);
     };
   }, [moreOpen, placeMoreMenu]);
 
   useEffect(() => {
     if (!moreOpen) return;
     const closeOnOutside = (event: PointerEvent) => {
-      if (
-        !(event.target instanceof Element) ||
-        !event.target.closest(".admin-more")
-      )
-        setMoreOpen(false);
+      if (!(event.target instanceof Element) || !event.target.closest('.admin-more')) setMoreOpen(false);
     };
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setMoreOpen(false);
+      if (event.key === 'Escape') setMoreOpen(false);
     };
-    document.addEventListener("pointerdown", closeOnOutside);
-    document.addEventListener("keydown", closeOnEscape);
+    document.addEventListener('pointerdown', closeOnOutside);
+    document.addEventListener('keydown', closeOnEscape);
     return () => {
-      document.removeEventListener("pointerdown", closeOnOutside);
-      document.removeEventListener("keydown", closeOnEscape);
+      document.removeEventListener('pointerdown', closeOnOutside);
+      document.removeEventListener('keydown', closeOnEscape);
     };
   }, [moreOpen]);
 
   useEffect(() => {
     if (!adminUser) return;
     if (adminUser.mustChangePassword) {
-      if (adminTab !== "users") setAdminTab("users");
+      if (adminTab !== 'users') setAdminTab('users');
       return;
     }
-    const accountView =
-      new URLSearchParams(locationSearch).get("account") === "1";
-    if (adminTab === "users" && accountView) return;
+    const accountView = new URLSearchParams(locationSearch).get('account') === '1';
+    if (adminTab === 'users' && accountView) return;
     const permissionByTab: Record<AdminTab, string> = {
-      overview: "overview.read",
-      dashboard: "overview.read",
-      major: "major.read",
-      weekly: "weekly.read",
-      classes: "school.read",
-      devices: "device.read",
-      users: "user.read",
+      overview: 'overview.read',
+      dashboard: 'overview.read',
+      major: 'major.read',
+      weekly: 'weekly.read',
+      classes: 'school.read',
+      devices: 'device.read',
+      users: 'user.read',
     };
     if (adminCan(permissionByTab[adminTab], adminUser)) return;
-    const next = (Object.keys(permissionByTab) as AdminTab[]).find((tab) =>
-      adminCan(permissionByTab[tab], adminUser),
-    );
+    const next = (Object.keys(permissionByTab) as AdminTab[]).find((tab) => adminCan(permissionByTab[tab], adminUser));
     if (next) setAdminTab(next);
   }, [adminTab, adminUser, locationSearch]);
 
-  const can = useCallback(
-    (permission: string) => adminCan(permission, adminUser),
-    [adminUser],
-  );
+  const can = useCallback((permission: string) => adminCan(permission, adminUser), [adminUser]);
 
   const openMyAccount = useCallback(() => {
-    setDeniedModule("");
-    navigate("/admin?tab=users&account=1");
-    setAdminTab("users");
+    setDeniedModule('');
+    navigate('/admin?tab=users&account=1');
+    setAdminTab('users');
     setMoreOpen(false);
   }, [navigate]);
 
   const selectAdminTab = useCallback(
     (item: (typeof ADMIN_NAV)[number]) => {
-      if (item.id === "users" && !can(item.permission)) {
+      if (item.id === 'users' && !can(item.permission)) {
         openMyAccount();
         return;
       }
@@ -141,7 +120,7 @@ export function useAdminModals(params: {
         setDeniedModule(item.label);
         return;
       }
-      setDeniedModule("");
+      setDeniedModule('');
       setAdminTab(item.id);
     },
     [can, openMyAccount],

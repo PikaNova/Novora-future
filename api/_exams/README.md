@@ -8,15 +8,15 @@
 原 `api/exams.ts` 同时承担：数据库连接与建表迁移、payload 映射、diff 比较、鉴权校验、
 ClassIsland 插件逻辑，以及最终的 HTTP 请求编排。现在拆为：
 
-| 文件 | 职责 |
-| --- | --- |
-| `api/exams.ts` | 只保留 HTTP 入口（thin handler）：解析 action、CORS、缓存头、请求编排、错误兜底 |
-| `api/_exams/types.ts` | 共享数据行类型：`ExamRow`、`UpdatedRow`、`PluginInstanceRow` |
-| `api/_exams/db.ts` | neon 客户端缓存、一次性建表/迁移（`ensureTableOnce` / `ensureUpdatedAtBigIntOnce`）、错误识别（`missingRelation` / `updatedAtIntegerOverflow`） |
-| `api/_exams/payload.ts` | `exam_data` 行 → API payload 映射（`examPayload`、`arrayValue`、`objectValue`、`ExamPayload` 类型） |
-| `api/_exams/diff.ts` | JSON 规范化比较与记录级 diff（`sameJson`、`recordDiff`、`changedRecords`、`cleanActiveWeeklyPlanByClass`） |
-| `api/_exams/permissions.ts` | 鉴权校验（`validateMutation`、`allScope`） |
-| `api/_exams/plugin.ts` | ClassIsland 插件：凭据/哈希、API 元信息、班级与范围标签、有效考试解析等 |
+| 文件                        | 职责                                                                                                                                            |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `api/exams.ts`              | 只保留 HTTP 入口（thin handler）：解析 action、CORS、缓存头、请求编排、错误兜底                                                                 |
+| `api/_exams/types.ts`       | 共享数据行类型：`ExamRow`、`UpdatedRow`、`PluginInstanceRow`                                                                                    |
+| `api/_exams/db.ts`          | neon 客户端缓存、一次性建表/迁移（`ensureTableOnce` / `ensureUpdatedAtBigIntOnce`）、错误识别（`missingRelation` / `updatedAtIntegerOverflow`） |
+| `api/_exams/payload.ts`     | `exam_data` 行 → API payload 映射（`examPayload`、`arrayValue`、`objectValue`、`ExamPayload` 类型）                                             |
+| `api/_exams/diff.ts`        | JSON 规范化比较与记录级 diff（`sameJson`、`recordDiff`、`changedRecords`、`cleanActiveWeeklyPlanByClass`）                                      |
+| `api/_exams/permissions.ts` | 鉴权校验（`validateMutation`、`allScope`）                                                                                                      |
+| `api/_exams/plugin.ts`      | ClassIsland 插件：凭据/哈希、API 元信息、班级与范围标签、有效考试解析等                                                                         |
 
 ## 为什么放在 `_exams/`
 

@@ -6,7 +6,15 @@ import '../styles/exam-quick-menu.css';
 
 type MenuPosition = { top: number; left: number; width: number };
 
-export default function ExamQuickMenu({ onLocal, onAdmin, onTemporary }: { onLocal: () => void; onAdmin: () => void; onTemporary: () => void }) {
+export default function ExamQuickMenu({
+  onLocal,
+  onAdmin,
+  onTemporary,
+}: {
+  onLocal: () => void;
+  onAdmin: () => void;
+  onTemporary: () => void;
+}) {
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState<MenuPosition>({ top: 48, left: 12, width: 196 });
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -20,20 +28,23 @@ export default function ExamQuickMenu({ onLocal, onAdmin, onTemporary }: { onLoc
     const estimatedHeight = menuRef.current?.offsetHeight || 150;
     const left = Math.min(window.innerWidth - width - 12, Math.max(12, rect.right - width));
     const below = rect.bottom + 8;
-    const top = below + estimatedHeight <= window.innerHeight - 12
-      ? below
-      : Math.max(12, rect.top - estimatedHeight - 8);
+    const top =
+      below + estimatedHeight <= window.innerHeight - 12 ? below : Math.max(12, rect.top - estimatedHeight - 8);
     setPosition({ top, left, width });
   }, []);
 
-  useLayoutEffect(() => { if (open) updatePosition(); }, [open, updatePosition]);
+  useLayoutEffect(() => {
+    if (open) updatePosition();
+  }, [open, updatePosition]);
   useEffect(() => {
     if (!open) return;
     const closeOnOutside = (event: PointerEvent) => {
       const target = event.target as Node;
       if (!triggerRef.current?.contains(target) && !menuRef.current?.contains(target)) setOpen(false);
     };
-    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') setOpen(false); };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
     document.addEventListener('pointerdown', closeOnOutside);
     document.addEventListener('keydown', closeOnEscape);
     window.addEventListener('resize', updatePosition);
@@ -47,20 +58,46 @@ export default function ExamQuickMenu({ onLocal, onAdmin, onTemporary }: { onLoc
   }, [open, updatePosition]);
 
   const go = async (fn: () => void, message?: string) => {
-    if (!message || await confirmDialog({ title: '离开考试大屏', message, tone: 'warning', confirmLabel: '继续' })) { setOpen(false); fn(); }
+    if (!message || (await confirmDialog({ title: '离开考试大屏', message, tone: 'warning', confirmLabel: '继续' }))) {
+      setOpen(false);
+      fn();
+    }
   };
 
-  const menu = open ? createPortal(
-    <div ref={menuRef} className="exam-quick__menu" style={position} role="menu" aria-label="大屏更多功能">
-      <button role="menuitem" onClick={() => void go(onTemporary)}><Play />快速开始考试</button>
-      <button role="menuitem" onClick={() => void go(onLocal)}><MonitorCog />本地设置</button>
-      <button role="menuitem" onClick={() => void go(onAdmin, '进入管理后台后，大屏将停止全屏展示。')}><LogIn />进入管理后台</button>
-    </div>,
-    document.body,
-  ) : null;
+  const menu = open
+    ? createPortal(
+        <div ref={menuRef} className="exam-quick__menu" style={position} role="menu" aria-label="大屏更多功能">
+          <button role="menuitem" onClick={() => void go(onTemporary)}>
+            <Play />
+            快速开始考试
+          </button>
+          <button role="menuitem" onClick={() => void go(onLocal)}>
+            <MonitorCog />
+            本地设置
+          </button>
+          <button role="menuitem" onClick={() => void go(onAdmin, '进入管理后台后，大屏将停止全屏展示。')}>
+            <LogIn />
+            进入管理后台
+          </button>
+        </div>,
+        document.body,
+      )
+    : null;
 
-  return <div className="exam-quick">
-    <button ref={triggerRef} type="button" aria-label="更多" title="更多" aria-expanded={open} aria-haspopup="menu" onClick={() => setOpen(value => !value)}><Ellipsis /></button>
-    {menu}
-  </div>;
+  return (
+    <div className="exam-quick">
+      <button
+        ref={triggerRef}
+        type="button"
+        aria-label="更多"
+        title="更多"
+        aria-expanded={open}
+        aria-haspopup="menu"
+        onClick={() => setOpen((value) => !value)}
+      >
+        <Ellipsis />
+      </button>
+      {menu}
+    </div>
+  );
 }

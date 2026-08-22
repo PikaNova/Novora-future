@@ -17,6 +17,7 @@ export function formatRetryMessage(remainingSeconds: number, prefix: string): st
 export function loginLockoutRetryAfterMs(error: unknown): number | null {
   if (!error || typeof error !== 'object') return null;
   const value = error as { code?: unknown; retryAfterMs?: unknown };
-  if (value.code !== 'LOGIN_LOCKED' || typeof value.retryAfterMs !== 'number' || !Number.isFinite(value.retryAfterMs)) return null;
+  if (value.code !== 'LOGIN_LOCKED' || typeof value.retryAfterMs !== 'number' || !Number.isFinite(value.retryAfterMs))
+    return null;
   return value.retryAfterMs > 0 ? value.retryAfterMs : null;
 }

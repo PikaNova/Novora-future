@@ -44,8 +44,11 @@ test('threeWayMergeExam: keeps different new majors and preserves a local edit',
     payload({ majors: [baseMajor, major({ id: 'm3', name: 'Remote new' })], activeMajorId: 'm1' }),
   );
 
-  assert.deepEqual(result.payload.majors.map(item => item.id), ['m1', 'm2', 'm3']);
-  assert.equal(result.payload.majors.find(item => item.id === 'm1')?.name, 'Local rename');
+  assert.deepEqual(
+    result.payload.majors.map((item) => item.id),
+    ['m1', 'm2', 'm3'],
+  );
+  assert.equal(result.payload.majors.find((item) => item.id === 'm1')?.name, 'Local rename');
   assert.equal(result.payload.activeMajorId, 'm2');
   assert.equal(result.payload.title, 'Local new');
   assert.equal(result.conflictCount, 0);
@@ -60,7 +63,10 @@ test('threeWayMergeExam: falls back after deletion of the active major', () => {
     payload({ majors: [kept, deleted], activeMajorId: 'm2' }),
   );
 
-  assert.deepEqual(result.payload.majors.map(item => item.id), ['m1']);
+  assert.deepEqual(
+    result.payload.majors.map((item) => item.id),
+    ['m1'],
+  );
   assert.equal(result.payload.activeMajorId, 'm1');
   assert.equal(result.payload.title, 'Keep');
 });
@@ -89,11 +95,7 @@ test('threeWayMergeExam: supplies defaults for omitted optional fields', () => {
 });
 
 test('threeWayMergeExam: always uses the remote updatedAt version', () => {
-  const result = threeWayMergeExam(
-    payload({ updatedAt: 1 }),
-    payload({ updatedAt: 2 }),
-    payload({ updatedAt: 3 }),
-  );
+  const result = threeWayMergeExam(payload({ updatedAt: 1 }), payload({ updatedAt: 2 }), payload({ updatedAt: 3 }));
 
   assert.equal(result.payload.updatedAt, 3);
 });

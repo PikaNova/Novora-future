@@ -8,7 +8,7 @@
     radial-gradient(circle at 50% 52%, rgba(93, 240, 210, 0.055), transparent 24%),
     linear-gradient(180deg, #0b1018 0%, #06080d 100%);
   color: #eef6ff;
-  font-family: "Exam Source Han", "Microsoft YaHei", "PingFang SC", "Noto Sans SC", system-ui, sans-serif;
+  font-family: 'Exam Source Han', 'Microsoft YaHei', 'PingFang SC', 'Noto Sans SC', system-ui, sans-serif;
 }
 
 .loading-state__stage {
@@ -136,29 +136,70 @@
 }
 
 @keyframes loadingStateEnter {
-  from { opacity: 0; filter: blur(3px); }
-  to { opacity: 1; filter: blur(0); }
+  from {
+    opacity: 0;
+    filter: blur(3px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
 }
 
 @keyframes loadingStateText {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes loadingStateSeat {
-  0%, 100% { opacity: 0.1; transform: scale(0.82); box-shadow: none; }
-  9% { opacity: 1; transform: scale(1); box-shadow: 0 0 8px var(--seat-glow, rgba(142, 232, 255, 0.55)); }
-  18% { opacity: 0.1; transform: scale(0.82); box-shadow: none; }
+  0%,
+  100% {
+    opacity: 0.1;
+    transform: scale(0.82);
+    box-shadow: none;
+  }
+  9% {
+    opacity: 1;
+    transform: scale(1);
+    box-shadow: 0 0 8px var(--seat-glow, rgba(142, 232, 255, 0.55));
+  }
+  18% {
+    opacity: 0.1;
+    transform: scale(0.82);
+    box-shadow: none;
+  }
 }
 
 @keyframes loadingStateSeatHot {
-  0%, 100% { opacity: 0.35; transform: scale(0.9); box-shadow: none; }
-  50% { opacity: 1; transform: scale(1.05); box-shadow: 0 0 12px 2px var(--seat-glow, rgba(142, 232, 255, 0.6)); }
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.9);
+    box-shadow: none;
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+    box-shadow: 0 0 12px 2px var(--seat-glow, rgba(142, 232, 255, 0.6));
+  }
 }
 
 @keyframes loadingStateSeatBreath {
-  0%, 100% { opacity: 0.45; transform: scale(0.9); }
-  50% { opacity: 1; transform: scale(1); }
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

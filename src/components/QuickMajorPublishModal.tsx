@@ -1,16 +1,16 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Clock3, X } from "lucide-react";
-import type { MajorExam } from "../types";
-import type { SchoolClass, SchoolGrade } from "../types/school";
-import { ALL_TRACK_SUBJECTS, subjectAppliesToClass } from "../types/school";
-import { COMMON_EXAM_SUBJECTS } from "../data/subjects";
-import { DateTimeField } from "./touch-datetime-picker";
-import ClassMultiPicker, { type ClassPickerOption } from "./ClassMultiPicker";
-import SubjectIcon from "./SubjectIcon";
-import TimeRangePickerModal from "./TimeRangePickerModal";
-import AdminWizardSteps from "./AdminWizardSteps";
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Clock3, X } from 'lucide-react';
+import type { MajorExam } from '../types';
+import type { SchoolClass, SchoolGrade } from '../types/school';
+import { ALL_TRACK_SUBJECTS, subjectAppliesToClass } from '../types/school';
+import { COMMON_EXAM_SUBJECTS } from '../data/subjects';
+import { DateTimeField } from './touch-datetime-picker';
+import ClassMultiPicker, { type ClassPickerOption } from './ClassMultiPicker';
+import SubjectIcon from './SubjectIcon';
+import TimeRangePickerModal from './TimeRangePickerModal';
+import AdminWizardSteps from './AdminWizardSteps';
 import AdminModalPortal from './AdminModalPortal';
-import { APP_SETTINGS_CHANGED_EVENT, getAppSettings } from "../utils/appSettings";
+import { APP_SETTINGS_CHANGED_EVENT, getAppSettings } from '../utils/appSettings';
 
 export interface QuickMajorPublishInput {
   name: string;
@@ -34,13 +34,13 @@ interface Props {
   onPublish: (input: QuickMajorPublishInput) => void;
 }
 
-const SUBJECTS = [...COMMON_EXAM_SUBJECTS, "其他"];
+const SUBJECTS = [...COMMON_EXAM_SUBJECTS, '其他'];
 const DELAYS = [
-  { label: "立即开始", minutes: 0 },
-  { label: "5 分钟后", minutes: 5 },
-  { label: "10 分钟后", minutes: 10 },
-  { label: "15 分钟后", minutes: 15 },
-  { label: "30 分钟后", minutes: 30 },
+  { label: '立即开始', minutes: 0 },
+  { label: '5 分钟后', minutes: 5 },
+  { label: '10 分钟后', minutes: 10 },
+  { label: '15 分钟后', minutes: 15 },
+  { label: '30 分钟后', minutes: 30 },
 ];
 const DURATIONS = [45, 60, 75, 90, 120, 150];
 const TIME_STEP_MS = 5 * 60_000;
@@ -56,18 +56,18 @@ function localInputValue(time: number) {
 }
 
 function displayTime(value: string) {
-  return value ? value.replace("T", " ") : "未设置";
+  return value ? value.replace('T', ' ') : '未设置';
 }
 
 function formatDuration(minutes: number) {
   if (minutes < 60) return `${minutes} 分钟`;
   const hours = Math.floor(minutes / 60);
   const rest = minutes % 60;
-  return `${hours} 小时${rest ? ` ${rest} 分钟` : ""}`;
+  return `${hours} 小时${rest ? ` ${rest} 分钟` : ''}`;
 }
 
 function splitClock(value: string) {
-  const [hour = "0", minute = "0"] = value.split(":");
+  const [hour = '0', minute = '0'] = value.split(':');
   return {
     hour: Math.max(0, Math.min(23, Number(hour) || 0)),
     minute: Math.max(0, Math.min(59, Number(minute) || 0)),
@@ -77,7 +77,7 @@ function splitClock(value: string) {
 function clockAfter(value: string, duration: number) {
   const { hour, minute } = splitClock(value);
   const total = (hour * 60 + minute + duration) % (24 * 60);
-  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
 }
 
 export default function QuickMajorPublishModal({
@@ -92,54 +92,56 @@ export default function QuickMajorPublishModal({
   onPublish,
 }: Props) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [name, setName] = useState(
-    `临时统一考试 · ${new Date().toLocaleDateString("zh-CN")}`,
-  );
-  const [examDate, setExamDate] = useState(() =>
-    localInputValue(Date.now()).slice(0, 10),
-  );
-  const [targetGradeIds, setTargetGradeIds] =
-    useState<string[]>(initialGradeIds);
-  const [targetClassIds, setTargetClassIds] = useState<string[]>(
-    lockedClassId ? [lockedClassId] : [],
-  );
+  const [name, setName] = useState(`临时统一考试 · ${new Date().toLocaleDateString('zh-CN')}`);
+  const [examDate, setExamDate] = useState(() => localInputValue(Date.now()).slice(0, 10));
+  const [targetGradeIds, setTargetGradeIds] = useState<string[]>(initialGradeIds);
+  const [targetClassIds, setTargetClassIds] = useState<string[]>(lockedClassId ? [lockedClassId] : []);
   const [schoolWide, setSchoolWide] = useState(false);
-  const [subject, setSubject] = useState("");
-  const [customSubject, setCustomSubject] = useState("");
+  const [subject, setSubject] = useState('');
+  const [customSubject, setCustomSubject] = useState('');
   const [delayMinutes, setDelayMinutes] = useState(0);
   // The date is chosen in step 1. The follow-up picker deliberately owns only
   // the time portion, matching weekly-plan editing and avoiding a second date.
-  const [customStartTime, setCustomStartTime] = useState("08:00");
+  const [customStartTime, setCustomStartTime] = useState('08:00');
   const [useCustomStart, setUseCustomStart] = useState(false);
   const [durationMinutes, setDurationMinutes] = useState(60);
   const [crossDayConfirmed, setCrossDayConfirmed] = useState(false);
   const [timeFlowOpen, setTimeFlowOpen] = useState(false);
-  const timeFlowSnapshotRef = useRef<null | { customStartTime: string; durationMinutes: number; crossDayConfirmed: boolean; useCustomStart: boolean }>(null);
+  const timeFlowSnapshotRef = useRef<null | {
+    customStartTime: string;
+    durationMinutes: number;
+    crossDayConfirmed: boolean;
+    useCustomStart: boolean;
+  }>(null);
   const timeFlowAnchorRef = useRef<HTMLButtonElement | null>(null);
   const [priorityOverSchedule, setPriorityOverSchedule] = useState(false);
-  const [error, setError] = useState("");
-  const [subjectTrackModeEnabled, setSubjectTrackModeEnabled] = useState(() => getAppSettings().exam.initialization.subjectTrackModeEnabled !== false);
+  const [error, setError] = useState('');
+  const [subjectTrackModeEnabled, setSubjectTrackModeEnabled] = useState(
+    () => getAppSettings().exam.initialization.subjectTrackModeEnabled === true,
+  );
   const [trackDispatchEnabled, setTrackDispatchEnabled] = useState(true);
 
   useEffect(() => {
-    const sync = () => setSubjectTrackModeEnabled(getAppSettings().exam.initialization.subjectTrackModeEnabled !== false);
+    const sync = () =>
+      setSubjectTrackModeEnabled(getAppSettings().exam.initialization.subjectTrackModeEnabled === true);
     window.addEventListener(APP_SETTINGS_CHANGED_EVENT, sync);
-    window.addEventListener("storage", sync);
+    window.addEventListener('storage', sync);
     return () => {
       window.removeEventListener(APP_SETTINGS_CHANGED_EVENT, sync);
-      window.removeEventListener("storage", sync);
+      window.removeEventListener('storage', sync);
     };
   }, []);
 
   const startTime = useCustomStart
     ? `${examDate}T${customStartTime}`
-    : localInputValue(delayMinutes === 0 ? Date.now() + 60_000 : roundUpToFiveMinutes(Date.now() + delayMinutes * 60_000));
+    : localInputValue(
+        delayMinutes === 0 ? Date.now() + 60_000 : roundUpToFiveMinutes(Date.now() + delayMinutes * 60_000),
+      );
   const finalDuration = durationMinutes;
   const previewEndTime = Number.isFinite(new Date(startTime).getTime())
     ? localInputValue(new Date(startTime).getTime() + finalDuration * 60_000)
-    : "";
-  const finalSubject =
-    subject === OTHER_SUBJECT ? customSubject.trim() : subject;
+    : '';
+  const finalSubject = subject === OTHER_SUBJECT ? customSubject.trim() : subject;
   const isElectiveSubject = subjectTrackModeEnabled && ALL_TRACK_SUBJECTS.includes(subject);
   const canUseTrackDispatch = isElectiveSubject && !schoolWide && !lockedClassId && targetGradeIds.length > 0;
   const trackMatchedClassIds = useMemo(() => {
@@ -149,14 +151,18 @@ export default function QuickMajorPublishModal({
       .map((item) => item.id);
   }, [classes, isElectiveSubject, subject, targetGradeIds]);
   const effectiveTrackDispatch = canUseTrackDispatch && trackDispatchEnabled;
-  const effectiveTargetGradeIds = schoolWide ? [] : targetGradeIds;
-  const effectiveTargetClassIds = schoolWide
-    ? []
-    : lockedClassId
-      ? [lockedClassId]
-      : effectiveTrackDispatch
-        ? trackMatchedClassIds
-        : targetClassIds;
+  const effectiveTargetGradeIds = useMemo(() => (schoolWide ? [] : targetGradeIds), [schoolWide, targetGradeIds]);
+  const effectiveTargetClassIds = useMemo(
+    () =>
+      schoolWide
+        ? []
+        : lockedClassId
+          ? [lockedClassId]
+          : effectiveTrackDispatch
+            ? trackMatchedClassIds
+            : targetClassIds,
+    [effectiveTrackDispatch, lockedClassId, schoolWide, targetClassIds, trackMatchedClassIds],
+  );
   const classOptions = useMemo<ClassPickerOption[]>(() => {
     const gradeNames = new Map(grades.map((grade) => [grade.id, grade.name]));
     return classes
@@ -164,7 +170,7 @@ export default function QuickMajorPublishModal({
       .map((item) => ({
         id: item.id,
         gradeId: item.gradeId,
-        gradeName: gradeNames.get(item.gradeId) ?? "未分配年级",
+        gradeName: gradeNames.get(item.gradeId) ?? '未分配年级',
         className: item.name,
       }));
   }, [classes, grades, targetGradeIds]);
@@ -197,8 +203,7 @@ export default function QuickMajorPublishModal({
     const end = start + finalDuration * 60_000;
     if (!Number.isFinite(start) || !Number.isFinite(end)) return [];
     return majors.filter((major) => {
-      if (major.endedAt || !major.items.some((item) => item.enabled))
-        return false;
+      if (major.endedAt || !major.items.some((item) => item.enabled)) return false;
       const applies =
         !effectiveTargetGradeIds.length ||
         !major.targetGradeIds?.length ||
@@ -208,40 +213,39 @@ export default function QuickMajorPublishModal({
         !major.targetClassIds?.length ||
         major.targetClassIds.some((id) => effectiveTargetClassIds.includes(id));
       return (
-        applies && classApplies &&
+        applies &&
+        classApplies &&
         major.items.some(
           (item) =>
-            item.enabled &&
-            start < new Date(item.endTime).getTime() &&
-            end > new Date(item.startTime).getTime(),
+            item.enabled && start < new Date(item.endTime).getTime() && end > new Date(item.startTime).getTime(),
         )
       );
     });
   }, [effectiveTargetClassIds, effectiveTargetGradeIds, finalDuration, majors, startTime]);
 
   const next = () => {
-    setError("");
+    setError('');
     if (step === 1) {
       if (!name.trim()) {
-        setError("请填写本次统一考试名称。");
+        setError('请填写本次统一考试名称。');
         return;
       }
       if (!schoolWide && !lockedClassId && !targetGradeIds.length) {
-        setError("请至少选择一个年级，或选择全校统一。");
+        setError('请至少选择一个年级，或选择全校统一。');
         return;
       }
     }
     if (step === 2) {
       if (!finalSubject) {
-        setError("请选择考试科目。");
+        setError('请选择考试科目。');
         return;
       }
       if (!startTime || !Number.isFinite(new Date(startTime).getTime())) {
-        setError("请设置有效的开始时间。");
+        setError('请设置有效的开始时间。');
         return;
       }
       if (startTime.slice(0, 10) !== previewEndTime.slice(0, 10) && !crossDayConfirmed) {
-        setError("本场考试会跨日，请进入“时间设置”并勾选启用跨日考试。");
+        setError('本场考试会跨日，请进入“时间设置”并勾选启用跨日考试。');
         return;
       }
     }
@@ -250,9 +254,7 @@ export default function QuickMajorPublishModal({
 
   const publish = () => {
     if (!priorityOverSchedule && conflicts.length) {
-      setError(
-        "检测到与现有安排重叠。请确认保留原安排，或勾选本次临时统一考试优先。",
-      );
+      setError('检测到与现有安排重叠。请确认保留原安排，或勾选本次临时统一考试优先。');
       return;
     }
     onPublish({
@@ -300,280 +302,298 @@ export default function QuickMajorPublishModal({
           <AdminWizardSteps
             active={step - 1}
             steps={[
-              { label: "选择范围", hint: "名称、日期和班级" },
-              { label: "科目时间", hint: "开始方式与时长" },
-              { label: "确认下发", hint: "检查冲突后发布" },
+              { label: '选择范围', hint: '名称、日期和班级' },
+              { label: '科目时间', hint: '开始方式与时长' },
+              { label: '确认下发', hint: '检查冲突后发布' },
             ]}
-            summary={<><span>当前考试</span><strong>{name || "尚未填写名称"}</strong><span>{finalSubject || "尚未选择科目"}</span><span>{displayTime(startTime)} · {formatDuration(finalDuration)}</span></>}
+            summary={
+              <>
+                <span>当前考试</span>
+                <strong>{name || '尚未填写名称'}</strong>
+                <span>{finalSubject || '尚未选择科目'}</span>
+                <span>
+                  {displayTime(startTime)} · {formatDuration(finalDuration)}
+                </span>
+              </>
+            }
           />
           <div className="admin-workflow-content" key={step}>
-        {step === 1 && (
-          <div className="quick-major-modal__body">
-            <label className="admin-label">
-              考试名称
-              <input
-                className="admin-input"
-                autoFocus
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-              />
-            </label>
-            <label className="admin-label">
-              考试日期
-              <DateTimeField
-                className="admin-date-time-field"
-                value={examDate}
-                onChange={(value) => {
-                  setExamDate(value);
-                  setCrossDayConfirmed(false);
-                }}
-                mode="date"
-                title="选择考试日期"
-                showFieldPreview={false}
-              />
-              <span className="admin-field-hint">
-                选择日期后，请在下一步设置该日期的具体开始时间。
-              </span>
-            </label>
-            <div className="quick-major-modal__section">
-              <strong>{lockedClassName ? "适用班级" : "适用年级"}</strong>
-              <p>
-                {lockedClassName
-                  ? `本次考试仅下发到${lockedClassName}绑定的设备。`
-                  : "统一考试会自动下发到所选年级中已绑定的全部看板。"}
-              </p>
-              {lockedClassName ? (
-                <div className="quick-major-choice is-selected">
-                  {lockedClassName}
-                </div>
-              ) : (
-                <>
-                  {allowSchoolWide && (
-                    <button
-                      type="button"
-                      className={`quick-major-choice${schoolWide ? " is-selected" : ""}`}
-                      onClick={() => {
-                        setSchoolWide((value) => !value);
-                        setTargetClassIds([]);
-                      }}
-                    >
-                      全校统一<span>所有年级</span>
-                    </button>
+            {step === 1 && (
+              <div className="quick-major-modal__body">
+                <label className="admin-label">
+                  考试名称
+                  <input
+                    className="admin-input"
+                    autoFocus
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                  />
+                </label>
+                <label className="admin-label">
+                  考试日期
+                  <DateTimeField
+                    className="admin-date-time-field"
+                    value={examDate}
+                    onChange={(value) => {
+                      setExamDate(value);
+                      setCrossDayConfirmed(false);
+                    }}
+                    mode="date"
+                    title="选择考试日期"
+                    showFieldPreview={false}
+                  />
+                  <span className="admin-field-hint">选择日期后，请在下一步设置该日期的具体开始时间。</span>
+                </label>
+                <div className="quick-major-modal__section">
+                  <strong>{lockedClassName ? '适用班级' : '适用年级'}</strong>
+                  <p>
+                    {lockedClassName
+                      ? `本次考试仅下发到${lockedClassName}绑定的设备。`
+                      : '统一考试会自动下发到所选年级中已绑定的全部看板。'}
+                  </p>
+                  {lockedClassName ? (
+                    <div className="quick-major-choice is-selected">{lockedClassName}</div>
+                  ) : (
+                    <>
+                      {allowSchoolWide && (
+                        <button
+                          type="button"
+                          className={`quick-major-choice${schoolWide ? ' is-selected' : ''}`}
+                          onClick={() => {
+                            setSchoolWide((value) => !value);
+                            setTargetClassIds([]);
+                          }}
+                        >
+                          全校统一<span>所有年级</span>
+                        </button>
+                      )}
+                      <div className="quick-major-choice-grid">
+                        {grades.map((grade) => (
+                          <button
+                            type="button"
+                            key={grade.id}
+                            className={`quick-major-choice${!schoolWide && targetGradeIds.includes(grade.id) ? ' is-selected' : ''}`}
+                            onClick={() => {
+                              setSchoolWide(false);
+                              setTargetGradeIds((ids) =>
+                                ids.includes(grade.id) ? ids.filter((id) => id !== grade.id) : [...ids, grade.id],
+                              );
+                              if (targetGradeIds.includes(grade.id)) {
+                                const removedClassIds = new Set(
+                                  classes.filter((item) => item.gradeId === grade.id).map((item) => item.id),
+                                );
+                                setTargetClassIds((ids) => ids.filter((id) => !removedClassIds.has(id)));
+                              }
+                            }}
+                          >
+                            {grade.name}
+                          </button>
+                        ))}
+                      </div>
+                      {!schoolWide && targetGradeIds.length > 0 && (
+                        <div className="quick-major-class-targets">
+                          <div>
+                            <strong>指定班级（可选）</strong>
+                            <span>
+                              {targetClassIds.length
+                                ? `仅下发到已选的 ${targetClassIds.length} 个班级`
+                                : '未勾选时下发到所选年级的全部班级'}
+                            </span>
+                          </div>
+                          <ClassMultiPicker
+                            options={classOptions}
+                            selectedIds={targetClassIds}
+                            onChange={setTargetClassIds}
+                            noun="班级"
+                            emptyText="所选年级暂无可用班级"
+                          />
+                        </div>
+                      )}
+                    </>
                   )}
-                  <div className="quick-major-choice-grid">
-                    {grades.map((grade) => (
+                </div>
+              </div>
+            )}
+
+            {step === 2 && (
+              <div className="quick-major-modal__body">
+                <div className="quick-major-modal__section">
+                  <strong>考试科目</strong>
+                  <div className="quick-major-subjects">
+                    {SUBJECTS.map((value) => (
                       <button
                         type="button"
-                        key={grade.id}
-                        className={`quick-major-choice${!schoolWide && targetGradeIds.includes(grade.id) ? " is-selected" : ""}`}
-                        onClick={() => {
-                          setSchoolWide(false);
-                          setTargetGradeIds((ids) =>
-                            ids.includes(grade.id) ? ids.filter((id) => id !== grade.id) : [...ids, grade.id],
-                          );
-                          if (targetGradeIds.includes(grade.id)) {
-                            const removedClassIds = new Set(classes.filter((item) => item.gradeId === grade.id).map((item) => item.id));
-                            setTargetClassIds((ids) => ids.filter((id) => !removedClassIds.has(id)));
-                          }
-                        }}
+                        key={value}
+                        className={subject === value ? 'is-selected' : ''}
+                        onClick={() => setSubject(value)}
                       >
-                        {grade.name}
+                        <SubjectIcon subject={value} size={16} />
+                        <span>{value}</span>
                       </button>
                     ))}
                   </div>
-                  {!schoolWide && targetGradeIds.length > 0 && (
-                    <div className="quick-major-class-targets">
-                      <div>
-                        <strong>指定班级（可选）</strong>
-                        <span>{targetClassIds.length ? `仅下发到已选的 ${targetClassIds.length} 个班级` : "未勾选时下发到所选年级的全部班级"}</span>
-                      </div>
-                      <ClassMultiPicker
-                        options={classOptions}
-                        selectedIds={targetClassIds}
-                        onChange={setTargetClassIds}
-                        noun="班级"
-                        emptyText="所选年级暂无可用班级"
+                  {subject === OTHER_SUBJECT && (
+                    <label>
+                      自定义科目名称
+                      <input
+                        className="admin-input"
+                        value={customSubject}
+                        onChange={(event) => setCustomSubject(event.target.value)}
+                        placeholder="例如：信息技术"
+                        maxLength={40}
+                        autoFocus
                       />
+                    </label>
+                  )}
+                  {canUseTrackDispatch && (
+                    <div className="quick-major-track-match">
+                      <label className="quick-major-track-match__switch">
+                        <span>
+                          <strong>按选科下发</strong>
+                          <small>
+                            {trackDispatchEnabled ? `只发给包含${finalSubject}的班级` : '当前范围内班级都会收到'}
+                          </small>
+                        </span>
+                        <input
+                          type="checkbox"
+                          checked={trackDispatchEnabled}
+                          onChange={(event) => setTrackDispatchEnabled(event.target.checked)}
+                        />
+                      </label>
+                      <p>
+                        {trackDispatchEnabled
+                          ? `预计下发 ${trackMatchedClassIds.length} 个班级；未分科班级默认接收所有科目。`
+                          : '已关闭选科过滤，将按上一步选择的年级/班级统一下发。'}
+                      </p>
                     </div>
                   )}
-                </>
-              )}
-            </div>
-          </div>
-        )}
-
-        {step === 2 && (
-          <div className="quick-major-modal__body">
-            <div className="quick-major-modal__section">
-              <strong>考试科目</strong>
-              <div className="quick-major-subjects">
-                {SUBJECTS.map((value) => (
+                </div>
+                <div className="quick-major-modal__section">
+                  <strong>开始方式</strong>
+                  <p>只决定考试何时进入等待状态；具体开始与结束时间在下方“时间设置”中统一调整。</p>
+                  <div className="quick-major-choice-grid">
+                    {DELAYS.map((option) => (
+                      <button
+                        type="button"
+                        key={option.minutes}
+                        className={`quick-major-choice${!useCustomStart && delayMinutes === option.minutes ? ' is-selected' : ''}`}
+                        onClick={() => {
+                          setUseCustomStart(false);
+                          setDelayMinutes(option.minutes);
+                          setCrossDayConfirmed(false);
+                        }}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="admin-major-duration-presets quick-major-inline-durations">
+                    <span>常用考试时长</span>
+                    <div>
+                      {DURATIONS.map((minutes) => (
+                        <button
+                          type="button"
+                          key={minutes}
+                          className={durationMinutes === minutes ? 'is-selected' : ''}
+                          onClick={() => {
+                            setDurationMinutes(minutes);
+                            setCrossDayConfirmed(false);
+                          }}
+                        >
+                          {formatDuration(minutes)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div className="quick-major-modal__section quick-major-time-settings">
+                  <strong>自定义时间</strong>
+                  <p>特殊时间安排可直接设置开始和结束时间，系统自动计算实际时长。</p>
                   <button
+                    ref={timeFlowAnchorRef}
                     type="button"
-                    key={value}
-                    className={subject === value ? "is-selected" : ""}
-                    onClick={() => setSubject(value)}
+                    className="quick-major-time-trigger"
+                    onClick={openTimeFlow}
                   >
-                    <SubjectIcon subject={value} size={16} />
-                    <span>{value}</span>
+                    <span>{useCustomStart ? '已自定义开始与结束时间' : '当前按开始方式和常用时长计算'}</span>
+                    <strong>
+                      {startTime.slice(11, 16)} - {previewEndTime.slice(11, 16)}
+                    </strong>
+                    <small>
+                      {examDate} · {formatDuration(durationMinutes)}，点击自定义起止时间
+                    </small>
                   </button>
-                ))}
+                </div>
+                <section className="quick-major-live-preview" aria-live="polite">
+                  <Clock3 aria-hidden="true" />
+                  <div>
+                    <span>考试预览</span>
+                    <strong>{finalSubject || '请先选择考试科目'}</strong>
+                    <p>
+                      {previewEndTime
+                        ? `${displayTime(startTime)} - ${displayTime(previewEndTime)}`
+                        : '请选择有效的开始时间'}
+                    </p>
+                    <small>
+                      {formatDuration(finalDuration)} · {useCustomStart ? '自定义起止时间' : '快捷时间设置'}
+                    </small>
+                  </div>
+                </section>
               </div>
-              {subject === OTHER_SUBJECT && (
-                <label>
-                  自定义科目名称
-                  <input
-                    className="admin-input"
-                    value={customSubject}
-                    onChange={(event) => setCustomSubject(event.target.value)}
-                    placeholder="例如：信息技术"
-                    maxLength={40}
-                    autoFocus
-                  />
-                </label>
-              )}
-              {canUseTrackDispatch && (
-                <div className="quick-major-track-match">
-                  <label className="quick-major-track-match__switch">
-                    <span>
-                      <strong>按选科下发</strong>
-                      <small>{trackDispatchEnabled ? `只发给包含${finalSubject}的班级` : "当前范围内班级都会收到"}</small>
-                    </span>
+            )}
+
+            {step === 3 && (
+              <div className="quick-major-modal__body">
+                <section className="quick-major-summary">
+                  <span>
+                    {schoolWide
+                      ? '全校统一'
+                      : effectiveTargetClassIds.length
+                        ? classes
+                            .filter((item) => effectiveTargetClassIds.includes(item.id))
+                            .map(
+                              (item) => `${grades.find((grade) => grade.id === item.gradeId)?.name ?? ''}${item.name}`,
+                            )
+                            .join('、')
+                        : grades
+                            .filter((grade) => effectiveTargetGradeIds.includes(grade.id))
+                            .map((grade) => grade.name)
+                            .join('、') + '全部班级'}
+                  </span>
+                  <strong>{name}</strong>
+                  <p>
+                    {finalSubject} · {displayTime(startTime)} 开始 · {formatDuration(finalDuration)}
+                  </p>
+                </section>
+                <section className={`quick-major-conflicts${conflicts.length ? ' has-conflicts' : ''}`}>
+                  <strong>
+                    {conflicts.length ? `发现 ${conflicts.length} 场可能冲突的现有大型考试` : '未发现时间冲突'}
+                  </strong>
+                  {conflicts.length ? (
+                    <ul>
+                      {conflicts.map((major) => (
+                        <li key={major.id}>{major.name}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p>将按照现有调度规则发布，不影响其他考试。</p>
+                  )}
+                </section>
+                {conflicts.length > 0 && (
+                  <label className="quick-major-priority">
                     <input
                       type="checkbox"
-                      checked={trackDispatchEnabled}
-                      onChange={(event) => setTrackDispatchEnabled(event.target.checked)}
+                      checked={priorityOverSchedule}
+                      onChange={(event) => setPriorityOverSchedule(event.target.checked)}
                     />
+                    <span>
+                      <strong>本次临时统一考试优先</strong>
+                      <small>仅覆盖重叠时间内的正式大型考试；原安排不会被删除。</small>
+                    </span>
                   </label>
-                  <p>
-                    {trackDispatchEnabled
-                      ? `预计下发 ${trackMatchedClassIds.length} 个班级；未分科班级默认接收所有科目。`
-                      : "已关闭选科过滤，将按上一步选择的年级/班级统一下发。"}
-                  </p>
-                </div>
-              )}
-            </div>
-            <div className="quick-major-modal__section">
-              <strong>开始方式</strong>
-              <p>只决定考试何时进入等待状态；具体开始与结束时间在下方“时间设置”中统一调整。</p>
-              <div className="quick-major-choice-grid">
-                {DELAYS.map((option) => (
-                  <button
-                    type="button"
-                    key={option.minutes}
-                    className={`quick-major-choice${!useCustomStart && delayMinutes === option.minutes ? " is-selected" : ""}`}
-                    onClick={() => {
-                      setUseCustomStart(false);
-                      setDelayMinutes(option.minutes);
-                      setCrossDayConfirmed(false);
-                    }}
-                  >
-                    {option.label}
-                  </button>
-                ))}
+                )}
               </div>
-              <div className="admin-major-duration-presets quick-major-inline-durations">
-                <span>常用考试时长</span>
-                <div>
-                  {DURATIONS.map((minutes) => (
-                    <button
-                      type="button"
-                      key={minutes}
-                      className={durationMinutes === minutes ? "is-selected" : ""}
-                      onClick={() => {
-                        setDurationMinutes(minutes);
-                        setCrossDayConfirmed(false);
-                      }}
-                    >
-                      {formatDuration(minutes)}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-            <div className="quick-major-modal__section quick-major-time-settings">
-              <strong>自定义时间</strong>
-              <p>特殊时间安排可直接设置开始和结束时间，系统自动计算实际时长。</p>
-              <button ref={timeFlowAnchorRef} type="button" className="quick-major-time-trigger" onClick={openTimeFlow}>
-                <span>{useCustomStart ? "已自定义开始与结束时间" : "当前按开始方式和常用时长计算"}</span>
-                <strong>{startTime.slice(11, 16)} - {previewEndTime.slice(11, 16)}</strong>
-                <small>{examDate} · {formatDuration(durationMinutes)}，点击自定义起止时间</small>
-              </button>
-            </div>
-            <section className="quick-major-live-preview" aria-live="polite">
-              <Clock3 aria-hidden="true" />
-              <div>
-                <span>考试预览</span>
-                <strong>{finalSubject || "请先选择考试科目"}</strong>
-                <p>{previewEndTime ? `${displayTime(startTime)} - ${displayTime(previewEndTime)}` : "请选择有效的开始时间"}</p>
-                <small>
-                  {formatDuration(finalDuration)} · {useCustomStart ? "自定义起止时间" : "快捷时间设置"}
-                </small>
-              </div>
-            </section>
-          </div>
-        )}
-
-        {step === 3 && (
-          <div className="quick-major-modal__body">
-            <section className="quick-major-summary">
-              <span>
-                {schoolWide
-                  ? "全校统一"
-                  : effectiveTargetClassIds.length
-                    ? classes
-                        .filter((item) => effectiveTargetClassIds.includes(item.id))
-                        .map((item) => `${grades.find((grade) => grade.id === item.gradeId)?.name ?? ""}${item.name}`)
-                        .join("、")
-                    : grades
-                      .filter((grade) =>
-                        effectiveTargetGradeIds.includes(grade.id),
-                      )
-                      .map((grade) => grade.name)
-                      .join("、") + "全部班级"}
-              </span>
-              <strong>{name}</strong>
-              <p>
-                {finalSubject} · {displayTime(startTime)} 开始 · {formatDuration(finalDuration)}
-              </p>
-            </section>
-            <section
-              className={`quick-major-conflicts${conflicts.length ? " has-conflicts" : ""}`}
-            >
-              <strong>
-                {conflicts.length
-                  ? `发现 ${conflicts.length} 场可能冲突的现有大型考试`
-                  : "未发现时间冲突"}
-              </strong>
-              {conflicts.length ? (
-                <ul>
-                  {conflicts.map((major) => (
-                    <li key={major.id}>{major.name}</li>
-                  ))}
-                </ul>
-              ) : (
-                <p>将按照现有调度规则发布，不影响其他考试。</p>
-              )}
-            </section>
-            {conflicts.length > 0 && (
-              <label className="quick-major-priority">
-                <input
-                  type="checkbox"
-                  checked={priorityOverSchedule}
-                  onChange={(event) =>
-                    setPriorityOverSchedule(event.target.checked)
-                  }
-                />
-                <span>
-                  <strong>本次临时统一考试优先</strong>
-                  <small>
-                    仅覆盖重叠时间内的正式大型考试；原安排不会被删除。
-                  </small>
-                </span>
-              </label>
             )}
-          </div>
-        )}
           </div>
         </div>
 
@@ -584,12 +604,12 @@ export default function QuickMajorPublishModal({
               step === 1
                 ? onClose
                 : () => {
-                    setError("");
+                    setError('');
                     setStep((value) => (value - 1) as 1 | 2 | 3);
                   }
             }
           >
-            {step === 1 ? "取消" : "上一步"}
+            {step === 1 ? '取消' : '上一步'}
           </button>
           {step < 3 ? (
             <button className="admin-btn admin-btn--primary" onClick={next}>
@@ -605,7 +625,7 @@ export default function QuickMajorPublishModal({
           open={timeFlowOpen}
           startValue={useCustomStart ? customStartTime : startTime.slice(11, 16)}
           endValue={useCustomStart ? clockAfter(customStartTime, durationMinutes) : previewEndTime.slice(11, 16)}
-          subject={finalSubject || "待选择科目"}
+          subject={finalSubject || '待选择科目'}
           contextLabel={examDate}
           presets={[]}
           initialCrossDay={crossDayConfirmed}

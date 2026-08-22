@@ -52,9 +52,9 @@ test('alerts group usernames case-insensitively and retain the newest spelling',
 });
 
 test('alerts sort the most recently failed username first', () => {
-  const alerts = evaluateLoginFailureAlerts([
-    ...failures('newer', 3),
-    ...failures('older', 3, 10_000),
-  ], NOW);
-  assert.deepEqual(alerts.map(alert => alert.username), ['newer', 'older']);
+  const alerts = evaluateLoginFailureAlerts([...failures('newer', 3), ...failures('older', 3, 10_000)], NOW);
+  assert.deepEqual(
+    alerts.map((alert) => alert.username),
+    ['newer', 'older'],
+  );
 });

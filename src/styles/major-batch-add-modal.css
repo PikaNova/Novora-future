@@ -51,8 +51,8 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   grid-template-areas:
-    "title count"
-    "desc badge";
+    'title count'
+    'desc badge';
   align-items: start;
   gap: 8px 12px;
   width: 100%;
@@ -107,8 +107,8 @@
 .major-batch-pattern-grid .quick-major-choice {
   grid-template-columns: minmax(0, 1fr) auto;
   grid-template-areas:
-    "title count"
-    "desc badge";
+    'title count'
+    'desc badge';
   align-items: start;
   gap: 8px 12px;
   width: 100%;
@@ -529,7 +529,10 @@
   color: #e8f2f8;
   font: 700 12px/1 system-ui;
   cursor: pointer;
-  transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+  transition:
+    transform 0.16s ease,
+    border-color 0.16s ease,
+    background 0.16s ease;
   white-space: nowrap;
 }
 
@@ -632,9 +635,9 @@
   .major-batch-modal .major-batch-template {
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
-      "title count"
-      "desc desc"
-      "badge badge";
+      'title count'
+      'desc desc'
+      'badge badge';
     gap: 7px 12px;
     min-height: auto;
     padding: 16px 18px;
@@ -649,9 +652,9 @@
   .major-batch-modal .major-batch-pattern-grid .quick-major-choice {
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
-      "title count"
-      "desc desc"
-      "badge badge";
+      'title count'
+      'desc desc'
+      'badge badge';
     gap: 7px 12px;
     min-height: auto;
     padding: 16px 18px;
@@ -701,4 +704,8 @@
   }
 }
 
-.major-batch-template em.is-school{border-color:rgba(92,201,132,.38)!important;color:#9be7b8!important;background:rgba(39,174,96,.13)!important}
+.major-batch-template em.is-school {
+  border-color: rgba(92, 201, 132, 0.38) !important;
+  color: #9be7b8 !important;
+  background: rgba(39, 174, 96, 0.13) !important;
+}

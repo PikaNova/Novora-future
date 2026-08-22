@@ -1,17 +1,14 @@
-import type { ExamItem, MajorExam } from "../types/index.js";
-import type { SchoolClass } from "../types/school.js";
-import { subjectAppliesToClass } from "../types/school.js";
-import { isTrackSubject, normalizeSubjectName } from "../data/subjects.js";
+import type { ExamItem, MajorExam } from '../types/index.js';
+import type { SchoolClass } from '../types/school.js';
+import { subjectAppliesToClass } from '../types/school.js';
+import { isTrackSubject, normalizeSubjectName } from '../data/subjects.js';
 
-export const NO_MATCHING_TRACK_CLASS_ID = "__no_matching_track_class__";
+export const NO_MATCHING_TRACK_CLASS_ID = '__no_matching_track_class__';
 
-type ScopedClass = Pick<SchoolClass, "id" | "gradeId" | "enabled" | "track">;
-type ScopedMajor = Pick<MajorExam, "targetClassIds" | "targetGradeIds">;
+type ScopedClass = Pick<SchoolClass, 'id' | 'gradeId' | 'enabled' | 'track'>;
+type ScopedMajor = Pick<MajorExam, 'targetClassIds' | 'targetGradeIds'>;
 
-export function classesInMajorScope<T extends ScopedClass>(
-  major: ScopedMajor,
-  classes: readonly T[],
-): T[] {
+export function classesInMajorScope<T extends ScopedClass>(major: ScopedMajor, classes: readonly T[]): T[] {
   return classes.filter((item) => {
     if (!item.enabled) return false;
     if (major.targetClassIds?.length) return major.targetClassIds.includes(item.id);
@@ -61,17 +58,12 @@ export function recomputeMajorsTrackClassIds(
 ): { majors: MajorExam[]; changes: TrackClassIdsChange[] } {
   const changes: TrackClassIdsChange[] = [];
   const nextMajors = majors.map((major) => {
-    if (major.source === "quick" || major.temporary) return major;
+    if (major.source === 'quick' || major.temporary) return major;
 
     let majorChanged = false;
     const nextItems: ExamItem[] = major.items.map((item) => {
       if (!isTrackSubject(normalizeSubjectName(item.name))) return item;
-      const nextTargetClassIds = computeAutoTrackClassIds(
-        major,
-        item.name,
-        classes,
-        subjectTrackModeEnabled,
-      );
+      const nextTargetClassIds = computeAutoTrackClassIds(major, item.name, classes, subjectTrackModeEnabled);
       if (sameIds(item.targetClassIds, nextTargetClassIds)) return item;
       majorChanged = true;
       changes.push({

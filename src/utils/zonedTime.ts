@@ -35,7 +35,7 @@ export function getZonedParts(ms: number, timeZone = DISPLAY_TIME_ZONE): ZonedPa
     weekday: 'short',
   });
   const parts = formatter.formatToParts(new Date(ms));
-  const get = (type: string) => parts.find(part => part.type === type)?.value ?? '';
+  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? '';
   let hour = Number.parseInt(get('hour'), 10);
   if (hour === 24) hour = 0;
   return {
@@ -65,13 +65,6 @@ export function parseZonedTime(isoLocal: string, timeZone = DISPLAY_TIME_ZONE): 
   const utcGuess = new Date(`${isoLocal}Z`).getTime();
   if (Number.isNaN(utcGuess)) return Number.NaN;
   const parts = getZonedParts(utcGuess, timeZone);
-  const asUtcFromParts = Date.UTC(
-    parts.year,
-    parts.month - 1,
-    parts.day,
-    parts.hour,
-    parts.minute,
-    parts.second,
-  );
+  const asUtcFromParts = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
   return utcGuess - (asUtcFromParts - utcGuess);
 }

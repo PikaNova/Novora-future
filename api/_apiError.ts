@@ -18,19 +18,35 @@ function errorText(error: unknown): string {
 export function classifyDatabaseError(error: unknown, operation: DatabaseOperation): ClassifiedError {
   const raw = errorText(error);
   const text = raw.toLowerCase();
-  const code = typeof error === 'object' && error !== null && 'code' in error
-    ? String((error as { code?: unknown }).code ?? '')
-    : '';
+  const code =
+    typeof error === 'object' && error !== null && 'code' in error
+      ? String((error as { code?: unknown }).code ?? '')
+      : '';
 
   // ── 配置类（不可重试）────────────────────────────────────────────
   if (/database_url is not set|missing.*database_url/.test(text)) {
-    return { status: 503, code: 'DATABASE_NOT_CONFIGURED', message: '服务器尚未配置数据库连接，请检查 DATABASE_URL 环境变量', retryable: false };
+    return {
+      status: 503,
+      code: 'DATABASE_NOT_CONFIGURED',
+      message: '服务器尚未配置数据库连接，请检查 DATABASE_URL 环境变量',
+      retryable: false,
+    };
   }
   if (/password authentication failed|authentication failed|invalid.*credential|28p01/.test(`${text} ${code}`)) {
-    return { status: 503, code: 'DATABASE_AUTH_FAILED', message: '数据库连接配置无效，请检查服务器环境变量', retryable: false };
+    return {
+      status: 503,
+      code: 'DATABASE_AUTH_FAILED',
+      message: '数据库连接配置无效，请检查服务器环境变量',
+      retryable: false,
+    };
   }
   if (/does not exist|undefined_table|undefined_column|42p01|42703/.test(`${text} ${code}`)) {
-    return { status: 503, code: 'DATABASE_SCHEMA_MISMATCH', message: '数据库结构与当前版本不兼容，请重新部署最新版本完成数据库升级', retryable: false };
+    return {
+      status: 503,
+      code: 'DATABASE_SCHEMA_MISMATCH',
+      message: '数据库结构与当前版本不兼容，请重新部署最新版本完成数据库升级',
+      retryable: false,
+    };
   }
 
   // ── 超时（可重试）───────────────────────────────────────────────
@@ -54,17 +70,36 @@ export function classifyDatabaseError(error: unknown, operation: DatabaseOperati
   }
 
   // ── 通用网络 / 连接失败（可重试）────────────────────────────────
-  if (/fetch failed|econnreset|econnrefused|enotfound|getaddrinfo|connection|socket|network|terminated|57p0[13]/.test(`${text} ${code}`)) {
-    return { status: 503, code: 'DATABASE_UNAVAILABLE', message: '暂时无法连接数据库，本机数据不会因此被清除', retryable: true };
+  if (
+    /fetch failed|econnreset|econnrefused|enotfound|getaddrinfo|connection|socket|network|terminated|57p0[13]/.test(
+      `${text} ${code}`,
+    )
+  ) {
+    return {
+      status: 503,
+      code: 'DATABASE_UNAVAILABLE',
+      message: '暂时无法连接数据库，本机数据不会因此被清除',
+      retryable: true,
+    };
   }
 
   // ── 按操作类型的兜底（operation-aware fallback）────────────────
   const byOperation: Record<DatabaseOperation, ClassifiedError> = {
-    connect:     { status: 503, code: 'DATABASE_UNAVAILABLE',         message: '暂时无法连接数据库，请稍后重试',           retryable: true  },
-    read:        { status: 500, code: 'DATABASE_READ_FAILED',         message: '数据库读取失败，请稍后重试',               retryable: true  },
-    write:       { status: 500, code: 'DATABASE_WRITE_FAILED',        message: '数据库写入失败，服务端变更未完成',          retryable: true  },
-    transaction: { status: 500, code: 'DATABASE_TRANSACTION_FAILED', message: '数据库操作未完成，变更已回滚',             retryable: true  },
-    schema:      { status: 503, code: 'DATABASE_SCHEMA_MISMATCH',    message: '数据库结构升级失败，请重新部署最新版本',    retryable: false },
+    connect: { status: 503, code: 'DATABASE_UNAVAILABLE', message: '暂时无法连接数据库，请稍后重试', retryable: true },
+    read: { status: 500, code: 'DATABASE_READ_FAILED', message: '数据库读取失败，请稍后重试', retryable: true },
+    write: { status: 500, code: 'DATABASE_WRITE_FAILED', message: '数据库写入失败，服务端变更未完成', retryable: true },
+    transaction: {
+      status: 500,
+      code: 'DATABASE_TRANSACTION_FAILED',
+      message: '数据库操作未完成，变更已回滚',
+      retryable: true,
+    },
+    schema: {
+      status: 503,
+      code: 'DATABASE_SCHEMA_MISMATCH',
+      message: '数据库结构升级失败，请重新部署最新版本',
+      retryable: false,
+    },
   };
   return byOperation[operation];
 }
@@ -97,17 +132,13 @@ export function sendDatabaseError(
   });
 }
 
-export function sendRateLimited(
-  req: VercelRequest,
-  res: VercelResponse,
-  retryAfterSeconds = 1,
-): void {
+export function sendRateLimited(req: VercelRequest, res: VercelResponse, retryAfterSeconds = 1): void {
   const id = requestId(req, res);
-  res.setHeader("Retry-After", String(Math.max(1, Math.ceil(retryAfterSeconds))));
+  res.setHeader('Retry-After', String(Math.max(1, Math.ceil(retryAfterSeconds))));
   res.status(429).json({
     ok: false,
-    code: "RATE_LIMITED",
-    error: "其他设备正在保存数据，系统将很快自动重试。",
+    code: 'RATE_LIMITED',
+    error: '其他设备正在保存数据，系统将很快自动重试。',
     retryable: true,
     requestId: id,
   });

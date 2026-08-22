@@ -23,18 +23,18 @@
 
 ## 文件清单
 
-| 文件 | 类型 | 本次改动 |
-|---|---|---|
-| `src/pages/ExamPage.tsx` | 替换 | 全屏「退出全屏」按钮删除，退出按钮只在考试结束后 15 分钟内弹出 |
-| `src/styles/exam.css` | 替换 | 移除 `.exam-fs-exit` 相关样式，保留结束退出浮层 |
-| `vercel.json` | 替换 | 函数就近区域 `regions:["sin1"]`（新加坡，与 Neon 对齐）；`/fonts/*`、`/assets/*` 强缓存头 |
-| `vite.config.ts` | 替换 | 新增 `base: process.env.ASSET_CDN_BASE || '/'`，可切 CDN 分发（默认同源、零行为变化） |
-| `api/announcements.ts` | 替换 | 公告图片链接改走**同源**相对路径（原来改写为绝对遥测台地址） |
-| `api/announcement-images.ts` | **新增** | 同源图片代理：转发到遥测台图片接口，换域名不再裂图，且可缓存 |
-| `scripts/build-fonts.py` | 替换 | 新增 `--core` 激进子集模式 |
-| `scripts/font-charset-core.txt` | **新增** | 核心字符集：GB2312 一级常用字 3755 + ASCII + 标点（共 3876 字） |
-| `public/fonts/source-han-sc-standard-subset.woff2` | 替换 | 激进子集：1.79MB → **1.01MB**（-45%） |
-| `public/fonts/source-han-sc-heavy-subset.woff2` | 替换 | 激进子集：1.79MB → **1.01MB**（-45%） |
+| 文件                                               | 类型     | 本次改动                                                                                  |
+| -------------------------------------------------- | -------- | ----------------------------------------------------------------------------------------- |
+| `src/pages/ExamPage.tsx`                           | 替换     | 全屏「退出全屏」按钮删除，退出按钮只在考试结束后 15 分钟内弹出                            |
+| `src/styles/exam.css`                              | 替换     | 移除 `.exam-fs-exit` 相关样式，保留结束退出浮层                                           |
+| `vercel.json`                                      | 替换     | 函数就近区域 `regions:["sin1"]`（新加坡，与 Neon 对齐）；`/fonts/*`、`/assets/*` 强缓存头 |
+| `vite.config.ts`                                   | 替换     | 新增 `base: process.env.ASSET_CDN_BASE                                                    |     | '/'`，可切 CDN 分发（默认同源、零行为变化） |
+| `api/announcements.ts`                             | 替换     | 公告图片链接改走**同源**相对路径（原来改写为绝对遥测台地址）                              |
+| `api/announcement-images.ts`                       | **新增** | 同源图片代理：转发到遥测台图片接口，换域名不再裂图，且可缓存                              |
+| `scripts/build-fonts.py`                           | 替换     | 新增 `--core` 激进子集模式                                                                |
+| `scripts/font-charset-core.txt`                    | **新增** | 核心字符集：GB2312 一级常用字 3755 + ASCII + 标点（共 3876 字）                           |
+| `public/fonts/source-han-sc-standard-subset.woff2` | 替换     | 激进子集：1.79MB → **1.01MB**（-45%）                                                     |
+| `public/fonts/source-han-sc-heavy-subset.woff2`    | 替换     | 激进子集：1.79MB → **1.01MB**（-45%）                                                     |
 
 ## ⚠️ 部署注意
 

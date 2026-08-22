@@ -1,10 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {
-  isLegacySharedTokenVersionCurrent,
-  isTokenNotExpired,
-  isUserTokenVersionCurrent,
-} from '../api/_auth.js';
+import { isLegacySharedTokenVersionCurrent, isTokenNotExpired, isUserTokenVersionCurrent } from '../api/_auth.js';
 
 const NOW = 1_700_000_000_000;
 

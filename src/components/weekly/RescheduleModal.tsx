@@ -1,17 +1,17 @@
-import React from "react";
-import AdminModalPortal from "../AdminModalPortal";
-import { DateTimeField } from "../touch-datetime-picker";
-import TimeRangePickerModal from "../TimeRangePickerModal";
-import { useBackdropDismiss } from "../../hooks/useBackdropDismiss";
-import { useWeeklyExceptions } from "../../hooks/weekly/useWeeklyExceptions";
-import type { PreviewOcc } from "./weeklyShared";
+import React from 'react';
+import AdminModalPortal from '../AdminModalPortal';
+import { DateTimeField } from '../touch-datetime-picker';
+import TimeRangePickerModal from '../TimeRangePickerModal';
+import { useBackdropDismiss } from '../../hooks/useBackdropDismiss';
+import { useWeeklyExceptions } from '../../hooks/weekly/useWeeklyExceptions';
+import type { PreviewOcc } from './weeklyShared';
 
 type ExceptionsState = ReturnType<typeof useWeeklyExceptions<PreviewOcc>>;
 
 interface RescheduleModalProps {
   backdropProps: ReturnType<typeof useBackdropDismiss>;
-  rescheduleTarget: ExceptionsState["rescheduleTarget"];
-  setRescheduleTarget: ExceptionsState["setRescheduleTarget"];
+  rescheduleTarget: ExceptionsState['rescheduleTarget'];
+  setRescheduleTarget: ExceptionsState['setRescheduleTarget'];
   rescheduleError: string;
   setRescheduleError: (value: string) => void;
   rescheduleTimeOpen: boolean;
@@ -34,26 +34,17 @@ export default function RescheduleModal({
 
   return (
     <>
-      <AdminModalPortal
-        className="admin-modal-overlay"
-        {...backdropProps(() => setRescheduleTarget(null))}
-      >
+      <AdminModalPortal className="admin-modal-overlay" {...backdropProps(() => setRescheduleTarget(null))}>
         <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
           <h2 className="admin-modal__title">临时调课（仅此一次）</h2>
-          {rescheduleError && (
-            <div className="admin-error">{rescheduleError}</div>
-          )}
+          {rescheduleError && <div className="admin-error">{rescheduleError}</div>}
           <div className="admin-form">
             <label className="admin-label">
               名称
               <input
                 className="admin-input"
                 value={rescheduleTarget.name}
-                onChange={(e) =>
-                  setRescheduleTarget(
-                    (p) => p && { ...p, name: e.target.value },
-                  )
-                }
+                onChange={(e) => setRescheduleTarget((p) => p && { ...p, name: e.target.value })}
               />
             </label>
             <label className="admin-label">
@@ -69,26 +60,28 @@ export default function RescheduleModal({
             </label>
             <div className="admin-major-endtime">
               <span>时间设置</span>
-              <button ref={rescheduleTimeAnchorRef} type="button" className="admin-major-endtime__trigger" onClick={() => setRescheduleTimeOpen(true)}>
-                <strong>{rescheduleTarget.startTime} - {rescheduleTarget.endTime}</strong>
+              <button
+                ref={rescheduleTimeAnchorRef}
+                type="button"
+                className="admin-major-endtime__trigger"
+                onClick={() => setRescheduleTimeOpen(true)}
+              >
+                <strong>
+                  {rescheduleTarget.startTime} - {rescheduleTarget.endTime}
+                </strong>
                 <small>一次设置本次调课的开始与结束时间</small>
               </button>
             </div>
-            <p className="admin-major-card__hint">
-              仅调整这一次实例，不影响周期规则本身。
-            </p>
+            <p className="admin-major-card__hint">仅调整这一次实例，不影响周期规则本身。</p>
             <div className="admin-form-actions">
-              <button
-                className="admin-btn admin-btn--primary"
-                onClick={commitReschedule}
-              >
+              <button className="admin-btn admin-btn--primary" onClick={commitReschedule}>
                 确认并保存
               </button>
               <button
                 className="admin-btn admin-btn--ghost"
                 onClick={() => {
                   setRescheduleTarget(null);
-                  setRescheduleError("");
+                  setRescheduleError('');
                 }}
               >
                 取消
@@ -101,19 +94,19 @@ export default function RescheduleModal({
         open={rescheduleTimeOpen}
         startValue={rescheduleTarget.startTime}
         endValue={rescheduleTarget.endTime}
-        subject={rescheduleTarget.name || "临时调课"}
+        subject={rescheduleTarget.name || '临时调课'}
         contextLabel={rescheduleTarget.date}
         allowCrossDay={false}
         anchorRef={rescheduleTimeAnchorRef}
         onPreviewChange={(startTime, endTime) => {
-          setRescheduleTarget((value) => value ? { ...value, startTime, endTime } : value);
+          setRescheduleTarget((value) => (value ? { ...value, startTime, endTime } : value));
         }}
         onPreviewCancel={(startTime, endTime) => {
-          setRescheduleTarget((value) => value ? { ...value, startTime, endTime } : value);
+          setRescheduleTarget((value) => (value ? { ...value, startTime, endTime } : value));
         }}
         onCancel={() => setRescheduleTimeOpen(false)}
         onConfirm={(startTime, endTime) => {
-          setRescheduleTarget((value) => value ? { ...value, startTime, endTime } : value);
+          setRescheduleTarget((value) => (value ? { ...value, startTime, endTime } : value));
           setRescheduleTimeOpen(false);
         }}
       />

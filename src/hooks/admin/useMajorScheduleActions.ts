@@ -1,48 +1,33 @@
-import { useCallback, useEffect, useState } from "react";
-import type { MutableRefObject } from "react";
-import type { NavigateFunction } from "react-router-dom";
-import type { AlertsSettings, ExamItem, MajorExam } from "../../types";
-import type { SchoolClass, SchoolGrade } from "../../types/school";
-import { isTrackSubject, normalizeSubjectName } from "../../data/subjects";
-import { classesInMajorScope as sharedClassesInMajorScope, computeAutoTrackClassIds } from "../../utils/trackClassIds";
-import type { InitializationState } from "../../utils/settings/school";
-import {
-  getAppSettings,
-  updateExamSettings,
-  updateAlertsSettings,
-  genMajorId,
-} from "../../utils/appSettings";
-import {
-  getCloudSnapshot,
-  saveExamsToServer,
-  type AdminUserContext,
-} from "../../services/examService";
-import { threeWayMergeExam } from "../../utils/examMerge";
-import {
-  clearPendingExamSync,
-  getPendingExamSync,
-  queuePendingExamSync,
-} from "../../services/examOutbox";
-import { recordSyncConflict } from "../../services/offlineStore";
-import { notify } from "../../services/notify";
-import { formatApiError } from "../../services/apiError";
-import { normalizeExamItems } from "../../utils/examSchedule";
-import type { QuickMajorPublishInput } from "../../components/QuickMajorPublishModal";
-import type { WeeklyState } from "./useWeeklyScheduleSync";
-import type { SyncState } from "./adminPageUtils";
-import { makeId, syncMajorStateRef, toLocalInput } from "./adminPageUtils";
+import { useCallback, useEffect, useState } from 'react';
+import type { MutableRefObject } from 'react';
+import type { NavigateFunction } from 'react-router-dom';
+import type { AlertsSettings, ExamItem, MajorExam } from '../../types';
+import type { SchoolClass, SchoolGrade } from '../../types/school';
+import { isTrackSubject, normalizeSubjectName } from '../../data/subjects';
+import { classesInMajorScope as sharedClassesInMajorScope, computeAutoTrackClassIds } from '../../utils/trackClassIds';
+import type { InitializationState } from '../../utils/settings/school';
+import { getAppSettings, updateExamSettings, updateAlertsSettings, genMajorId } from '../../utils/appSettings';
+import { getCloudSnapshot, saveExamsToServer, type AdminUserContext } from '../../services/examService';
+import { threeWayMergeExam } from '../../utils/examMerge';
+import { clearPendingExamSync, getPendingExamSync, queuePendingExamSync } from '../../services/examOutbox';
+import { recordSyncConflict } from '../../services/offlineStore';
+import { notify } from '../../services/notify';
+import { formatApiError } from '../../services/apiError';
+import { normalizeExamItems } from '../../utils/examSchedule';
+import type { QuickMajorPublishInput } from '../../components/QuickMajorPublishModal';
+import type { WeeklyState } from './useWeeklyScheduleSync';
+import type { SyncState } from './adminPageUtils';
+import { makeId, syncMajorStateRef, toLocalInput } from './adminPageUtils';
 
 export type MajorModal = {
-  mode: "add" | "rename";
+  mode: 'add' | 'rename';
   name: string;
   targetGradeIds: string[];
-  next?: "import";
+  next?: 'import';
 } | null;
 
 const retryBackoffDelay = (attempt: number) =>
-  new Promise((resolve) =>
-    setTimeout(resolve, Math.min(4000, 400 * 2 ** attempt)),
-  );
+  new Promise((resolve) => setTimeout(resolve, Math.min(4000, 400 * 2 ** attempt)));
 
 // Owns the major-exam domain: the exam roster itself (`majors`), which one is
 // active/being edited, the selected grade/class scope, all major-exam modal
@@ -99,28 +84,17 @@ export function useMajorScheduleActions(params: {
   } = params;
 
   const [majors, setMajors] = useState<MajorExam[]>(initialMajors);
-  const [activeMajorId, setActiveMajorId] = useState<string>(
-    initialActiveMajorId,
-  );
-  const [editingMajorId, setEditingMajorId] = useState<string>(
-    initialActiveMajorId,
-  );
-  const [editingMajorIdByGrade, setEditingMajorIdByGrade] = useState<
-    Record<string, string>
-  >({});
-  const [selectedGradeId, setSelectedGradeId] = useState<string>(
-    initialSelectedGradeId,
-  );
-  const [selectedClassId, setSelectedClassId] = useState<string>(
-    initialSelectedClassId,
-  );
+  const [activeMajorId, setActiveMajorId] = useState<string>(initialActiveMajorId);
+  const [editingMajorId, setEditingMajorId] = useState<string>(initialActiveMajorId);
+  const [editingMajorIdByGrade, setEditingMajorIdByGrade] = useState<Record<string, string>>({});
+  const [selectedGradeId, setSelectedGradeId] = useState<string>(initialSelectedGradeId);
+  const [selectedClassId, setSelectedClassId] = useState<string>(initialSelectedClassId);
 
   const [majorModal, setMajorModal] = useState<MajorModal>(null);
   const [majorModalStep, setMajorModalStep] = useState(0);
-  const [majorError, setMajorError] = useState("");
+  const [majorError, setMajorError] = useState('');
   const [deleteMajorOpen, setDeleteMajorOpen] = useState(false);
-  const [quickMajorDeleteTarget, setQuickMajorDeleteTarget] =
-    useState<MajorExam | null>(null);
+  const [quickMajorDeleteTarget, setQuickMajorDeleteTarget] = useState<MajorExam | null>(null);
   const [majorPrintOpen, setMajorPrintOpen] = useState(false);
   const [quickMajorOpen, setQuickMajorOpen] = useState(false);
   const [majorBatchAddOpen, setMajorBatchAddOpen] = useState(false);
@@ -134,9 +108,7 @@ export function useMajorScheduleActions(params: {
     if (!visibleGrades.some((grade) => grade.id === selectedGradeId)) {
       const gradeId = visibleGrades[0].id;
       const classId =
-        adminUser.roleId === "class_admin"
-          ? (visibleClasses.find((item) => item.gradeId === gradeId)?.id ?? "")
-          : "";
+        adminUser.roleId === 'class_admin' ? (visibleClasses.find((item) => item.gradeId === gradeId)?.id ?? '') : '';
       setSelectedGradeId(gradeId);
       setSelectedClassId(classId);
       updateExamSettings({ selectedGradeId: gradeId, selectedClassId: classId });
@@ -144,15 +116,13 @@ export function useMajorScheduleActions(params: {
     }
     if (
       (selectedClassId &&
-        !visibleClasses.some(
-          (item) => item.id === selectedClassId && item.gradeId === selectedGradeId,
-        )) ||
-      (!selectedClassId && adminUser.roleId === "class_admin")
+        !visibleClasses.some((item) => item.id === selectedClassId && item.gradeId === selectedGradeId)) ||
+      (!selectedClassId && adminUser.roleId === 'class_admin')
     ) {
       const classId =
-        adminUser.roleId === "class_admin"
-          ? (visibleClasses.find((item) => item.gradeId === selectedGradeId)?.id ?? "")
-          : "";
+        adminUser.roleId === 'class_admin'
+          ? (visibleClasses.find((item) => item.gradeId === selectedGradeId)?.id ?? '')
+          : '';
       setSelectedClassId(classId);
       updateExamSettings({ selectedGradeId, selectedClassId: classId });
     }
@@ -162,12 +132,8 @@ export function useMajorScheduleActions(params: {
     if (hasAllScope) return true;
     const gradeMatch =
       !major.targetGradeIds?.length ||
-      major.targetGradeIds.some((id) =>
-        visibleGrades.some((grade) => grade.id === id),
-      );
-    const classMatch =
-      !major.targetClassIds?.length ||
-      major.targetClassIds.some((id) => visibleClassIds.has(id));
+      major.targetGradeIds.some((id) => visibleGrades.some((grade) => grade.id === id));
+    const classMatch = !major.targetClassIds?.length || major.targetClassIds.some((id) => visibleClassIds.has(id));
     return gradeMatch && classMatch;
   });
 
@@ -192,92 +158,60 @@ export function useMajorScheduleActions(params: {
     const now = Date.now();
     const score = (major: MajorExam) => {
       const enabled = major.items.filter((item) => item.enabled);
-      const start = Math.min(
-        ...enabled.map((item) => new Date(item.startTime).getTime()),
-      );
-      const end = Math.max(
-        ...enabled.map((item) => new Date(item.endTime).getTime()),
-      );
+      const start = Math.min(...enabled.map((item) => new Date(item.startTime).getTime()));
+      const end = Math.max(...enabled.map((item) => new Date(item.endTime).getTime()));
       if (Number.isFinite(start) && now >= start && now <= end) return 0;
       if (Number.isFinite(start) && start > now) return 1;
       return 2;
     };
     const phaseDiff = score(a) - score(b);
     if (phaseDiff) return phaseDiff;
-    const aStart = Math.min(
-      ...a.items
-        .map((item) => new Date(item.startTime).getTime())
-        .filter(Number.isFinite),
-    );
-    const bStart = Math.min(
-      ...b.items
-        .map((item) => new Date(item.startTime).getTime())
-        .filter(Number.isFinite),
-    );
+    const aStart = Math.min(...a.items.map((item) => new Date(item.startTime).getTime()).filter(Number.isFinite));
+    const bStart = Math.min(...b.items.map((item) => new Date(item.startTime).getTime()).filter(Number.isFinite));
     return (
       (Number.isFinite(aStart) ? aStart : Number.MAX_SAFE_INTEGER) -
-        (Number.isFinite(bStart) ? bStart : Number.MAX_SAFE_INTEGER) ||
-      a.order - b.order
+        (Number.isFinite(bStart) ? bStart : Number.MAX_SAFE_INTEGER) || a.order - b.order
     );
   });
   const hasScopedMajor = orderedScopedMajors.length > 0;
-  const activeMajor: MajorExam =
-    orderedScopedMajors.find((m) => m.id === editingMajorId) ??
+  const activeMajor: MajorExam = orderedScopedMajors.find((m) => m.id === editingMajorId) ??
     orderedScopedMajors[0] ?? {
-      id: "",
-      name: "当前年级暂无大型考试",
+      id: '',
+      name: '当前年级暂无大型考试',
       items: [],
       order: -1,
       targetGradeIds: selectedGradeId ? [selectedGradeId] : [],
     };
   const items = activeMajor?.items ?? [];
-  const subjectTrackModeEnabled =
-    initializationRef.current.subjectTrackModeEnabled !== false;
-  const classesInMajorScope = (major: MajorExam) =>
-    sharedClassesInMajorScope(major, visibleClasses);
+  const subjectTrackModeEnabled = initializationRef.current.subjectTrackModeEnabled === true;
+  const classesInMajorScope = (major: MajorExam) => sharedClassesInMajorScope(major, visibleClasses);
   const autoTrackClassIdsForMajorItem = (major: MajorExam, subject: string) =>
     computeAutoTrackClassIds(major, subject, visibleClasses, subjectTrackModeEnabled);
   const activeMajorTrackSubjects = items.filter((item) => isTrackSubject(item.name));
-  const activeMajorTrackScopedCount = activeMajorTrackSubjects.filter(
-    (item) => item.targetClassIds?.length,
-  ).length;
-  const activeMajorUnsetTrackClassCount = classesInMajorScope(activeMajor).filter(
-    (item) => !item.track?.length,
-  ).length;
+  const activeMajorTrackScopedCount = activeMajorTrackSubjects.filter((item) => item.targetClassIds?.length).length;
+  const activeMajorUnsetTrackClassCount = classesInMajorScope(activeMajor).filter((item) => !item.track?.length).length;
 
   const changeSelectedGrade = (gradeId: string) => {
     if (gradeId === selectedGradeId) return;
     if (editingRef.current) {
-      const subject = editingRef.current.name.trim() || "未命名分考试";
-      notify(
-        "warning",
-        `“${subject}”仍在编辑中，请先确认并保存，或取消本次编辑后再切换年级。`,
-        "请先保存分考试",
-      );
+      const subject = editingRef.current.name.trim() || '未命名分考试';
+      notify('warning', `“${subject}”仍在编辑中，请先确认并保存，或取消本次编辑后再切换年级。`, '请先保存分考试');
       return;
     }
     if (gradeId && !visibleGrades.some((grade) => grade.id === gradeId)) return;
     setSelectedGradeId(gradeId);
-    setSelectedClassId("");
-    const candidates = visibleMajors.filter((major) =>
-      majorAppliesToGrade(major, gradeId),
-    );
+    setSelectedClassId('');
+    const candidates = visibleMajors.filter((major) => majorAppliesToGrade(major, gradeId));
     const remembered = editingMajorIdByGrade[gradeId];
     const nextMajor =
       candidates.find((major) => major.id === remembered) ??
       candidates.find((major) => major.targetGradeIds?.includes(gradeId)) ??
       candidates[0];
     if (nextMajor) setEditingMajorId(nextMajor.id);
-    updateExamSettings({ selectedGradeId: gradeId, selectedClassId: "" });
+    updateExamSettings({ selectedGradeId: gradeId, selectedClassId: '' });
   };
   const changeSelectedClass = (classId: string) => {
-    if (
-      classId &&
-      !visibleClasses.some(
-        (item) => item.id === classId && item.gradeId === selectedGradeId,
-      )
-    )
-      return;
+    if (classId && !visibleClasses.some((item) => item.id === classId && item.gradeId === selectedGradeId)) return;
     setSelectedClassId(classId);
     updateExamSettings({ selectedGradeId, selectedClassId: classId });
   };
@@ -286,7 +220,7 @@ export function useMajorScheduleActions(params: {
     const active = ms.find((m) => m.id === activeId) ?? ms[0];
     return {
       items: active?.items ?? [],
-      title: active?.name ?? "",
+      title: active?.name ?? '',
       majors: ms,
       activeMajorId: activeId,
       alerts: alertsRef.current,
@@ -296,24 +230,19 @@ export function useMajorScheduleActions(params: {
   };
 
   const pushToServerExec = useCallback(
-    async (ms: MajorExam[], activeId: string, syncLabel = "保存考试安排") => {
-      if (typeof navigator !== "undefined" && !navigator.onLine) {
+    async (ms: MajorExam[], activeId: string, syncLabel = '保存考试安排') => {
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
         pendingRef.current = true;
-        setSync("offline");
+        setSync('offline');
         return;
       }
-      setSync("saving");
+      setSync('saving');
       const queued = getPendingExamSync();
       const payload = queued?.payload ?? buildPayload(ms, activeId);
       const baseSnapshot = getCloudSnapshot();
-      const baseUpdatedAt = Math.max(
-        queued?.baseSnapshot?.updatedAt ?? 0,
-        baseSnapshot?.updatedAt ?? 0,
-      );
+      const baseUpdatedAt = Math.max(queued?.baseSnapshot?.updatedAt ?? 0, baseSnapshot?.updatedAt ?? 0);
       let expectedSavedAt = queued?.savedAt;
-      const isStalePush = () =>
-        expectedSavedAt != null &&
-        getPendingExamSync()?.savedAt !== expectedSavedAt;
+      const isStalePush = () => expectedSavedAt != null && getPendingExamSync()?.savedAt !== expectedSavedAt;
       const MAX_ATTEMPTS = 3;
       let currentPayload: typeof payload = payload;
       let currentBaseUpdatedAt = baseUpdatedAt;
@@ -323,25 +252,21 @@ export function useMajorScheduleActions(params: {
         const result = await saveExamsToServer({
           ...currentPayload,
           baseUpdatedAt: currentBaseUpdatedAt,
-          clientQueueKey: "admin-exam-save",
-          clientSyncLabel:
-            attempt === 0 ? syncLabel : `${syncLabel} · 合并后重试(${attempt})`,
+          clientQueueKey: 'admin-exam-save',
+          clientSyncLabel: attempt === 0 ? syncLabel : `${syncLabel} · 合并后重试(${attempt})`,
         } as never);
         if (isStalePush()) return;
-        if (result === "unauthorized") {
-          navigate("/login?next=/admin", { replace: true });
+        if (result === 'unauthorized') {
+          navigate('/login?next=/admin', { replace: true });
           return;
         }
-        if (result && typeof result === "object" && result.kind === "conflict") {
+        if (result && typeof result === 'object' && result.kind === 'conflict') {
           if (!result.remote) {
             pendingRef.current = true;
-            setSync("error");
-            notify(
-              "error",
-              "云端冲突数据不完整，本机修改已保留；请刷新后台后再保存。",
-              "同步失败",
-              { id: "admin-exam-sync-error" },
-            );
+            setSync('error');
+            notify('error', '云端冲突数据不完整，本机修改已保留；请刷新后台后再保存。', '同步失败', {
+              id: 'admin-exam-sync-error',
+            });
             return;
           }
           const local = { ...currentPayload, updatedAt: currentBaseUpdatedAt };
@@ -350,8 +275,7 @@ export function useMajorScheduleActions(params: {
             local as never,
             result.remote as never,
           );
-          if (merged.conflictCount)
-            void recordSyncConflict(merged.conflictCount, local, result.remote);
+          if (merged.conflictCount) void recordSyncConflict(merged.conflictCount, local, result.remote);
           const { alerts: mergedAlerts, ...mergedExam } = merged.payload as typeof payload & {
             alerts?: AlertsSettings;
           };
@@ -370,8 +294,7 @@ export function useMajorScheduleActions(params: {
           });
           expectedSavedAt = mergedQueuedAt;
           const mergedMajors = (merged.payload as { majors: MajorExam[] }).majors;
-          const mergedActiveMajorId =
-            (merged.payload as { activeMajorId: string }).activeMajorId;
+          const mergedActiveMajorId = (merged.payload as { activeMajorId: string }).activeMajorId;
           syncMajorStateRef(stateRef, mergedMajors, mergedActiveMajorId);
           setMajors(mergedMajors);
           setActiveMajorId(mergedActiveMajorId);
@@ -395,28 +318,24 @@ export function useMajorScheduleActions(params: {
             continue;
           }
           pendingRef.current = true;
-          setSync(
-            typeof navigator !== "undefined" && !navigator.onLine ? "offline" : "error",
-          );
+          setSync(typeof navigator !== 'undefined' && !navigator.onLine ? 'offline' : 'error');
           notify(
-            "error",
-            "云端数据变化较频繁，自动合并已重试多次仍未成功，结果已保留在本机，请稍后重新保存。",
-            "同步失败",
-            { id: "admin-exam-sync-error" },
+            'error',
+            '云端数据变化较频繁，自动合并已重试多次仍未成功，结果已保留在本机，请稍后重新保存。',
+            '同步失败',
+            { id: 'admin-exam-sync-error' },
           );
           return;
         }
-        if (typeof result !== "number") {
+        if (typeof result !== 'number') {
           pendingRef.current = true;
-          setSync(
-            typeof navigator !== "undefined" && !navigator.onLine ? "offline" : "error",
-          );
-          if (result && result.kind === "error")
+          setSync(typeof navigator !== 'undefined' && !navigator.onLine ? 'offline' : 'error');
+          if (result && result.kind === 'error')
             notify(
-              "error",
-              formatApiError(result.error, "保存考试数据失败"),
-              result.error.code.startsWith("DATABASE_") ? "数据库连接失败" : "同步失败",
-              { id: "admin-exam-sync-error" },
+              'error',
+              formatApiError(result.error, '保存考试数据失败'),
+              result.error.code.startsWith('DATABASE_') ? '数据库连接失败' : '同步失败',
+              { id: 'admin-exam-sync-error' },
             );
           return;
         }
@@ -433,13 +352,9 @@ export function useMajorScheduleActions(params: {
           updatedAt: result,
         } as never);
         if (pAlerts) updateAlertsSettings({ ...pAlerts, updatedAt: result } as never);
-        setSync("saved");
+        setSync('saved');
         if (totalConflicts)
-          notify(
-            "warning",
-            `已合并本机与云端修改；${totalConflicts} 个同字段冲突保留本机值。`,
-            "数据冲突已处理",
-          );
+          notify('warning', `已合并本机与云端修改；${totalConflicts} 个同字段冲突保留本机值。`, '数据冲突已处理');
         return;
       }
     },
@@ -447,10 +362,8 @@ export function useMajorScheduleActions(params: {
   );
 
   const pushToServer = useCallback(
-    (ms: MajorExam[], activeId: string, syncLabel = "保存考试安排") => {
-      const run = examPushChainRef.current.then(() =>
-        pushToServerExec(ms, activeId, syncLabel),
-      );
+    (ms: MajorExam[], activeId: string, syncLabel = '保存考试安排') => {
+      const run = examPushChainRef.current.then(() => pushToServerExec(ms, activeId, syncLabel));
       examPushChainRef.current = run.catch(() => {});
       return run;
     },
@@ -458,7 +371,7 @@ export function useMajorScheduleActions(params: {
   );
 
   const commit = useCallback(
-    (ms: MajorExam[], activeId: string, immediate = false, syncLabel = "保存考试安排") => {
+    (ms: MajorExam[], activeId: string, immediate = false, syncLabel = '保存考试安排') => {
       syncMajorStateRef(stateRef, ms, activeId);
       setMajors(ms);
       setActiveMajorId(activeId);
@@ -477,9 +390,7 @@ export function useMajorScheduleActions(params: {
         void pushToServer(ms, activeId, syncLabel);
         return;
       }
-      setSync(
-        typeof navigator !== "undefined" && !navigator.onLine ? "offline" : "saving",
-      );
+      setSync(typeof navigator !== 'undefined' && !navigator.onLine ? 'offline' : 'saving');
       saveTimer.current = setTimeout(() => {
         void pushToServer(ms, activeId, syncLabel);
       }, 650);
@@ -488,16 +399,14 @@ export function useMajorScheduleActions(params: {
   );
 
   const commitItems = useCallback(
-    (nextItems: ExamItem[], syncLabel = "保存考试安排") => {
-      const ms = stateRef.current.majors.map((m) =>
-        m.id === editingMajorId ? { ...m, items: nextItems } : m,
-      );
+    (nextItems: ExamItem[], syncLabel = '保存考试安排') => {
+      const ms = stateRef.current.majors.map((m) => (m.id === editingMajorId ? { ...m, items: nextItems } : m));
       commit(ms, stateRef.current.activeMajorId, false, syncLabel);
     },
     [commit, editingMajorId],
   );
   const commitBatchMajorItems = (nextItems: ExamItem[]) => {
-    commitItems(normalizeExamItems(nextItems), "批量更新分考试");
+    commitItems(normalizeExamItems(nextItems), '批量更新分考试');
     setMajorBatchAddOpen(false);
   };
 
@@ -505,18 +414,17 @@ export function useMajorScheduleActions(params: {
     if (id === editingMajorId) return;
     setEditingRef.current(null);
     setEditingMajorId(id);
-    if (selectedGradeId)
-      setEditingMajorIdByGrade((value) => ({ ...value, [selectedGradeId]: id }));
+    if (selectedGradeId) setEditingMajorIdByGrade((value) => ({ ...value, [selectedGradeId]: id }));
   };
   const commitMajorModal = (onContinueToImport: () => void) => {
     if (!majorModal) return;
     const name = majorModal.name.trim();
     if (!name) {
-      setMajorError("请输入大型考试名称");
+      setMajorError('请输入大型考试名称');
       return;
     }
-    const continueToImport = majorModal.mode === "add" && majorModal.next === "import";
-    if (majorModal.mode === "add") {
+    const continueToImport = majorModal.mode === 'add' && majorModal.next === 'import';
+    if (majorModal.mode === 'add') {
       const nm: MajorExam = {
         id: genMajorId(),
         name,
@@ -526,35 +434,28 @@ export function useMajorScheduleActions(params: {
       };
       const ms = [...majors, nm];
       setEditingMajorId(nm.id);
-      if (selectedGradeId)
-        setEditingMajorIdByGrade((value) => ({ ...value, [selectedGradeId]: nm.id }));
+      if (selectedGradeId) setEditingMajorIdByGrade((value) => ({ ...value, [selectedGradeId]: nm.id }));
       commit(ms, nm.id, true, `新增大型考试「${name}」`);
     } else {
       const ms = majors.map((m) =>
-        m.id === activeMajor.id
-          ? { ...m, name, targetGradeIds: majorModal.targetGradeIds }
-          : m,
+        m.id === activeMajor.id ? { ...m, name, targetGradeIds: majorModal.targetGradeIds } : m,
       );
       commit(ms, activeMajorId, true, `更新大型考试「${name}」`);
     }
     setMajorModal(null);
-    setMajorError("");
+    setMajorError('');
     if (continueToImport) onContinueToImport();
   };
   const removeMajor = () => {
     if (majors.length <= 1) return;
     const removedId = activeMajor.id;
-    const ms = majors
-      .filter((m) => m.id !== removedId)
-      .map((m, i) => ({ ...m, order: i }));
+    const ms = majors.filter((m) => m.id !== removedId).map((m, i) => ({ ...m, order: i }));
     const nextActiveId = removedId === activeMajorId ? ms[0].id : activeMajorId;
-    const nextEditing =
-      ms.find((major) => majorAppliesToGrade(major, selectedGradeId)) ?? ms[0];
+    const nextEditing = ms.find((major) => majorAppliesToGrade(major, selectedGradeId)) ?? ms[0];
     setEditingMajorId(nextEditing.id);
     setEditingMajorIdByGrade((value) => {
       const next = { ...value };
-      for (const gradeId of Object.keys(next))
-        if (next[gradeId] === removedId) delete next[gradeId];
+      for (const gradeId of Object.keys(next)) if (next[gradeId] === removedId) delete next[gradeId];
       if (selectedGradeId) next[selectedGradeId] = nextEditing.id;
       return next;
     });
@@ -562,12 +463,10 @@ export function useMajorScheduleActions(params: {
     setDeleteMajorOpen(false);
   };
   const removeQuickMajor = (major: MajorExam) => {
-    const ms = majors
-      .filter((item) => item.id !== major.id)
-      .map((item, index) => ({ ...item, order: index }));
-    const nextActiveId = activeMajorId === major.id ? ms[0]?.id ?? "" : activeMajorId;
+    const ms = majors.filter((item) => item.id !== major.id).map((item, index) => ({ ...item, order: index }));
+    const nextActiveId = activeMajorId === major.id ? (ms[0]?.id ?? '') : activeMajorId;
     const nextEditing = ms.find((item) => majorAppliesToGrade(item, selectedGradeId)) ?? ms[0];
-    setEditingMajorId(nextEditing?.id ?? "");
+    setEditingMajorId(nextEditing?.id ?? '');
     setEditingMajorIdByGrade((value) => {
       const next = { ...value };
       for (const gradeId of Object.keys(next)) {
@@ -582,7 +481,7 @@ export function useMajorScheduleActions(params: {
   const publishQuickMajor = (input: QuickMajorPublishInput) => {
     const start = new Date(input.startTime).getTime();
     if (!Number.isFinite(start)) {
-      notify("error", "开始时间无效，请重新设置。", "无法发布");
+      notify('error', '开始时间无效，请重新设置。', '无法发布');
       return;
     }
     const now = Date.now();
@@ -602,7 +501,7 @@ export function useMajorScheduleActions(params: {
       order: majors.length,
       targetGradeIds: input.targetGradeIds,
       targetClassIds: input.targetClassIds,
-      source: "quick",
+      source: 'quick',
       temporary: true,
       priorityOverSchedule: input.priorityOverSchedule,
       createdAt: now,
@@ -615,12 +514,12 @@ export function useMajorScheduleActions(params: {
       setEditingMajorIdByGrade((value) => ({ ...value, [selectedGradeId]: quick.id }));
     commit(next, quick.id, true, `快速发布「${quick.name}」`);
     setQuickMajorOpen(false);
-    notify("success", `已下发「${quick.name}」，看板将在下一次同步时收到安排。`, "统一考试已发布");
+    notify('success', `已下发「${quick.name}」，看板将在下一次同步时收到安排。`, '统一考试已发布');
   };
   const updateQuickMajor = (id: string, patch: Partial<MajorExam>, successMessage: string) => {
     const next = majors.map((major) => (major.id === id ? { ...major, ...patch } : major));
     commit(next, activeMajorId, true, successMessage);
-    notify("success", successMessage, "临时统一考试已更新");
+    notify('success', successMessage, '临时统一考试已更新');
   };
   const extendQuickMajor = (major: MajorExam) =>
     updateQuickMajor(
@@ -645,7 +544,7 @@ export function useMajorScheduleActions(params: {
   const promoteQuickMajor = (major: MajorExam) =>
     updateQuickMajor(
       major.id,
-      { source: "regular", temporary: false, priorityOverSchedule: false },
+      { source: 'regular', temporary: false, priorityOverSchedule: false },
       `「${major.name}」已转存为正式大型考试。`,
     );
 

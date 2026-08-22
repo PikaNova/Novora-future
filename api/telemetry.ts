@@ -30,7 +30,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const body = req.body && typeof req.body === 'object' ? req.body as Record<string, unknown> : {};
+    const body = req.body && typeof req.body === 'object' ? (req.body as Record<string, unknown>) : {};
     const instanceId = str(body.instanceId, 128);
     const event = str(body.event, 32);
     if (!instanceId || !event) {

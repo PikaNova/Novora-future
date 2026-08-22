@@ -57,18 +57,18 @@ npm start 只启动已编译的服务（server-build/server/serve.js），适合
 
 ## 环境变量
 
-| 变量 | 必填 | 说明 |
-| --- | --- | --- |
-| DATABASE_URL | 本地 compose 不需要（自动注入）；裸机运行必填 | 本地 PostgreSQL 连接串，不要带 sslmode=require&channel_binding=require（那是 Neon 专用参数） |
-| ADMIN_PASSWORD | 首次启动建议填 | 首次创建 admin 超级管理员的初始密码（>=8 位） |
-| ADMIN_RECOVERY_KEY | 可选 | 首次初始化时生成恢复密钥 |
-| PORT | 可选 | 默认 3000 |
-| CORS_ALLOWED_ORIGINS | 可选 | 同源部署可留空 |
-| TELEMETRY_* | 可选 | 全部留空则本地不发送遥测 |
-| GITHUB_REPO / GITHUB_TOKEN | 可选 | 更新检查；留空使用默认公开仓库或自动禁用 |
-| VERCEL_DEPLOY_HOOK_URL | 可选 | 本地留空，部署按钮自动隐藏/返回未配置 |
-| ENTRY_RATE_LIMIT_* | 可选 | 入口限流阈值，有安全默认值 |
-| VITE_SPEED_INSIGHTS | 可选 | 本地构建设为 false 关闭 Vercel Speed Insights（.env.example 默认 false；Docker 构建默认 false） |
+| 变量                       | 必填                                          | 说明                                                                                            |
+| -------------------------- | --------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| DATABASE_URL               | 本地 compose 不需要（自动注入）；裸机运行必填 | 本地 PostgreSQL 连接串，不要带 sslmode=require&channel_binding=require（那是 Neon 专用参数）    |
+| ADMIN_PASSWORD             | 首次启动建议填                                | 首次创建 admin 超级管理员的初始密码（>=8 位）                                                   |
+| ADMIN_RECOVERY_KEY         | 可选                                          | 首次初始化时生成恢复密钥                                                                        |
+| PORT                       | 可选                                          | 默认 3000                                                                                       |
+| CORS_ALLOWED_ORIGINS       | 可选                                          | 同源部署可留空                                                                                  |
+| TELEMETRY_*                | 可选                                          | 全部留空则本地不发送遥测                                                                        |
+| GITHUB_REPO / GITHUB_TOKEN | 可选                                          | 更新检查；留空使用默认公开仓库或自动禁用                                                        |
+| VERCEL_DEPLOY_HOOK_URL     | 可选                                          | 本地留空，部署按钮自动隐藏/返回未配置                                                           |
+| ENTRY_RATE_LIMIT_*         | 可选                                          | 入口限流阈值，有安全默认值                                                                      |
+| VITE_SPEED_INSIGHTS        | 可选                                          | 本地构建设为 false 关闭 Vercel Speed Insights（.env.example 默认 false；Docker 构建默认 false） |
 
 ## 公告图片说明
 
@@ -129,7 +129,6 @@ cd <项目目录> && npm run update:local
 ```bash
 git -C "<项目绝对路径>" pull --ff-only && docker compose -f "<项目绝对路径>/docker-compose.yml" up -d --build
 ```
-
 
 脚本会自动执行：
 

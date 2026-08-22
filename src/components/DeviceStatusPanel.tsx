@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import HelpTip from "./HelpTip";
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import HelpTip from './HelpTip';
 import {
   fetchDeviceBindings,
   revokeDevice,
@@ -9,35 +9,33 @@ import {
   type DeviceBindingInfo,
   type DeviceCommand,
   type PluginBindingInfo,
-} from "../services/classBinding";
-import { getAppSettings } from "../utils/appSettings";
-import { classDisplayName } from "../utils/classSettings";
-import { notify } from "../services/notify";
-import { confirmDialog } from "../services/appDialog";
-import { beginBatch, endBatch } from "../services/syncQueue";
-import Mascot from "./Mascot";
-import ClassMultiPicker, { type ClassPickerOption } from "./ClassMultiPicker";
-import InlineSelect from "./InlineSelect";
-import DesignPolicyManager from "./DesignPolicyManager";
-import { getAdminUser, logoutAdmin } from "../services/examService";
-import DeviceDetailDialog from "./DeviceDetailDialog";
-import { deviceIsInScope, resolveDeviceScope } from "../utils/deviceScope";
+} from '../services/classBinding';
+import { getAppSettings } from '../utils/appSettings';
+import { classDisplayName } from '../utils/classSettings';
+import { notify } from '../services/notify';
+import { confirmDialog } from '../services/appDialog';
+import { beginBatch, endBatch } from '../services/syncQueue';
+import Mascot from './Mascot';
+import ClassMultiPicker, { type ClassPickerOption } from './ClassMultiPicker';
+import InlineSelect from './InlineSelect';
+import DesignPolicyManager from './DesignPolicyManager';
+import { getAdminUser, logoutAdmin } from '../services/examService';
+import DeviceDetailDialog from './DeviceDetailDialog';
+import { deviceIsInScope, resolveDeviceScope } from '../utils/deviceScope';
 
 const ONLINE_MS = 90_000;
 const formatTime = (value: number) =>
-  value > 0
-    ? new Date(value).toLocaleString("zh-CN", { hour12: false })
-    : "从未上线";
+  value > 0 ? new Date(value).toLocaleString('zh-CN', { hour12: false }) : '从未上线';
 const statusLabel = (item?: DeviceBindingInfo) =>
   !item
-    ? "仅连接 ClassIsland"
-    : item.status === "exam-running"
-      ? "考试进行中"
-      : item.status === "waiting"
-        ? "等待考试"
-        : item.status === "temporary-paused"
-          ? "临时考试已暂停"
-          : "空闲";
+    ? '仅连接 ClassIsland'
+    : item.status === 'exam-running'
+      ? '考试进行中'
+      : item.status === 'waiting'
+        ? '等待考试'
+        : item.status === 'temporary-paused'
+          ? '临时考试已暂停'
+          : '空闲';
 
 type DeviceGroup = {
   key: string;
@@ -61,31 +59,28 @@ export default function DeviceStatusPanel({
   const [bindings, setBindings] = useState<DeviceBindingInfo[]>([]);
   const [plugins, setPlugins] = useState<PluginBindingInfo[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [query, setQuery] = useState("");
-  const [gradeFilter, setGradeFilter] = useState("*");
+  const [error, setError] = useState('');
+  const [query, setQuery] = useState('');
+  const [gradeFilter, setGradeFilter] = useState('*');
   const [classFilters, setClassFilters] = useState<string[]>([]);
-  const [deviceCategory, setDeviceCategory] = useState<"active" | "removed">(
-    "active",
-  );
+  const [deviceCategory, setDeviceCategory] = useState<'active' | 'removed'>('active');
   const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
-  const [detailKey, setDetailKey] = useState("");
+  const [detailKey, setDetailKey] = useState('');
   const [now, setNow] = useState(Date.now());
   const { grades, classes } = getAppSettings().exam;
   const currentInstanceId = getClassBindingInstanceId();
   const currentAdmin = getAdminUser();
   const currentAdminScope = useMemo(() => {
-    if (!currentAdmin) return "管理范围未记录";
-    if (currentAdmin.scopes.some((scope) => scope.type === "all")) return "全校";
-    const names = currentAdmin.scopes.map((scope) => scope.type === "grade"
-      ? grades.find((grade) => grade.id === scope.gradeId)?.name
-      : classDisplayName(grades, classes, scope.classId));
-    return names.filter(Boolean).join("、") || "未分配范围";
+    if (!currentAdmin) return '管理范围未记录';
+    if (currentAdmin.scopes.some((scope) => scope.type === 'all')) return '全校';
+    const names = currentAdmin.scopes.map((scope) =>
+      scope.type === 'grade'
+        ? grades.find((grade) => grade.id === scope.gradeId)?.name
+        : classDisplayName(grades, classes, scope.classId),
+    );
+    return names.filter(Boolean).join('、') || '未分配范围';
   }, [classes, currentAdmin, grades]);
-  const deviceScope = useMemo(
-    () => resolveDeviceScope(grades, classes, currentAdmin),
-    [classes, currentAdmin, grades],
-  );
+  const deviceScope = useMemo(() => resolveDeviceScope(grades, classes, currentAdmin), [classes, currentAdmin, grades]);
   const selectableClasses = deviceScope.classes;
   const selectableGrades = deviceScope.grades;
 
@@ -95,9 +90,9 @@ export default function DeviceStatusPanel({
       const result = await fetchDeviceBindings();
       setBindings(result.bindings);
       setPlugins(result.plugins);
-      setError("");
+      setError('');
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "设备管理加载失败");
+      setError(cause instanceof Error ? cause.message : '设备管理加载失败');
     } finally {
       setLoading(false);
     }
@@ -115,15 +110,13 @@ export default function DeviceStatusPanel({
   const groups = useMemo(() => {
     const attached = new Set<string>();
     const result: DeviceGroup[] = bindings.map((dashboard) => {
-      const linked = plugins.filter(
-        (plugin) => plugin.viewerInstanceId === dashboard.instanceId,
-      );
+      const linked = plugins.filter((plugin) => plugin.viewerInstanceId === dashboard.instanceId);
       linked.forEach((plugin) => attached.add(plugin.pluginInstanceId));
       return {
         key: `viewer:${dashboard.instanceId}`,
         instanceId: dashboard.instanceId,
-        gradeId: dashboard.gradeId || linked[0]?.gradeId || "",
-        classId: dashboard.classId || linked[0]?.classId || "",
+        gradeId: dashboard.gradeId || linked[0]?.gradeId || '',
+        classId: dashboard.classId || linked[0]?.classId || '',
         dashboard,
         plugins: linked,
       };
@@ -142,16 +135,13 @@ export default function DeviceStatusPanel({
     return result;
   }, [bindings, plugins]);
 
-  const visibleClasses = selectableClasses.filter(
-    (item) => gradeFilter === "*" || item.gradeId === gradeFilter,
-  );
+  const visibleClasses = selectableClasses.filter((item) => gradeFilter === '*' || item.gradeId === gradeFilter);
   const pickerOptions = useMemo<ClassPickerOption[]>(
     () =>
       visibleClasses.map((item) => ({
         id: item.id,
         gradeId: item.gradeId,
-        gradeName:
-          grades.find((grade) => grade.id === item.gradeId)?.name ?? "未知年级",
+        gradeName: grades.find((grade) => grade.id === item.gradeId)?.name ?? '未知年级',
         className: item.name,
       })),
     [grades, visibleClasses],
@@ -165,15 +155,13 @@ export default function DeviceStatusPanel({
       scopedGroups.filter((item) => {
         const name = classDisplayName(grades, classes, item.classId);
         const text = query.trim().toLowerCase();
-        const pluginIds = item.plugins
-          .map((plugin) => plugin.pluginInstanceId)
-          .join(" ");
+        const pluginIds = item.plugins.map((plugin) => plugin.pluginInstanceId).join(' ');
         const dashboard = item.dashboard;
         return (
-          (gradeFilter === "*" || item.gradeId === gradeFilter) &&
+          (gradeFilter === '*' || item.gradeId === gradeFilter) &&
           (!classFilters.length || classFilters.includes(item.classId)) &&
           (!text ||
-            `${item.instanceId} ${pluginIds} ${name} ${dashboard?.currentExam || ""} ${dashboard?.currentSubject || ""}`
+            `${item.instanceId} ${pluginIds} ${name} ${dashboard?.currentExam || ''} ${dashboard?.currentSubject || ''}`
               .toLowerCase()
               .includes(text))
         );
@@ -182,37 +170,21 @@ export default function DeviceStatusPanel({
   );
 
   const isRemovedGroup = (item: DeviceGroup) =>
-    item.dashboard?.revoked === true &&
-    item.plugins.every((plugin) => !plugin.paired);
-  const activeFiltered = useMemo(
-    () => filtered.filter((item) => !isRemovedGroup(item)),
-    [filtered],
-  );
-  const removedFiltered = useMemo(
-    () => filtered.filter(isRemovedGroup),
-    [filtered],
-  );
-  const categoryFiltered =
-    deviceCategory === "removed" ? removedFiltered : activeFiltered;
+    item.dashboard?.revoked === true && item.plugins.every((plugin) => !plugin.paired);
+  const activeFiltered = useMemo(() => filtered.filter((item) => !isRemovedGroup(item)), [filtered]);
+  const removedFiltered = useMemo(() => filtered.filter(isRemovedGroup), [filtered]);
+  const categoryFiltered = deviceCategory === 'removed' ? removedFiltered : activeFiltered;
 
   const dashboardOnline = (item: DeviceGroup) =>
-    !!item.dashboard &&
-    !item.dashboard.revoked &&
-    now - item.dashboard.lastSeenAt <= ONLINE_MS;
-  const pluginOnline = (plugin: PluginBindingInfo) =>
-    plugin.paired && now - plugin.pluginLastSeenAt <= ONLINE_MS;
-  const viewerOnline = (plugin: PluginBindingInfo) =>
-    plugin.paired && now - plugin.viewerLastSeenAt <= ONLINE_MS;
+    !!item.dashboard && !item.dashboard.revoked && now - item.dashboard.lastSeenAt <= ONLINE_MS;
+  const pluginOnline = (plugin: PluginBindingInfo) => plugin.paired && now - plugin.pluginLastSeenAt <= ONLINE_MS;
+  const viewerOnline = (plugin: PluginBindingInfo) => plugin.paired && now - plugin.viewerLastSeenAt <= ONLINE_MS;
   const groupOnline = (item: DeviceGroup) =>
-    dashboardOnline(item) ||
-    item.plugins.some((plugin) => pluginOnline(plugin) || viewerOnline(plugin));
+    dashboardOnline(item) || item.plugins.some((plugin) => pluginOnline(plugin) || viewerOnline(plugin));
   const groupLastSeenAt = (item: DeviceGroup) =>
     Math.max(
       item.dashboard?.lastSeenAt || 0,
-      ...item.plugins.flatMap((plugin) => [
-        plugin.pluginLastSeenAt,
-        plugin.viewerLastSeenAt,
-      ]),
+      ...item.plugins.flatMap((plugin) => [plugin.pluginLastSeenAt, plugin.viewerLastSeenAt]),
     );
   const orderedFiltered = useMemo(
     () =>
@@ -222,42 +194,41 @@ export default function DeviceStatusPanel({
         if (aOnline !== bOnline) return aOnline ? -1 : 1;
         const recentFirst = groupLastSeenAt(b) - groupLastSeenAt(a);
         if (recentFirst !== 0) return recentFirst;
-        return (a.instanceId || a.key).localeCompare(b.instanceId || b.key, "zh-CN");
+        return (a.instanceId || a.key).localeCompare(b.instanceId || b.key, 'zh-CN');
       }),
     [categoryFiltered, now],
   );
-  const currentGroup = groups.find(item => item.instanceId === currentInstanceId);
+  const currentGroup = groups.find((item) => item.instanceId === currentInstanceId);
   const displayedGroups = currentGroup
-    ? [currentGroup, ...orderedFiltered.filter(item => item.key !== currentGroup.key)]
+    ? [currentGroup, ...orderedFiltered.filter((item) => item.key !== currentGroup.key)]
     : orderedFiltered;
-  const detailDevice = groups.find(item => item.key === detailKey);
+  const detailDevice = groups.find((item) => item.key === detailKey);
   const onlineCount = scopedGroups.filter(groupOnline).length;
 
   const remove = async (item: DeviceGroup) => {
-    const label =
-      item.instanceId || item.plugins[0]?.pluginInstanceId || item.key;
+    const label = item.instanceId || item.plugins[0]?.pluginInstanceId || item.key;
     if (
       !(await confirmDialog({
-        title: "删除设备",
+        title: '删除设备',
         message: `确定删除设备 ${label}？\nNovora 看板与关联 ClassIsland 插件都会解除绑定。`,
-        tone: "danger",
-        confirmLabel: "删除设备",
+        tone: 'danger',
+        confirmLabel: '删除设备',
       }))
     )
       return;
     try {
       await revokeDevice(
-        item.dashboard?.instanceId || "",
+        item.dashboard?.instanceId || '',
         item.plugins.map((plugin) => plugin.pluginInstanceId),
       );
       if (item.dashboard?.instanceId === currentInstanceId) {
         logoutAdmin();
-        navigate("/login?next=%2Fadmin&deviceRemoved=1", { replace: true });
+        navigate('/login?next=%2Fadmin&deviceRemoved=1', { replace: true });
         return;
       }
       await load(true);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "删除设备失败");
+      setError(cause instanceof Error ? cause.message : '删除设备失败');
     }
   };
   const removeSelected = async () => {
@@ -266,75 +237,59 @@ export default function DeviceStatusPanel({
       !targets.length ||
       !(await confirmDialog({
         title: `删除 ${targets.length} 台设备`,
-        message:
-          "所有关联看板和 ClassIsland 插件都会解除绑定，并需要重新绑定。",
-        tone: "danger",
-        confirmLabel: "批量删除",
+        message: '所有关联看板和 ClassIsland 插件都会解除绑定，并需要重新绑定。',
+        tone: 'danger',
+        confirmLabel: '批量删除',
       }))
     )
       return;
-    notify("warning", `正在删除 ${targets.length} 台设备，请稍候…`);
+    notify('warning', `正在删除 ${targets.length} 台设备，请稍候…`);
     // 删除请求统一经过 syncQueue 全局限速，无需再手动逐台串行等待；
     // beginBatch/endBatch 确保批量期间的其他防抖任务不会插队打乱节奏。
     beginBatch();
     const results = await Promise.allSettled(
       targets.map((item) =>
         revokeDevice(
-          item.dashboard?.instanceId || "",
+          item.dashboard?.instanceId || '',
           item.plugins.map((plugin) => plugin.pluginInstanceId),
         ),
       ),
     );
     endBatch();
-    const failed = targets.filter((_, index) => results[index].status === "rejected");
+    const failed = targets.filter((_, index) => results[index].status === 'rejected');
     const currentIndex = targets.findIndex((item) => item.dashboard?.instanceId === currentInstanceId);
-    if (currentIndex >= 0 && results[currentIndex]?.status === "fulfilled") {
+    if (currentIndex >= 0 && results[currentIndex]?.status === 'fulfilled') {
       logoutAdmin();
-      navigate("/login?next=%2Fadmin&deviceRemoved=1", { replace: true });
+      navigate('/login?next=%2Fadmin&deviceRemoved=1', { replace: true });
       return;
     }
     setSelectedKeys(failed.map((item) => item.key));
     await load(true);
     if (!failed.length) {
-      setError("");
-      notify("success", `已删除 ${targets.length} 台设备。`);
+      setError('');
+      notify('success', `已删除 ${targets.length} 台设备。`);
     } else if (failed.length < targets.length) {
-      setError(
-        `${targets.length - failed.length} 台设备已删除，${failed.length} 台删除失败并保持选中，请重试。`,
-      );
-      notify("warning", "部分设备删除失败，列表已按实际结果刷新。");
+      setError(`${targets.length - failed.length} 台设备已删除，${failed.length} 台删除失败并保持选中，请重试。`);
+      notify('warning', '部分设备删除失败，列表已按实际结果刷新。');
     } else {
-      const firstFailure = results.find(
-        (result) => result.status === "rejected",
-      );
+      const firstFailure = results.find((result) => result.status === 'rejected');
       setError(
-        firstFailure?.status === "rejected" &&
-          firstFailure.reason instanceof Error
+        firstFailure?.status === 'rejected' && firstFailure.reason instanceof Error
           ? firstFailure.reason.message
-          : "批量删除设备失败",
+          : '批量删除设备失败',
       );
     }
   };
 
-  const command = async (
-    item: DeviceBindingInfo,
-    action: DeviceCommand["action"],
-  ) => {
+  const command = async (item: DeviceBindingInfo, action: DeviceCommand['action']) => {
     try {
-      await sendDeviceCommand(
-        item.instanceId,
-        action,
-        action === "extend" ? 5 : undefined,
-      );
+      await sendDeviceCommand(item.instanceId, action, action === 'extend' ? 5 : undefined);
       notify(
-        "success",
-        `已发送${action === "pause" ? "暂停" : action === "resume" ? "继续" : action === "extend" ? "延长 5 分钟" : "结束"}指令。`,
+        'success',
+        `已发送${action === 'pause' ? '暂停' : action === 'resume' ? '继续' : action === 'extend' ? '延长 5 分钟' : '结束'}指令。`,
       );
     } catch (cause) {
-      notify(
-        "error",
-        cause instanceof Error ? cause.message : "临时考试指令发送失败",
-      );
+      notify('error', cause instanceof Error ? cause.message : '临时考试指令发送失败');
     }
   };
 
@@ -351,20 +306,18 @@ export default function DeviceStatusPanel({
               </HelpTip>
             </span>
           </h2>
-          <p>
-            一个设备视图同时显示 Novora 看板、ClassIsland
-            插件、当前考试和班级绑定。
-          </p>
+          <p>一个设备视图同时显示 Novora 看板、ClassIsland 插件、当前考试和班级绑定。</p>
         </div>
-        <button
-          className="admin-btn"
-          onClick={() => void load()}
-          disabled={loading}
-        >
+        <button className="admin-btn" onClick={() => void load()} disabled={loading}>
           刷新
         </button>
       </div>
-      <DesignPolicyManager grades={selectableGrades} classes={selectableClasses} devices={bindings} canEdit={canEditDesign} />
+      <DesignPolicyManager
+        grades={selectableGrades}
+        classes={selectableClasses}
+        devices={bindings}
+        canEdit={canEditDesign}
+      />
       <div className="device-status__stats">
         <div>
           <span>设备总数</span>
@@ -377,13 +330,7 @@ export default function DeviceStatusPanel({
         <div>
           <span>考试进行中</span>
           <strong>
-            {
-              groups.filter(
-                (item) =>
-                  dashboardOnline(item) &&
-                  item.dashboard?.status === "exam-running",
-              ).length
-            }
+            {groups.filter((item) => dashboardOnline(item) && item.dashboard?.status === 'exam-running').length}
           </strong>
         </div>
         <div>
@@ -411,7 +358,7 @@ export default function DeviceStatusPanel({
               setClassFilters([]);
             }}
             options={[
-              { value: "*", label: "全部年级" },
+              { value: '*', label: '全部年级' },
               ...selectableGrades.map((item) => ({ value: item.id, label: item.name })),
             ]}
           />
@@ -419,18 +366,14 @@ export default function DeviceStatusPanel({
         <details className="device-status__class-filter">
           <summary>
             班级筛选
-            {classFilters.length ? ` · ${classFilters.length} 个` : " · 全部"}
+            {classFilters.length ? ` · ${classFilters.length} 个` : ' · 全部'}
           </summary>
           <ClassMultiPicker
             options={pickerOptions}
             selectedIds={classFilters}
             onChange={setClassFilters}
             showSearch={false}
-            selectionSummary={
-              classFilters.length
-                ? `已筛选 ${classFilters.length} 个班级`
-                : "当前显示全部班级"
-            }
+            selectionSummary={classFilters.length ? `已筛选 ${classFilters.length} 个班级` : '当前显示全部班级'}
           />
         </details>
       </div>
@@ -438,43 +381,33 @@ export default function DeviceStatusPanel({
         <button
           type="button"
           role="tab"
-          aria-selected={deviceCategory === "active"}
-          className={deviceCategory === "active" ? "is-active" : ""}
-          onClick={() => setDeviceCategory("active")}
+          aria-selected={deviceCategory === 'active'}
+          className={deviceCategory === 'active' ? 'is-active' : ''}
+          onClick={() => setDeviceCategory('active')}
         >
           有效设备 <span>{activeFiltered.length}</span>
         </button>
         <button
           type="button"
           role="tab"
-          aria-selected={deviceCategory === "removed"}
-          className={deviceCategory === "removed" ? "is-active" : ""}
-          onClick={() => setDeviceCategory("removed")}
+          aria-selected={deviceCategory === 'removed'}
+          className={deviceCategory === 'removed' ? 'is-active' : ''}
+          onClick={() => setDeviceCategory('removed')}
         >
           已删除设备 <span>{removedFiltered.length}</span>
         </button>
       </div>
-      {canRevoke && deviceCategory === "active" && (
+      {canRevoke && deviceCategory === 'active' && (
         <div className="device-status__batch">
           <label>
             <input
               type="checkbox"
-              checked={
-                activeFiltered.length > 0 &&
-                activeFiltered.every((item) => selectedKeys.includes(item.key))
-              }
+              checked={activeFiltered.length > 0 && activeFiltered.every((item) => selectedKeys.includes(item.key))}
               onChange={(event) =>
                 setSelectedKeys(
                   event.target.checked
-                    ? [
-                        ...new Set([
-                          ...selectedKeys,
-                          ...activeFiltered.map((item) => item.key),
-                        ]),
-                      ]
-                    : selectedKeys.filter(
-                        (key) => !activeFiltered.some((item) => item.key === key),
-                      ),
+                    ? [...new Set([...selectedKeys, ...activeFiltered.map((item) => item.key)])]
+                    : selectedKeys.filter((key) => !activeFiltered.some((item) => item.key === key)),
                 )
               }
             />
@@ -490,15 +423,15 @@ export default function DeviceStatusPanel({
           </button>
         </div>
       )}
-      {currentGroup && <div className="device-status__current-note">当前设备固定显示在列表首位，不受搜索和班级筛选影响。</div>}
-      {error && <div className="admin-error">{error}</div>}
-      {loading && (
-        <div className="device-status__loading">正在读取设备状态…</div>
+      {currentGroup && (
+        <div className="device-status__current-note">当前设备固定显示在列表首位，不受搜索和班级筛选影响。</div>
       )}
+      {error && <div className="admin-error">{error}</div>}
+      {loading && <div className="device-status__loading">正在读取设备状态…</div>}
       {!loading && displayedGroups.length === 0 && (
         <div className="admin-empty">
           <Mascot className="mascot-empty" size={64} alt="" />
-          <p>{deviceCategory === "removed" ? "暂无已删除设备" : "暂无符合条件的有效设备"}</p>
+          <p>{deviceCategory === 'removed' ? '暂无已删除设备' : '暂无符合条件的有效设备'}</p>
         </div>
       )}
       {displayedGroups.length > 0 && (
@@ -513,128 +446,94 @@ export default function DeviceStatusPanel({
             {displayedGroups.map((item) => {
               const dashboard = item.dashboard;
               const temporary =
-                !!dashboard &&
-                (dashboard.currentExam.includes("临时考试") ||
-                  dashboard.status === "temporary-paused");
+                !!dashboard && (dashboard.currentExam.includes('临时考试') || dashboard.status === 'temporary-paused');
               const lastSeenAt = groupLastSeenAt(item);
               const removed = isRemovedGroup(item);
               const isDashboardOnline = dashboardOnline(item);
               const isCurrentDevice = item.instanceId === currentInstanceId;
-              const managementRoleName = dashboard?.managementRoleName || (isCurrentDevice ? currentAdmin?.roleName : "") || "";
-              const managementScope = dashboard?.managementScopeLabel || (isCurrentDevice ? currentAdminScope : "管理范围未记录");
-              const deviceRoleTitle = dashboard?.isManagement ? "管理设备" : dashboard ? "班级考试端" : "ClassIsland 插件";
+              const managementRoleName =
+                dashboard?.managementRoleName || (isCurrentDevice ? currentAdmin?.roleName : '') || '';
+              const managementScope =
+                dashboard?.managementScopeLabel || (isCurrentDevice ? currentAdminScope : '管理范围未记录');
+              const deviceRoleTitle = dashboard?.isManagement
+                ? '管理设备'
+                : dashboard
+                  ? '班级考试端'
+                  : 'ClassIsland 插件';
               const assignment = dashboard?.isManagement
-                ? `${managementRoleName || "管理身份未记录"} · ${managementScope}`
-                : item.classId ? classDisplayName(grades, classes, item.classId) : "未绑定班级";
+                ? `${managementRoleName || '管理身份未记录'} · ${managementScope}`
+                : item.classId
+                  ? classDisplayName(grades, classes, item.classId)
+                  : '未绑定班级';
               return (
                 <div
-                  className={`device-status__row${removed ? " is-revoked" : ""}${isCurrentDevice ? " is-current" : ""}`}
+                  className={`device-status__row${removed ? ' is-revoked' : ''}${isCurrentDevice ? ' is-current' : ''}`}
                   key={item.key}
                 >
-                  <div className={`device-status__instance${canRevoke && !removed ? " is-selectable" : ""}`}>
+                  <div className={`device-status__instance${canRevoke && !removed ? ' is-selectable' : ''}`}>
                     {canRevoke && !removed && (
                       <input
                         type="checkbox"
                         checked={selectedKeys.includes(item.key)}
                         onChange={(event) =>
                           setSelectedKeys((value) =>
-                            event.target.checked
-                              ? [...value, item.key]
-                              : value.filter((key) => key !== item.key),
+                            event.target.checked ? [...value, item.key] : value.filter((key) => key !== item.key),
                           )
                         }
                         aria-label={`选择设备 ${item.instanceId}`}
                       />
                     )}
-                    <strong className={item.classId || dashboard?.isManagement ? "" : "is-unbound"}>
+                    <strong className={item.classId || dashboard?.isManagement ? '' : 'is-unbound'}>
                       {deviceRoleTitle}
                       {isCurrentDevice && <em className="device-status__current-badge">当前设备</em>}
                     </strong>
                     <small className="device-status__management-scope">{assignment}</small>
                     {dashboard ? (
-                      <code title={dashboard.instanceId}>
-                        看板 {dashboard.instanceId}
-                      </code>
+                      <code title={dashboard.instanceId}>看板 {dashboard.instanceId}</code>
                     ) : (
                       <code>尚无独立看板心跳</code>
                     )}
                     {item.plugins.map((plugin) => (
-                      <code
-                        title={plugin.pluginInstanceId}
-                        key={plugin.pluginInstanceId}
-                      >
+                      <code title={plugin.pluginInstanceId} key={plugin.pluginInstanceId}>
                         ClassIsland {plugin.pluginInstanceId}
                       </code>
                     ))}
                   </div>
                   <div className="device-status__class">
                     <strong>
-                      {removed
-                        ? "已删除，等待重新绑定"
-                        : isDashboardOnline
-                          ? statusLabel(dashboard)
-                          : "设备离线"}
+                      {removed ? '已删除，等待重新绑定' : isDashboardOnline ? statusLabel(dashboard) : '设备离线'}
                     </strong>
                     <div className="device-status__channels">
-                      <span
-                        className={
-                          isDashboardOnline ? "is-online" : "is-offline"
-                        }
-                      >
-                        Novora 看板 {isDashboardOnline ? "在线" : "离线"}
+                      <span className={isDashboardOnline ? 'is-online' : 'is-offline'}>
+                        Novora 看板 {isDashboardOnline ? '在线' : '离线'}
                       </span>
                       {item.plugins.map((plugin) => (
                         <span
                           key={plugin.pluginInstanceId}
-                          className={
-                            pluginOnline(plugin)
-                              ? "is-online"
-                              : plugin.paired
-                                ? "is-offline"
-                                : "is-removed"
-                          }
+                          className={pluginOnline(plugin) ? 'is-online' : plugin.paired ? 'is-offline' : 'is-removed'}
                         >
-                          ClassIsland{" "}
-                          {pluginOnline(plugin)
-                            ? "在线"
-                            : plugin.paired
-                              ? "离线"
-                              : "未绑定"}
+                          ClassIsland {pluginOnline(plugin) ? '在线' : plugin.paired ? '离线' : '未绑定'}
                         </span>
                       ))}
                     </div>
                     <span>
                       {isDashboardOnline && dashboard?.currentSubject
-                        ? `${dashboard.status === "waiting" ? "下一场" : dashboard.status === "temporary-paused" ? "已暂停" : "正在进行"}：${dashboard.currentExam} · ${dashboard.currentSubject}`
+                        ? `${dashboard.status === 'waiting' ? '下一场' : dashboard.status === 'temporary-paused' ? '已暂停' : '正在进行'}：${dashboard.currentExam} · ${dashboard.currentSubject}`
                         : dashboard
-                          ? `页面 ${dashboard.page || "未知"} · v${dashboard.clientVersion || "未知"}`
-                          : "插件已接入，等待 Novora 看板客户端心跳"}
+                          ? `页面 ${dashboard.page || '未知'} · v${dashboard.clientVersion || '未知'}`
+                          : '插件已接入，等待 Novora 看板客户端心跳'}
                     </span>
                     {isDashboardOnline && temporary && canRevoke && (
                       <div className="device-status__commands">
                         <button
                           onClick={() =>
-                            void command(
-                              dashboard,
-                              dashboard.status === "temporary-paused"
-                                ? "resume"
-                                : "pause",
-                            )
+                            void command(dashboard, dashboard.status === 'temporary-paused' ? 'resume' : 'pause')
                           }
                         >
-                          {dashboard.status === "temporary-paused"
-                            ? "继续"
-                            : "暂停"}
+                          {dashboard.status === 'temporary-paused' ? '继续' : '暂停'}
                         </button>
-                        <button
-                          onClick={() => void command(dashboard, "extend")}
-                        >
-                          +5 分钟
-                        </button>
-                        <button
-                          className="is-danger"
-                          onClick={() => void command(dashboard, "end")}
-                        >
+                        <button onClick={() => void command(dashboard, 'extend')}>+5 分钟</button>
+                        <button className="is-danger" onClick={() => void command(dashboard, 'end')}>
                           结束
                         </button>
                       </div>
@@ -644,8 +543,20 @@ export default function DeviceStatusPanel({
                     <time>{formatTime(lastSeenAt)}</time>
                   </div>
                   <div className="device-status__actions">
-                    <button className="admin-btn" onClick={() => setDetailKey(item.key)}>详情</button>
-                    {canRevoke ? <button className="admin-btn admin-btn--danger" onClick={() => void remove(item)} disabled={removed}>{removed ? "已删除" : "删除"}</button> : <span className="device-status__readonly">只读</span>}
+                    <button className="admin-btn" onClick={() => setDetailKey(item.key)}>
+                      详情
+                    </button>
+                    {canRevoke ? (
+                      <button
+                        className="admin-btn admin-btn--danger"
+                        onClick={() => void remove(item)}
+                        disabled={removed}
+                      >
+                        {removed ? '已删除' : '删除'}
+                      </button>
+                    ) : (
+                      <span className="device-status__readonly">只读</span>
+                    )}
                   </div>
                 </div>
               );
@@ -653,7 +564,22 @@ export default function DeviceStatusPanel({
           </div>
         </div>
       )}
-      {detailDevice && <DeviceDetailDialog device={detailDevice} grades={grades} classes={classes} selectableGrades={selectableGrades} selectableClasses={selectableClasses} currentInstanceId={currentInstanceId} canBind={canBind} onClose={() => setDetailKey("")} onUpdated={() => { setDetailKey(""); void load(true); }} />}
+      {detailDevice && (
+        <DeviceDetailDialog
+          device={detailDevice}
+          grades={grades}
+          classes={classes}
+          selectableGrades={selectableGrades}
+          selectableClasses={selectableClasses}
+          currentInstanceId={currentInstanceId}
+          canBind={canBind}
+          onClose={() => setDetailKey('')}
+          onUpdated={() => {
+            setDetailKey('');
+            void load(true);
+          }}
+        />
+      )}
     </main>
   );
 }

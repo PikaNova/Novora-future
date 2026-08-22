@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { isolateQuickMajorCreate, sanitizeStaleSnapshot, validateMutation, allScope } from '../api/_exams/permissions.js';
+import {
+  isolateQuickMajorCreate,
+  sanitizeStaleSnapshot,
+  validateMutation,
+  allScope,
+} from '../api/_exams/permissions.js';
 import type { AdminActor, AdminScope, Permission } from '../api/_auth.js';
 import type { ExamPayload } from '../api/_exams/payload.js';
 
@@ -150,7 +155,7 @@ test('validateMutation: quick_create lets an actor manage their own quick/tempor
   if (result.ok) assert.ok(result.actions.includes('major.quick_create'));
 });
 
-test('isolateQuickMajorCreate: keeps only a class admin\'s new quick major from a stale full snapshot', () => {
+test("isolateQuickMajorCreate: keeps only a class admin's new quick major from a stale full snapshot", () => {
   const actor = makeActor({
     id: 7,
     permissions: ['major.quick_create'],
@@ -158,9 +163,14 @@ test('isolateQuickMajorCreate: keeps only a class admin\'s new quick major from 
   });
   const formal = { id: 'formal', name: 'formal', items: [], targetGradeIds: ['g1'], targetClassIds: [] };
   const quick = {
-    id: 'quick', name: 'quick', items: [{ id: 'i1', name: 'math' }],
-    targetGradeIds: ['g1'], targetClassIds: ['c1'], source: 'quick',
-    temporary: true, createdBy: 7,
+    id: 'quick',
+    name: 'quick',
+    items: [{ id: 'i1', name: 'math' }],
+    targetGradeIds: ['g1'],
+    targetClassIds: ['c1'],
+    source: 'quick',
+    temporary: true,
+    createdBy: 7,
   };
   const current = makeCurrent({ majors: [formal], classes: [{ id: 'c1', gradeId: 'g1' }] });
   const isolated = isolateQuickMajorCreate(actor, current, {
@@ -181,9 +191,32 @@ test('isolateQuickMajorCreate: rebuilds a quick-major deletion from the server s
     scopes: [scope({ type: 'class', gradeId: 'g1', classId: 'c1' })],
   });
   const formal = { id: 'formal', name: 'formal', items: [], targetGradeIds: ['g1'], targetClassIds: [] };
-  const retained = { id: 'retained', name: 'retained', items: [], targetGradeIds: ['g1'], targetClassIds: ['c1'], source: 'quick', temporary: true, createdBy: 8 };
-  const removed = { id: 'removed', name: 'removed', items: [], targetGradeIds: ['g1'], targetClassIds: ['c1'], source: 'quick', temporary: true, createdBy: 7 };
-  const current = makeCurrent({ majors: [formal, retained, removed], activeMajorId: 'formal', title: 'formal', classes: [{ id: 'c1', gradeId: 'g1' }] });
+  const retained = {
+    id: 'retained',
+    name: 'retained',
+    items: [],
+    targetGradeIds: ['g1'],
+    targetClassIds: ['c1'],
+    source: 'quick',
+    temporary: true,
+    createdBy: 8,
+  };
+  const removed = {
+    id: 'removed',
+    name: 'removed',
+    items: [],
+    targetGradeIds: ['g1'],
+    targetClassIds: ['c1'],
+    source: 'quick',
+    temporary: true,
+    createdBy: 7,
+  };
+  const current = makeCurrent({
+    majors: [formal, retained, removed],
+    activeMajorId: 'formal',
+    title: 'formal',
+    classes: [{ id: 'c1', gradeId: 'g1' }],
+  });
   const isolated = isolateQuickMajorCreate(actor, current, {
     majors: [{ ...formal, name: 'stale client formal' }],
     items: [],
@@ -204,10 +237,16 @@ test('sanitizeStaleSnapshot: keeps own weekly changes but restores other classes
   const current = makeCurrent({
     weeklyPlans: [own, outside],
     grades: [{ id: 'g1' }, { id: 'g2' }],
-    classes: [{ id: 'c1', gradeId: 'g1' }, { id: 'c2', gradeId: 'g2' }],
+    classes: [
+      { id: 'c1', gradeId: 'g1' },
+      { id: 'c2', gradeId: 'g2' },
+    ],
   });
   const sanitized = sanitizeStaleSnapshot(actor, current, {
-    weeklyPlans: [{ ...own, name: 'own client' }, { ...outside, name: 'outside stale' }],
+    weeklyPlans: [
+      { ...own, name: 'own client' },
+      { ...outside, name: 'outside stale' },
+    ],
     grades: [{ id: 'g1', name: 'stale' }],
     classes: [{ id: 'c1', gradeId: 'g1', name: 'stale' }],
   });
@@ -222,7 +261,10 @@ test('sanitizeStaleSnapshot: keeps an active weekly plan change for the managed 
     scopes: [scope({ type: 'class', gradeId: 'g1', classId: 'c1' })],
   });
   const current = makeCurrent({
-    classes: [{ id: 'c1', gradeId: 'g1' }, { id: 'c2', gradeId: 'g2' }],
+    classes: [
+      { id: 'c1', gradeId: 'g1' },
+      { id: 'c2', gradeId: 'g2' },
+    ],
     activeWeeklyPlanIdByClassId: { c1: 'w1', c2: 'w2' },
   });
   const sanitized = sanitizeStaleSnapshot(actor, current, {
@@ -242,7 +284,10 @@ test('sanitizeStaleSnapshot: grade admins retain only class changes in their gra
   const outside = { id: 'c2', gradeId: 'g2', name: 'outside server' };
   const current = makeCurrent({ classes: [own, outside] });
   const sanitized = sanitizeStaleSnapshot(actor, current, {
-    classes: [{ ...own, name: 'own client' }, { ...outside, name: 'outside stale' }],
+    classes: [
+      { ...own, name: 'own client' },
+      { ...outside, name: 'outside stale' },
+    ],
   });
   assert.deepEqual(sanitized.classes, [{ ...own, name: 'own client' }, outside]);
 });
@@ -254,19 +299,32 @@ test('sanitizeStaleSnapshot: keeps an owned quick-major change but restores stal
     scopes: [scope({ type: 'class', gradeId: 'g1', classId: 'c1' })],
   });
   const quick = {
-    id: 'quick', name: 'quick server', source: 'quick', temporary: true, createdBy: 7,
-    targetGradeIds: ['g1'], targetClassIds: ['c1'], items: [{ id: 'i1', enabled: true }],
+    id: 'quick',
+    name: 'quick server',
+    source: 'quick',
+    temporary: true,
+    createdBy: 7,
+    targetGradeIds: ['g1'],
+    targetClassIds: ['c1'],
+    items: [{ id: 'i1', enabled: true }],
   };
   const formal = { id: 'formal', name: 'formal server', items: [], targetGradeIds: ['g2'], targetClassIds: [] };
   const current = makeCurrent({
-    majors: [quick, formal], items: quick.items, title: quick.name, activeMajorId: quick.id,
-    alerts: { enabled: true }, classes: [{ id: 'c1', gradeId: 'g1' }],
+    majors: [quick, formal],
+    items: quick.items,
+    title: quick.name,
+    activeMajorId: quick.id,
+    alerts: { enabled: true },
+    classes: [{ id: 'c1', gradeId: 'g1' }],
   });
   const changedQuick = { ...quick, name: 'quick client' };
   const sanitized = sanitizeStaleSnapshot(actor, current, {
     majors: [changedQuick, { ...formal, name: 'formal stale' }],
-    items: changedQuick.items, title: changedQuick.name, activeMajorId: changedQuick.id,
-    alerts: { enabled: false }, classes: current.classes,
+    items: changedQuick.items,
+    title: changedQuick.name,
+    activeMajorId: changedQuick.id,
+    alerts: { enabled: false },
+    classes: current.classes,
   });
   assert.deepEqual(sanitized.majors, [changedQuick, formal]);
   assert.deepEqual(sanitized.alerts, current.alerts);
@@ -280,13 +338,24 @@ test('sanitizeStaleSnapshot: keeps an in-scope co-manager early end but restores
     scopes: [scope({ type: 'class', gradeId: 'g1', classId: 'c1' })],
   });
   const quick = {
-    id: 'quick', name: 'quick', source: 'quick', temporary: true, createdBy: 7, endedAt: null,
-    targetGradeIds: ['g1'], targetClassIds: ['c1'], items: [{ id: 'i1', enabled: true }],
+    id: 'quick',
+    name: 'quick',
+    source: 'quick',
+    temporary: true,
+    createdBy: 7,
+    endedAt: null,
+    targetGradeIds: ['g1'],
+    targetClassIds: ['c1'],
+    items: [{ id: 'i1', enabled: true }],
   };
   const formal = { id: 'formal', name: 'formal server', items: [], targetGradeIds: ['g2'], targetClassIds: [] };
   const current = makeCurrent({
-    majors: [quick, formal], items: quick.items, title: quick.name, activeMajorId: quick.id,
-    alerts: { enabled: true }, classes: [{ id: 'c1', gradeId: 'g1' }],
+    majors: [quick, formal],
+    items: quick.items,
+    title: quick.name,
+    activeMajorId: quick.id,
+    alerts: { enabled: true },
+    classes: [{ id: 'c1', gradeId: 'g1' }],
   });
   const endedQuick = {
     ...quick,
@@ -295,8 +364,11 @@ test('sanitizeStaleSnapshot: keeps an in-scope co-manager early end but restores
   };
   const sanitized = sanitizeStaleSnapshot(actor, current, {
     majors: [endedQuick, { ...formal, name: 'formal stale' }],
-    items: endedQuick.items, title: endedQuick.name, activeMajorId: endedQuick.id,
-    alerts: { enabled: false }, classes: current.classes,
+    items: endedQuick.items,
+    title: endedQuick.name,
+    activeMajorId: endedQuick.id,
+    alerts: { enabled: false },
+    classes: current.classes,
   });
   assert.deepEqual(sanitized.majors, [endedQuick, formal]);
   assert.deepEqual(sanitized.alerts, current.alerts);
@@ -356,8 +428,15 @@ test('validateMutation: quick_create lets a class co-manager end an in-scope tem
     scopes: [scope({ type: 'class', gradeId: 'g1', classId: 'c1' })],
   });
   const quick = {
-    id: 'quick', name: 'quick', order: 0, targetGradeIds: ['g1'], targetClassIds: ['c1'],
-    source: 'quick', temporary: true, createdBy: 7, endedAt: null,
+    id: 'quick',
+    name: 'quick',
+    order: 0,
+    targetGradeIds: ['g1'],
+    targetClassIds: ['c1'],
+    source: 'quick',
+    temporary: true,
+    createdBy: 7,
+    endedAt: null,
     items: [{ id: 'i1', name: 'math', enabled: true }],
   };
   const ended = {
@@ -366,11 +445,17 @@ test('validateMutation: quick_create lets a class co-manager end an in-scope tem
     items: quick.items.map((item) => ({ ...item, enabled: false })),
   };
   const current = makeCurrent({
-    majors: [quick], items: quick.items, title: quick.name, activeMajorId: quick.id,
+    majors: [quick],
+    items: quick.items,
+    title: quick.name,
+    activeMajorId: quick.id,
     classes: [{ id: 'c1', gradeId: 'g1', name: '1' }],
   });
   const result = validateMutation(actor, current, {
-    majors: [ended], items: ended.items, title: ended.name, activeMajorId: ended.id,
+    majors: [ended],
+    items: ended.items,
+    title: ended.name,
+    activeMajorId: ended.id,
   });
   assert.equal(result.ok, true);
   if (result.ok) assert.ok(result.actions.includes('major.quick_create'));
@@ -382,8 +467,15 @@ test('validateMutation: legacy zero endedAt is treated as unfinished for early e
     scopes: [scope({ type: 'class', gradeId: 'g1', classId: 'c1' })],
   });
   const quick = {
-    id: 'quick', name: 'quick', order: 0, targetGradeIds: ['g1'], targetClassIds: ['c1'],
-    source: 'quick', temporary: true, createdBy: 7, endedAt: 0,
+    id: 'quick',
+    name: 'quick',
+    order: 0,
+    targetGradeIds: ['g1'],
+    targetClassIds: ['c1'],
+    source: 'quick',
+    temporary: true,
+    createdBy: 7,
+    endedAt: 0,
     items: [{ id: 'i1', name: 'math', enabled: true }],
   };
   const ended = {
@@ -392,11 +484,17 @@ test('validateMutation: legacy zero endedAt is treated as unfinished for early e
     items: quick.items.map((item) => ({ ...item, enabled: false })),
   };
   const current = makeCurrent({
-    majors: [quick], items: quick.items, title: quick.name, activeMajorId: quick.id,
+    majors: [quick],
+    items: quick.items,
+    title: quick.name,
+    activeMajorId: quick.id,
     classes: [{ id: 'c1', gradeId: 'g1', name: '1' }],
   });
   const result = validateMutation(actor, current, {
-    majors: [ended], items: ended.items, title: ended.name, activeMajorId: ended.id,
+    majors: [ended],
+    items: ended.items,
+    title: ended.name,
+    activeMajorId: ended.id,
   });
   assert.equal(result.ok, true);
 });
@@ -408,17 +506,30 @@ test('validateMutation: scoped quick co-management cannot alter a temporary exam
     scopes: [scope({ type: 'class', gradeId: 'g1', classId: 'c1' })],
   });
   const quick = {
-    id: 'quick', name: 'quick', order: 0, targetGradeIds: ['g1'], targetClassIds: ['c1'],
-    source: 'quick', temporary: true, createdBy: 7, endedAt: null,
+    id: 'quick',
+    name: 'quick',
+    order: 0,
+    targetGradeIds: ['g1'],
+    targetClassIds: ['c1'],
+    source: 'quick',
+    temporary: true,
+    createdBy: 7,
+    endedAt: null,
     items: [{ id: 'i1', name: 'math', enabled: true }],
   };
   const changed = { ...quick, name: 'renamed', endedAt: 1_000, items: [{ ...quick.items[0], enabled: false }] };
   const current = makeCurrent({
-    majors: [quick], items: quick.items, title: quick.name, activeMajorId: quick.id,
+    majors: [quick],
+    items: quick.items,
+    title: quick.name,
+    activeMajorId: quick.id,
     classes: [{ id: 'c1', gradeId: 'g1', name: '1' }],
   });
   const result = validateMutation(actor, current, {
-    majors: [changed], items: changed.items, title: changed.name, activeMajorId: changed.id,
+    majors: [changed],
+    items: changed.items,
+    title: changed.name,
+    activeMajorId: changed.id,
   });
   assert.equal(result.ok, false);
   if (!result.ok) assert.equal(result.permission, 'major.edit');
@@ -431,17 +542,33 @@ test('validateMutation: a class co-manager cannot end a temporary quick major th
     scopes: [scope({ type: 'class', gradeId: 'g1', classId: 'c1' })],
   });
   const quick = {
-    id: 'quick', name: 'quick', order: 0, targetGradeIds: ['g1'], targetClassIds: ['c1', 'c2'],
-    source: 'quick', temporary: true, createdBy: 7, endedAt: null,
+    id: 'quick',
+    name: 'quick',
+    order: 0,
+    targetGradeIds: ['g1'],
+    targetClassIds: ['c1', 'c2'],
+    source: 'quick',
+    temporary: true,
+    createdBy: 7,
+    endedAt: null,
     items: [{ id: 'i1', name: 'math', enabled: true }],
   };
   const ended = { ...quick, endedAt: 1_000, items: [{ ...quick.items[0], enabled: false }] };
   const current = makeCurrent({
-    majors: [quick], items: quick.items, title: quick.name, activeMajorId: quick.id,
-    classes: [{ id: 'c1', gradeId: 'g1', name: '1' }, { id: 'c2', gradeId: 'g1', name: '2' }],
+    majors: [quick],
+    items: quick.items,
+    title: quick.name,
+    activeMajorId: quick.id,
+    classes: [
+      { id: 'c1', gradeId: 'g1', name: '1' },
+      { id: 'c2', gradeId: 'g1', name: '2' },
+    ],
   });
   const result = validateMutation(actor, current, {
-    majors: [ended], items: ended.items, title: ended.name, activeMajorId: ended.id,
+    majors: [ended],
+    items: ended.items,
+    title: ended.name,
+    activeMajorId: ended.id,
   });
   assert.equal(result.ok, false);
   if (!result.ok) assert.equal(result.permission, 'major.edit');
@@ -470,8 +597,16 @@ test('validateMutation: adding one weekly plan needs weekly.create; adding 2+ al
 });
 
 test('validateMutation: a class-scoped actor cannot create a weekly plan for a class outside their scope', () => {
-  const actor = makeActor({ permissions: ['weekly.create'], scopes: [scope({ type: 'class', gradeId: 'g1', classId: 'c1' })] });
-  const current = makeCurrent({ classes: [{ id: 'c1', gradeId: 'g1' }, { id: 'c2', gradeId: 'g1' }] });
+  const actor = makeActor({
+    permissions: ['weekly.create'],
+    scopes: [scope({ type: 'class', gradeId: 'g1', classId: 'c1' })],
+  });
+  const current = makeCurrent({
+    classes: [
+      { id: 'c1', gradeId: 'g1' },
+      { id: 'c2', gradeId: 'g1' },
+    ],
+  });
   const result = validateMutation(actor, current, { weeklyPlans: [{ id: 'w1', gradeId: 'g1', classId: 'c2' }] });
   assert.equal(result.ok, false);
   if (!result.ok) assert.match(result.error, /班级管理范围/);
@@ -483,7 +618,10 @@ test('validateMutation: a class-scoped actor can edit only their own weekly plan
     scopes: [scope({ type: 'class', gradeId: 'g1', classId: 'c1' })],
   });
   const current = makeCurrent({
-    classes: [{ id: 'c1', gradeId: 'g1' }, { id: 'c2', gradeId: 'g1' }],
+    classes: [
+      { id: 'c1', gradeId: 'g1' },
+      { id: 'c2', gradeId: 'g1' },
+    ],
     weeklyPlans: [
       { id: 'w1', gradeId: 'g1', classId: 'c1', name: 'before' },
       { id: 'w2', gradeId: 'g1', classId: 'c2', name: 'other' },
@@ -517,9 +655,14 @@ test('validateMutation: changing the active weekly plan mapping needs weekly.edi
 
 test('validateMutation: grade structure changes require school.grade_manage AND all-scope', () => {
   const current = makeCurrent({ grades: [{ id: 'g1', name: '高一' }] });
-  const newGrades = [{ id: 'g1', name: '高一' }, { id: 'g2', name: '高二' }];
+  const newGrades = [
+    { id: 'g1', name: '高一' },
+    { id: 'g2', name: '高二' },
+  ];
 
-  const missingPermission = validateMutation(makeActor({ scopes: [scope({ type: 'all' })] }), current, { grades: newGrades });
+  const missingPermission = validateMutation(makeActor({ scopes: [scope({ type: 'all' })] }), current, {
+    grades: newGrades,
+  });
   assert.equal(missingPermission.ok, false);
   if (!missingPermission.ok) assert.equal(missingPermission.permission, 'school.grade_manage');
 
@@ -541,7 +684,10 @@ test('validateMutation: grade structure changes require school.grade_manage AND 
 
 test('validateMutation: class structure changes require school.class_manage and per-class grade access', () => {
   const current = makeCurrent({ classes: [{ id: 'c1', gradeId: 'g1' }] });
-  const newClasses = [{ id: 'c1', gradeId: 'g1' }, { id: 'c2', gradeId: 'g2' }];
+  const newClasses = [
+    { id: 'c1', gradeId: 'g1' },
+    { id: 'c2', gradeId: 'g2' },
+  ];
 
   const wrongGrade = validateMutation(
     makeActor({ permissions: ['school.class_manage'], scopes: [scope({ type: 'grade', gradeId: 'g1' })] }),
@@ -562,7 +708,9 @@ test('validateMutation: class structure changes require school.class_manage and 
 test('validateMutation: schedule mode and conflict policy changes require the matching permission AND all-scope', () => {
   const current = makeCurrent({ scheduleMode: 'major-only' });
 
-  const noPerm = validateMutation(makeActor({ scopes: [scope({ type: 'all' })] }), current, { scheduleMode: 'weekly-only' });
+  const noPerm = validateMutation(makeActor({ scopes: [scope({ type: 'all' })] }), current, {
+    scheduleMode: 'weekly-only',
+  });
   assert.equal(noPerm.ok, false);
   if (!noPerm.ok) assert.equal(noPerm.permission, 'schedule.mode_edit');
 
@@ -583,7 +731,9 @@ test('validateMutation: schedule mode and conflict policy changes require the ma
 
   const conflictPolicyDenied = validateMutation(
     makeActor({ permissions: ['schedule.conflict_edit'], scopes: [scope({ type: 'grade', gradeId: 'g1' })] }),
-    makeCurrent({ weeklyConflictPolicy: { enabled: true, scope: 'whole-day', bufferBeforeMinutes: 0, bufferAfterMinutes: 0 } }),
+    makeCurrent({
+      weeklyConflictPolicy: { enabled: true, scope: 'whole-day', bufferBeforeMinutes: 0, bufferAfterMinutes: 0 },
+    }),
     { weeklyConflictPolicy: { enabled: false, scope: 'whole-day', bufferBeforeMinutes: 0, bufferAfterMinutes: 0 } },
   );
   assert.equal(conflictPolicyDenied.ok, false);
@@ -595,7 +745,9 @@ test('validateMutation: alerts changes only need alerts.edit, with no scope rest
   assert.equal(denied.ok, false);
   if (!denied.ok) assert.equal(denied.permission, 'alerts.edit');
 
-  const allowed = validateMutation(makeActor({ permissions: ['alerts.edit'] }), current, { alerts: { enabled: false } });
+  const allowed = validateMutation(makeActor({ permissions: ['alerts.edit'] }), current, {
+    alerts: { enabled: false },
+  });
   assert.equal(allowed.ok, true);
 });
 
@@ -643,8 +795,11 @@ test('sanitizeStaleSnapshot: grade admin can add an in-scope major while stale m
   const ownMajor = { id: 'm1', name: '已有考试', items: [], targetGradeIds: ['g1'], targetClassIds: [] };
   const staleMajor = { id: 'm2', name: '越权陈旧考试', items: [], targetGradeIds: ['g2'], targetClassIds: [] };
   const newMajor = {
-    id: 'm3', name: '新建考试', items: [{ id: 'i1', enabled: true }],
-    targetGradeIds: ['g1'], targetClassIds: [],
+    id: 'm3',
+    name: '新建考试',
+    items: [{ id: 'i1', enabled: true }],
+    targetGradeIds: ['g1'],
+    targetClassIds: [],
   };
   const current = makeCurrent({
     majors: [ownMajor, staleMajor],
@@ -672,11 +827,7 @@ test('sanitizeStaleSnapshot: grade admin can add an in-scope major while stale m
   });
 
   // 范围内已有考试保留客户端改名；越权陈旧考试回退；新建范围内考试保留
-  assert.deepEqual(sanitized.majors, [
-    { ...ownMajor, name: '已有考试(客户端改名)' },
-    staleMajor,
-    newMajor,
-  ]);
+  assert.deepEqual(sanitized.majors, [{ ...ownMajor, name: '已有考试(客户端改名)' }, staleMajor, newMajor]);
   // title / activeMajorId / items 从“清洗后接受的 activeMajor”派生
   assert.equal(sanitized.activeMajorId, 'm3');
   assert.equal(sanitized.title, '新建考试');

@@ -2,8 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { buildSqlText, createDbClient, isNeonEndpoint } from '../api/_dbAdapter.js';
 
-const NEON_URL =
-  'postgresql://neondb_owner:secret@ep-xxx.aws.neon.tech/neondb?sslmode=require&channel_binding=require';
+const NEON_URL = 'postgresql://neondb_owner:secret@ep-xxx.aws.neon.tech/neondb?sslmode=require&channel_binding=require';
 const LOCAL_URL = 'postgres://novora:novora@db:5432/novora';
 
 test('isNeonEndpoint routes Neon cloud URLs to the neon driver', () => {

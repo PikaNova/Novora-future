@@ -50,7 +50,10 @@ export function getInstanceId(): string {
   const store = ls();
   let id = store?.getItem(INSTANCE_KEY) || '';
   if (!id) {
-    const rnd = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `id-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const rnd =
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `id-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     id = rnd;
     try {
       store?.setItem(INSTANCE_KEY, id);
@@ -118,7 +121,8 @@ async function send(event: string, extra: Record<string, unknown> = {}): Promise
       clientTs: Date.now(),
       weekly: getWeeklyUsageSnapshot(),
       province: getAppSettings().exam.initialization.province || null,
-      schoolName: getAppSettings().exam.initialization.schoolFullName || getAppSettings().exam.initialization.schoolName || null,
+      schoolName:
+        getAppSettings().exam.initialization.schoolFullName || getAppSettings().exam.initialization.schoolName || null,
       ...extra,
     };
     const r = await fetch('/api/telemetry', {
@@ -159,12 +163,19 @@ export async function reportNow(event = 'manual'): Promise<boolean> {
 export async function reportPerformance(): Promise<void> {
   if (!isEnabled() || typeof performance === 'undefined') return;
   const nav = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
-  const connection = (navigator as Navigator & { connection?: { effectiveType?: string; rtt?: number; saveData?: boolean } }).connection;
-  await send('perf', { perf: {
-    page: location.pathname, ttfbMs: nav ? Math.round(nav.responseStart) : null,
-    domReadyMs: nav ? Math.round(nav.domContentLoadedEventEnd) : null,
-    loadMs: nav ? Math.round(nav.loadEventEnd) : null,
-    transferBytes: nav?.transferSize ?? null, effectiveType: connection?.effectiveType ?? null,
-    networkRttMs: connection?.rtt ?? null, saveData: connection?.saveData ?? false,
-  }});
+  const connection = (
+    navigator as Navigator & { connection?: { effectiveType?: string; rtt?: number; saveData?: boolean } }
+  ).connection;
+  await send('perf', {
+    perf: {
+      page: location.pathname,
+      ttfbMs: nav ? Math.round(nav.responseStart) : null,
+      domReadyMs: nav ? Math.round(nav.domContentLoadedEventEnd) : null,
+      loadMs: nav ? Math.round(nav.loadEventEnd) : null,
+      transferBytes: nav?.transferSize ?? null,
+      effectiveType: connection?.effectiveType ?? null,
+      networkRttMs: connection?.rtt ?? null,
+      saveData: connection?.saveData ?? false,
+    },
+  });
 }

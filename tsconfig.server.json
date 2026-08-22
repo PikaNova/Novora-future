@@ -4,5 +4,5 @@
     "outDir": "server-build",
     "rootDir": "."
   },
-  "include": ["server/**/*.ts", "api/**/*.ts"]
+  "include": ["server/**/*.ts", "api/**/*.ts", "src/shared/seo.ts"]
 }

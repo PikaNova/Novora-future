@@ -9,11 +9,34 @@ import './CommandDeck.css';
  * 方案 01 · 深色指挥舱
  * 默认推荐方案：多教室电视、监考室、中控 LED。
  */
-export default function CommandDeck({ vm, onDismissNotification, onBack, quickMenu, onOpenAnnouncements, onSwitchDesign, isFullscreen, onToggleFullscreen }: DesignProps) {
+export default function CommandDeck({
+  vm,
+  onDismissNotification,
+  onBack,
+  quickMenu,
+  onOpenAnnouncements,
+  onSwitchDesign,
+  isFullscreen,
+  onToggleFullscreen,
+}: DesignProps) {
   const {
-    masterTitle, phase, clock, dateText, currentName, startHM, endHM,
-    progressPct, elapsedText, remainingText, countdownText,
-    nextName, nextStartHM, urgency, timeSynced, online, notification,
+    masterTitle,
+    phase,
+    clock,
+    dateText,
+    currentName,
+    startHM,
+    endHM,
+    progressPct,
+    elapsedText,
+    remainingText,
+    countdownText,
+    nextName,
+    nextStartHM,
+    urgency,
+    timeSynced,
+    online,
+    notification,
   } = vm;
 
   const urgencyClass = `cd cd--${phase} cd--${urgency}`;
@@ -33,12 +56,20 @@ export default function CommandDeck({ vm, onDismissNotification, onBack, quickMe
     cards.push({ label: '本场考试', value: startHM && endHM ? `${startHM}–${endHM}` : '—', tone: 'next' });
   } else if (phase === 'live') {
     cards.push({ label: '当前阶段', value: '已开始', tone: 'ok' });
-    cards.push({ label: '距离交卷', value: remainingText, tone: urgency === 'critical' ? 'critical' : urgency === 'warn' ? 'warning' : 'ok' });
-    cards.push({ label: '下一科目', value: nextName ? `${nextName}　${nextStartHM ?? ''}` : '无', tone: 'next' });
+    cards.push({
+      label: '距离交卷',
+      value: remainingText,
+      tone: urgency === 'critical' ? 'critical' : urgency === 'warn' ? 'warning' : 'ok',
+    });
+    cards.push({ label: '下一科目', value: nextName ? `${nextName}\u3000${nextStartHM ?? ''}` : '无', tone: 'next' });
   } else if (phase === 'ended') {
     cards.push({ label: '当前状态', value: '已结束', tone: 'ok' });
     cards.push({ label: '下一场', value: nextName ? countdownText : '无', tone: nextName ? 'warning' : 'ok' });
-    cards.push({ label: '下一科目', value: nextName ? `${nextName}　${nextStartHM ?? ''}` : '今日结束', tone: 'next' });
+    cards.push({
+      label: '下一科目',
+      value: nextName ? `${nextName}\u3000${nextStartHM ?? ''}` : '今日结束',
+      tone: 'next',
+    });
   }
 
   return (
@@ -47,16 +78,27 @@ export default function CommandDeck({ vm, onDismissNotification, onBack, quickMe
 
       <header className="cd__top">
         <div className="cd__top-left">
-          <button className="cd__ghost" onClick={onBack} aria-label="返回首页"><ArrowLeft /></button>
+          <button className="cd__ghost" onClick={onBack} aria-label="返回首页">
+            <ArrowLeft />
+          </button>
           <span className="cd__master">{masterTitle || 'Novora'}</span>
         </div>
         <div className="cd__top-right">
-          <span className={`cd__sync cd__sync--${sync.tone}`}>
-            {sync.text}
-          </span>
-          <button className="cd__ghost" onClick={onOpenAnnouncements} aria-label="查看公告" title="系统公告"><Megaphone /></button>
-          <button className="cd__ghost" onClick={onSwitchDesign} aria-label="切换设计" title="切换展示设计"><LayoutGrid /></button>
-          <button className="cd__ghost" onClick={onToggleFullscreen} aria-label={isFullscreen ? '退出全屏' : '进入全屏'} title={isFullscreen ? '退出全屏' : '进入全屏'}>{isFullscreen ? <Minimize /> : <Maximize />}</button>
+          <span className={`cd__sync cd__sync--${sync.tone}`}>{sync.text}</span>
+          <button className="cd__ghost" onClick={onOpenAnnouncements} aria-label="查看公告" title="系统公告">
+            <Megaphone />
+          </button>
+          <button className="cd__ghost" onClick={onSwitchDesign} aria-label="切换设计" title="切换展示设计">
+            <LayoutGrid />
+          </button>
+          <button
+            className="cd__ghost"
+            onClick={onToggleFullscreen}
+            aria-label={isFullscreen ? '退出全屏' : '进入全屏'}
+            title={isFullscreen ? '退出全屏' : '进入全屏'}
+          >
+            {isFullscreen ? <Minimize /> : <Maximize />}
+          </button>
           {quickMenu}
         </div>
       </header>
@@ -65,7 +107,9 @@ export default function CommandDeck({ vm, onDismissNotification, onBack, quickMe
         <div className="cd__notify" role="status">
           <span className="cd__notify-icon">{notification.icon}</span>
           <span className="cd__notify-msg">{notification.message}</span>
-          <button className="cd__notify-close" onClick={onDismissNotification} aria-label="关闭提醒">×</button>
+          <button className="cd__notify-close" onClick={onDismissNotification} aria-label="关闭提醒">
+            ×
+          </button>
         </div>
       )}
 
@@ -74,7 +118,9 @@ export default function CommandDeck({ vm, onDismissNotification, onBack, quickMe
           <div className="cd__subject-block">
             <p className="cd__headline">{headline()}</p>
             {phase === 'live' && startHM && endHM && (
-              <p className="cd__period">{startHM} — {endHM}</p>
+              <p className="cd__period">
+                {startHM} — {endHM}
+              </p>
             )}
           </div>
         )}
@@ -94,7 +140,9 @@ export default function CommandDeck({ vm, onDismissNotification, onBack, quickMe
                   ? `已进行 ${elapsedText} · 剩余 ${remainingText}`
                   : phase === 'before'
                     ? `距开考 ${countdownText}`
-                    : nextName ? `下一场 ${countdownText}` : '今日考试已结束'}
+                    : nextName
+                      ? `下一场 ${countdownText}`
+                      : '今日考试已结束'}
               </span>
             </div>
           </>

@@ -1,23 +1,23 @@
-import React from "react";
+import React from 'react';
 
-type LoadingStateKind = "loading" | "auth" | "sync" | "design";
+type LoadingStateKind = 'loading' | 'auth' | 'sync' | 'design';
 
 const COPY: Record<LoadingStateKind, { title: string; message: string }> = {
   loading: {
-    title: "正在载入",
-    message: "请稍候",
+    title: '正在载入',
+    message: '请稍候',
   },
   auth: {
-    title: "正在获取权限",
-    message: "正在确认管理范围",
+    title: '正在获取权限',
+    message: '正在确认管理范围',
   },
   sync: {
-    title: "正在同步数据",
-    message: "正在读取云端安排",
+    title: '正在同步数据',
+    message: '正在读取云端安排',
   },
   design: {
-    title: "正在载入展示设计",
-    message: "正在进入考试大屏",
+    title: '正在载入展示设计',
+    message: '正在进入考试大屏',
   },
 };
 
@@ -62,13 +62,8 @@ function buildSeats(kind: LoadingStateKind): Seat[] {
     for (let col = 0; col < MATRIX_COLS; col++) {
       const snake = snakeIndex(row, col);
       const hot = row === HOT_SEAT.row && col === HOT_SEAT.col;
-      const active = kind === "design" || snake < fillLimit;
-      const delay =
-        kind === "design"
-          ? 0
-          : hot
-            ? Math.max(fillLimit, snake) * SEAT_STEP_MS
-            : snake * SEAT_STEP_MS;
+      const active = kind === 'design' || snake < fillLimit;
+      const delay = kind === 'design' ? 0 : hot ? Math.max(fillLimit, snake) * SEAT_STEP_MS : snake * SEAT_STEP_MS;
       seats.push({
         key: `${row}-${col}`,
         active,
@@ -81,7 +76,7 @@ function buildSeats(kind: LoadingStateKind): Seat[] {
 }
 
 export default function LoadingState({
-  kind = "loading",
+  kind = 'loading',
   title,
   message,
 }: {
@@ -106,12 +101,12 @@ export default function LoadingState({
               <span
                 key={seat.key}
                 className={[
-                  "loading-state__seat",
-                  seat.hot ? "loading-state__seat--hot" : seat.active ? "loading-state__seat--on" : "",
+                  'loading-state__seat',
+                  seat.hot ? 'loading-state__seat--hot' : seat.active ? 'loading-state__seat--on' : '',
                 ]
                   .filter(Boolean)
-                  .join(" ")}
-                style={seat.active && kind !== "design" ? { animationDelay: `${seat.delay}ms` } : undefined}
+                  .join(' ')}
+                style={seat.active && kind !== 'design' ? { animationDelay: `${seat.delay}ms` } : undefined}
               />
             ))}
           </div>

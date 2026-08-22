@@ -30,8 +30,20 @@ test('scheduleDebounced: flushes once after the debounce delay elapses, and not 
   __resetSyncQueueForTests();
   t.mock.timers.enable({ apis: ['setTimeout', 'setInterval', 'Date'] });
   let calls = 0;
-  scheduleDebounced('k1', () => { calls += 1; }, { debounceMs: 500 });
-  scheduleDebounced('k1', () => { calls += 1; }, { debounceMs: 500 });
+  scheduleDebounced(
+    'k1',
+    () => {
+      calls += 1;
+    },
+    { debounceMs: 500 },
+  );
+  scheduleDebounced(
+    'k1',
+    () => {
+      calls += 1;
+    },
+    { debounceMs: 500 },
+  );
   assert.equal(calls, 0);
   t.mock.timers.tick(499);
   assert.equal(calls, 0, 're-triggering the same key should not have flushed yet');
@@ -44,11 +56,29 @@ test('scheduleDebounced: forces a flush after maxWaitMs even with continuous re-
   t.mock.timers.enable({ apis: ['setTimeout', 'setInterval', 'Date'] });
   let calls = 0;
   const opts = { debounceMs: 500, maxWaitMs: 1200 };
-  scheduleDebounced('k2', () => { calls += 1; }, opts);
+  scheduleDebounced(
+    'k2',
+    () => {
+      calls += 1;
+    },
+    opts,
+  );
   t.mock.timers.tick(400);
-  scheduleDebounced('k2', () => { calls += 1; }, opts);
+  scheduleDebounced(
+    'k2',
+    () => {
+      calls += 1;
+    },
+    opts,
+  );
   t.mock.timers.tick(400);
-  scheduleDebounced('k2', () => { calls += 1; }, opts);
+  scheduleDebounced(
+    'k2',
+    () => {
+      calls += 1;
+    },
+    opts,
+  );
   assert.equal(calls, 0);
   t.mock.timers.tick(400); // total 1200ms since the first trigger == maxWaitMs
   assert.equal(calls, 1, 'maxWaitMs should force a flush even though the debounce window keeps resetting');
@@ -59,7 +89,13 @@ test('beginBatch/endBatch: defers a debounced flush that fires during a batch un
   t.mock.timers.enable({ apis: ['setTimeout', 'setInterval', 'Date'] });
   let calls = 0;
   beginBatch();
-  scheduleDebounced('k3', () => { calls += 1; }, { debounceMs: 200 });
+  scheduleDebounced(
+    'k3',
+    () => {
+      calls += 1;
+    },
+    { debounceMs: 200 },
+  );
   t.mock.timers.tick(200);
   assert.equal(calls, 0, 'flush must be deferred while the batch is open');
   endBatch();
@@ -72,7 +108,13 @@ test('beginBatch/endBatch: nested batches only flush once the outermost batch cl
   let calls = 0;
   beginBatch();
   beginBatch();
-  scheduleDebounced('k4', () => { calls += 1; }, { debounceMs: 100 });
+  scheduleDebounced(
+    'k4',
+    () => {
+      calls += 1;
+    },
+    { debounceMs: 100 },
+  );
   t.mock.timers.tick(100);
   endBatch();
   assert.equal(calls, 0, 'inner endBatch should not flush while an outer batch is still open');
@@ -87,14 +129,33 @@ test('runQueued: a high-priority task queued while another task is in flight jum
   // lastBusinessSendAt starts at 0) behaves like production instead of starting at epoch 0.
   t.mock.timers.enable({ apis: ['setTimeout', 'setInterval', 'Date'], now: Date.now() });
   const order: string[] = [];
-  const aDone = runQueued(async () => { order.push('A'); }, { priority: 'normal' });
-  const bDone = runQueued(async () => { order.push('B-normal'); }, { priority: 'normal' });
-  const cDone = runQueued(async () => { order.push('C-high'); }, { priority: 'high' });
+  const aDone = runQueued(
+    async () => {
+      order.push('A');
+    },
+    { priority: 'normal' },
+  );
+  const bDone = runQueued(
+    async () => {
+      order.push('B-normal');
+    },
+    { priority: 'normal' },
+  );
+  const cDone = runQueued(
+    async () => {
+      order.push('C-high');
+    },
+    { priority: 'high' },
+  );
   await flush();
   assert.deepEqual(order, ['A'], 'the first task runs immediately since nothing preceded it');
   t.mock.timers.tick(900); // MIN_BUSINESS_INTERVAL_MS gate between tasks
   await flush();
-  assert.deepEqual(order, ['A', 'C-high'], 'the high-priority task should be picked over the already-queued normal one');
+  assert.deepEqual(
+    order,
+    ['A', 'C-high'],
+    'the high-priority task should be picked over the already-queued normal one',
+  );
   t.mock.timers.tick(900);
   await flush();
   await Promise.all([aDone, bDone, cDone]);
@@ -106,15 +167,29 @@ test('runQueued: queuing a new task with the same key and a supersededValue canc
   t.mock.timers.enable({ apis: ['setTimeout', 'setInterval', 'Date'], now: Date.now() });
   const ran: string[] = [];
   // Occupies the in-flight slot so the same-key tasks below stay queued (not yet shifted) when the second one arrives.
-  const primeDone = runQueued(async () => { ran.push('prime'); });
-  const firstDone = runQueued(async () => { ran.push('first'); return 'first-result'; }, {
-    key: 'save',
-    supersededValue: 'superseded',
+  const primeDone = runQueued(async () => {
+    ran.push('prime');
   });
-  const secondDone = runQueued(async () => { ran.push('second'); return 'second-result'; }, {
-    key: 'save',
-    supersededValue: 'superseded',
-  });
+  const firstDone = runQueued(
+    async () => {
+      ran.push('first');
+      return 'first-result';
+    },
+    {
+      key: 'save',
+      supersededValue: 'superseded',
+    },
+  );
+  const secondDone = runQueued(
+    async () => {
+      ran.push('second');
+      return 'second-result';
+    },
+    {
+      key: 'save',
+      supersededValue: 'superseded',
+    },
+  );
   await flush();
   t.mock.timers.tick(900);
   await flush();
@@ -133,7 +208,13 @@ test('getSyncQueueSnapshot / subscribeSyncQueue: reflect syncing state and label
   assert.equal(snapshots[0].syncing, false);
 
   let resolveTask: () => void = () => {};
-  const done = runQueued(() => new Promise<void>((resolve) => { resolveTask = resolve; }), { label: 'saving' });
+  const done = runQueued(
+    () =>
+      new Promise<void>((resolve) => {
+        resolveTask = resolve;
+      }),
+    { label: 'saving' },
+  );
   assert.equal(getSyncQueueSnapshot().syncing, true);
   assert.equal(getSyncQueueSnapshot().currentLabel, 'saving');
   assert.ok(snapshots.length > 1, 'the listener should have been notified when the task started');
@@ -150,7 +231,12 @@ test('slow-task detection: marks the snapshot slow after SLOW_THRESHOLD_MS and c
   __resetSyncQueueForTests();
   t.mock.timers.enable({ apis: ['setTimeout', 'setInterval', 'Date'], now: Date.now() });
   let resolveTask: () => void = () => {};
-  const done = runQueued(() => new Promise<void>((resolve) => { resolveTask = resolve; }));
+  const done = runQueued(
+    () =>
+      new Promise<void>((resolve) => {
+        resolveTask = resolve;
+      }),
+  );
   assert.equal(getSyncQueueSnapshot().slow, false);
   t.mock.timers.tick(4000); // SLOW_THRESHOLD_MS
   assert.equal(getSyncQueueSnapshot().slow, true);

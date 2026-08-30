@@ -15,7 +15,10 @@ export type DesignPolicyRule = {
 export function sanitizeDesignPolicyRules(rawRules: unknown): DesignPolicyRule[] {
   const rules = Array.isArray(rawRules) ? rawRules : [];
   const allowedScopes = new Set(['school', 'grade', 'class', 'device']);
-  const parsedRules = rules.slice(0, 500).flatMap((rule: any, index: number) => {
+  const asRecord = (value: unknown): Record<string, unknown> =>
+    value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+  const parsedRules = rules.slice(0, 500).flatMap((rawRule: unknown, index: number) => {
+    const rule = asRecord(rawRule);
     const scope = String(rule?.scope ?? '');
     const scopeId = String(rule?.scopeId ?? '')
       .trim()

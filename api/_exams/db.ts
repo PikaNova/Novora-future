@@ -76,6 +76,8 @@ export function ensureTableOnce(): Promise<void> {
         transaction`ALTER TABLE exam_data ADD COLUMN IF NOT EXISTS initialization JSONB NOT NULL DEFAULT '{}'`,
         transaction`ALTER TABLE exam_data ADD COLUMN IF NOT EXISTS design_policy JSONB NOT NULL DEFAULT '{"rules":[],"updatedAt":0}'`,
         transaction`ALTER TABLE exam_data ADD COLUMN IF NOT EXISTS major_batch_presets JSONB NOT NULL DEFAULT '{"subjectGroups":[],"timeGroups":[],"updatedAt":0}'`,
+        transaction`ALTER TABLE exam_data ADD COLUMN IF NOT EXISTS exam_metadata JSONB NOT NULL DEFAULT '{}'`,
+        transaction`ALTER TABLE exam_data ADD COLUMN IF NOT EXISTS lifecycle JSONB NOT NULL DEFAULT '{"status":"draft","createdAt":0,"startedAt":null,"endedAt":null}'`,
         transaction`CREATE TABLE IF NOT EXISTS device_instances (
           instance_id TEXT PRIMARY KEY,
           grade_id TEXT NOT NULL DEFAULT '',
@@ -114,6 +116,15 @@ export function ensureTableOnce(): Promise<void> {
           next_allowed_at BIGINT NOT NULL DEFAULT 0,
           CHECK (id = 1)
         )`,
+        transaction`CREATE TABLE IF NOT EXISTS device_commands (
+          id TEXT PRIMARY KEY,
+          instance_id TEXT NOT NULL REFERENCES device_instances(instance_id) ON DELETE CASCADE,
+          action TEXT NOT NULL,
+          minutes INTEGER,
+          created_at BIGINT NOT NULL,
+          acknowledged_at BIGINT
+        )`,
+        transaction`CREATE INDEX IF NOT EXISTS device_commands_pending_idx ON device_commands(instance_id, acknowledged_at, created_at)`,
       ]);
       await Promise.all([
         ensureUpdatedAtBigIntOnce(),

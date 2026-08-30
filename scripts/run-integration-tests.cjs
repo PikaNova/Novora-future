@@ -31,7 +31,9 @@ function run(command, args) {
 }
 
 function runTestsWithTransientRetry() {
-  const args = ['--test', '.integration-check/tests/integration/*.test.js'];
+  // 集成用例共享同一个 disposable 数据库和全局 write_throttle 行，必须串行执行；
+  // 并发运行会让不同用例互相消费 900ms 写槽，产生非确定性的 429。
+  const args = ['--test', '--test-concurrency=1', '.integration-check/tests/integration/*.test.js'];
   for (let attempt = 1; attempt <= 2; attempt += 1) {
     const result = spawnSync(process.execPath, args, {
       cwd: process.cwd(),

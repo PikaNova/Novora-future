@@ -7,6 +7,7 @@ import { resolveEffectiveSchedule } from '../../src/utils/scheduleConflict.js';
 import { parseZonedTime } from '../../src/utils/zonedTime.js';
 import type { AdminActor } from '../_auth.js';
 import type { ExamPayload } from './payload.js';
+import { asRecord } from '../../src/shared/typeGuards.js';
 import type { MajorExam } from '../../src/types/index.js';
 import type { ScheduleMode, WeeklyConflictPolicy, WeeklyPlan } from '../../src/types/exam.js';
 
@@ -49,8 +50,8 @@ export function classIslandApiMeta() {
 }
 
 export function classLabel(payload: ExamPayload, gradeId: string, classId: string): string {
-  const grades = Array.isArray(payload.grades) ? (payload.grades as Array<Record<string, unknown>>) : [];
-  const classes = Array.isArray(payload.classes) ? (payload.classes as Array<Record<string, unknown>>) : [];
+  const grades = (Array.isArray(payload.grades) ? payload.grades : []).map(asRecord);
+  const classes = (Array.isArray(payload.classes) ? payload.classes : []).map(asRecord);
   const grade = grades.find((item) => String(item.id ?? '') === gradeId);
   const schoolClass = classes.find((item) => String(item.id ?? '') === classId);
   return [grade?.name, schoolClass?.name].filter(Boolean).map(String).join(' ');
@@ -58,7 +59,7 @@ export function classLabel(payload: ExamPayload, gradeId: string, classId: strin
 
 export function actorScopeLabel(actor: AdminActor, payload: ExamPayload): string {
   if (actor.permissions.includes('*') || actor.scopes.some((scope) => scope.type === 'all')) return '全校';
-  const grades = Array.isArray(payload.grades) ? (payload.grades as Array<Record<string, unknown>>) : [];
+  const grades = (Array.isArray(payload.grades) ? payload.grades : []).map(asRecord);
   const names = actor.scopes
     .map((scope) => {
       if (scope.type === 'grade')

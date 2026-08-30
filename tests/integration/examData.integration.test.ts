@@ -107,6 +107,13 @@ async function clearDatabase() {
   `;
 }
 
+async function releaseWriteSlot() {
+  await database()`UPDATE write_throttle SET next_allowed_at = ${-Date.now()} WHERE id = 1`;
+  // pg 客户端可能在前一条请求的 Promise 完成后仍有结果回调排队；给连接一个
+  // tick，确保后续路由看到已释放的槽位。
+  await new Promise((resolve) => setTimeout(resolve, 1_000));
+}
+
 async function seedRoles() {
   const sql = authSql();
   const now = Date.now();
@@ -303,6 +310,7 @@ test('database write: deleting grades and classes removes matching scopes and th
   );
 
   const afterDeletion = await readPayload();
+  await releaseWriteSlot();
   const denied = await post(
     removedGrade.token,
     bodyFrom(afterDeletion, {
@@ -355,6 +363,7 @@ test('database write: stale out-of-scope data cannot block or overwrite an owned
     }),
   );
   assert.equal(superWrite.statusCode, 200);
+  await releaseWriteSlot();
   const current = await readPayload();
 
   const quick = {
@@ -368,6 +377,8 @@ test('database write: stale out-of-scope data cannot block or overwrite an owned
     temporary: true,
     createdBy: classAdmin.id,
   };
+  await releaseWriteSlot();
+  __resetRateLimiterForTests();
   const create = await post(
     classAdmin.token,
     bodyFrom(stale, {
@@ -385,6 +396,7 @@ test('database write: stale out-of-scope data cannot block or overwrite an owned
   assert.ok(persisted.majors.some((major) => major.id === quick.id));
 
   const beforeDelete = await readPayload();
+  await releaseWriteSlot();
   const remove = await post(
     classAdmin.token,
     bodyFrom(beforeDelete, {
@@ -587,6 +599,7 @@ test('database device route: replacing a class device revokes and unpairs the ol
     VALUES ('plugin-a', 'hash', 'device-a', 'g1', 'c1', TRUE, ${now}, ${now})`;
 
   const second = makeRes();
+  await releaseWriteSlot();
   await handleManagedDeviceSetup(
     makeReq(admin.token, {
       instanceId: 'device-b',

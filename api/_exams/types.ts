@@ -17,6 +17,8 @@ export type ExamRow = {
   initialization?: unknown;
   design_policy?: unknown;
   major_batch_presets?: unknown;
+  exam_metadata?: unknown;
+  lifecycle?: unknown;
   updated_at?: number | string | null;
   bound_grade_id?: string | null;
   bound_class_id?: string | null;

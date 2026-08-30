@@ -27,7 +27,7 @@ function scope(partial: Partial<AdminScope>): AdminScope {
   return { type: 'grade', gradeId: '', classId: '', ...partial };
 }
 
-function makeCurrent(overrides: Partial<ExamPayload> = {}): ExamPayload {
+function makeCurrent(overrides: Record<string, unknown> = {}): ExamPayload {
   return {
     ok: true,
     items: [],
@@ -45,7 +45,7 @@ function makeCurrent(overrides: Partial<ExamPayload> = {}): ExamPayload {
     weeklyConflictPolicy: null,
     designPolicy: { rules: [], updatedAt: 0 },
     updatedAt: 0,
-    ...overrides,
+    ...(overrides as Partial<ExamPayload>),
   } as ExamPayload;
 }
 

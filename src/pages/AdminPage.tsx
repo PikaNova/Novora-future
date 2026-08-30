@@ -33,6 +33,7 @@ import '../styles/admin-track-additions.css';
 import { fmtAnnTime, phase, syncMajorStateRef } from '../hooks/admin/adminPageUtils';
 import { findMajorConflicts, findMajorConflictItemKeys } from '../utils/examConflicts';
 import type { SyncState } from '../hooks/admin/adminPageUtils';
+import type { ExamSavePayload } from '../shared/examContracts';
 import { useAdminAuthSession } from '../hooks/admin/useAdminAuthSession';
 import { useAnnouncements } from '../hooks/admin/useAnnouncements';
 import { useAdminModals, ADMIN_NAV } from '../hooks/admin/useAdminModals';
@@ -89,7 +90,7 @@ export default function AdminPage() {
   const commitRef = useRef<(ms: MajorExam[], activeId: string, immediate?: boolean, syncLabel?: string) => void>(
     () => {},
   );
-  const buildPayloadRef = useRef<(ms: MajorExam[], activeId: string) => Record<string, unknown>>(() => ({}));
+  const buildPayloadRef = useRef<(ms: MajorExam[], activeId: string) => ExamSavePayload>(() => ({}));
   const setMajorsRef = useRef<(ms: MajorExam[]) => void>(() => {});
   const setActiveMajorIdRef = useRef<(id: string) => void>(() => {});
   const editingRef = useRef<{ name: string } | null>(null);

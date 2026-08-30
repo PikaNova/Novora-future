@@ -105,7 +105,11 @@ export default function InlineSelect({
               const showGroup = option.group && option.group !== previous?.group;
               return (
                 <React.Fragment key={option.value}>
-                  {showGroup && <div className="inline-select__group" role="presentation">{option.group}</div>}
+                  {showGroup && (
+                    <div className="inline-select__group" role="presentation">
+                      {option.group}
+                    </div>
+                  )}
                   <button
                     type="button"
                     role="option"
@@ -119,7 +123,9 @@ export default function InlineSelect({
                       }
                     }}
                   >
-                    <span style={option.fontFamily ? { fontFamily: option.fontFamily } : undefined}>{option.label}</span>
+                    <span style={option.fontFamily ? { fontFamily: option.fontFamily } : undefined}>
+                      {option.label}
+                    </span>
                     {option.value === value && <Check aria-hidden="true" size={15} />}
                   </button>
                 </React.Fragment>

@@ -370,3 +370,28 @@ cat workspace/nas-sync-tracker.md
 ```bash
 git pull origin main
 ```
+
+## 2026-08-30 17:40 上传结果
+
+### 完成
+
+| 项目 | 结果 |
+|---|---|
+| 首次统一上传提交 | `347f3ba feat: consolidate P0/P1 and workspace tracker` |
+| 远程分支 | `https://github.com/PikaNova/Novora-future.git` `main` |
+| 推送方式 | fast-forward：`0850b00..347f3ba`，未使用 force push |
+| 提交规模 | 76 files changed，4553 insertions，471 deletions |
+| 源码改动 | 31 个修改文件 + 10 个新增源码/测试文件 |
+| 工作区文件 | 37 个根级文件复制到 `/workspace` |
+| 追踪入口 | `/workspace/nas-sync-tracker.md` |
+| 推送时间 | 2026-08-30 17:40 +08:00 |
+
+推送前的远程 `main` 检查结果为 `0850b0042282089f6b8dea5d0073127620a0059b`，与预期基线一致；推送后远程 `main` 为 `347f3ba`。
+
+### 结果记录提交
+
+本节本身会在首次上传后作为一条独立的文档提交再次推送到远程 `main`。NAS 侧使用 `git pull origin main` 后，请以远程最新 HEAD 为准。
+
+### 老仓库核验
+
+本次只向 `Novora-future` 推送，没有向 `https://github.com/PikaNova/Novora.git` 执行任何推送、tag 删除、分支覆盖或历史重写。

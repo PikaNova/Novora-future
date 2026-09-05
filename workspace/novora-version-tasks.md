@@ -32,7 +32,7 @@
 
 | 版本 | 主题 | 客户端 | 学校服务端 | 作者端 | 状态 |
 |---|---|---|---|---|---|
-| v2.7.x | 稳定与质量 | Hook/同步修复 | 集成门禁 | 无 | 规划完成 |
+| v2.7.x | 稳定与质量 | Hook/同步修复 | 集成门禁 | 无 | 已完成（v2.7.5） |
 | v2.8.x | 考试管理基础 | 考试 UI 重组 | ExamRecord + 状态机 | 基础实例/错误 | 未开始 |
 | v2.9.x | 设备与错误体系 | 设备 ID + 心跳 | 设备注册 + 空间模型 | 错误中心 | 未开始 |
 | v2.10.x | 作者中心正式版 | 更新流程 | 更新 API | 实例/版本/发布 | 未开始 |
@@ -52,23 +52,23 @@
 
 | 任务 ID | 端 | 任务 | 验收条件 |
 |---|---|---|---|
-| T-274-01 | 客户端 | 修复 `useMajorScheduleActions`、`useWeeklyScheduleSync` Hook 依赖 | 无未解释警告；保存回调读取最新状态 |
-| T-274-02 | 客户端 | 修复 `useExamNotify`、`useAlertOverlay` Hook 依赖 | 改名后提醒不丢失；timer 清理正确 |
-| T-274-03 | 客户端 | 修复 `DeviceStatusPanel`、`TimeRangePickerModal`、`DateTimePicker` | 设备分组、时间选择无过期值 |
-| T-274-04 | 全端 | 清理 4 个未格式化文件 | `format:check` 通过 |
-| T-274-05 | 全端 | 移除 unused 变量和无效 catch | 对应警告归零 |
-| T-274-06 | 全端 | 注释/窄范围抑制控制字符正则 | 安全意图有文档 |
+| T-274-01 ✅ | 客户端 | 修复 `useMajorScheduleActions`、`useWeeklyScheduleSync` Hook 依赖 | 无未解释警告；保存回调读取最新状态 |
+| T-274-02 ✅ | 客户端 | 修复 `useExamNotify`、`useAlertOverlay` Hook 依赖 | 改名后提醒不丢失；timer 清理正确 |
+| T-274-03 ✅ | 客户端 | 修复 `DeviceStatusPanel`、`TimeRangePickerModal`、`DateTimePicker` | 设备分组、时间选择无过期值 |
+| T-274-04 ✅ | 全端 | 清理 4 个未格式化文件 | `format:check` 通过 |
+| T-274-05 ✅ | 全端 | 移除 unused 变量和无效 catch | 对应警告归零 |
+| T-274-06 ✅ | 全端 | 注释/窄范围抑制控制字符正则 | 安全意图有文档 |
 
 ### v2.7.5 类型契约与集成门禁
 
 | 任务 ID | 端 | 任务 | 验收条件 |
 |---|---|---|---|
-| T-275-01 | 全端 | 共享类型：ExamPayload、心跳、命令、错误 | 前后端同一份定义 |
-| T-275-02 | 客户端 | `unknown → type` 校验边界 | 非法响应被拒绝 |
-| T-275-03 | 服务端 | `api/_exams` 核心 `any` 清理 | API 核心无 `any` |
-| T-275-04 | 全端 | 独立 `INTEGRATION_DATABASE_URL` 环境 | 空库可重复初始化 |
-| T-275-05 | 服务端 | 集成测试：BIGINT、并发写、写槽、回滚 | 四场景可重复通过 |
-| T-275-06 | 服务端 | schema 版本记录 + 迁移日志 | 健康检查报告版本 |
+| T-275-01 ✅ | 全端 | 共享类型：ExamPayload、心跳、命令、错误 | 前后端同一份定义 |
+| T-275-02 ✅ | 客户端 | `unknown → type` 校验边界 | 非法响应被拒绝 |
+| T-275-03 ✅ | 服务端 | `api/_exams` 核心 `any` 清理 | API 核心无 `any` |
+| T-275-04 ✅ | 全端 | 独立 `INTEGRATION_DATABASE_URL` 环境 | 空库可重复初始化 |
+| T-275-05 ✅ | 服务端 | 集成测试：BIGINT、并发写、写槽、回滚 | 四场景可重复通过 |
+| T-275-06 ✅ | 服务端 | schema 版本记录 + 迁移日志 | 健康检查报告版本 |
 
 **出口条件**：427/427 测试通过；API/前端/服务构建通过；格式检查通过；集成套件通过。
 

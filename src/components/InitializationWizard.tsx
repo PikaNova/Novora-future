@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { ImagePlus } from 'lucide-react';
 import type { ScheduleMode, WeeklyWeekMode } from '../types/exam';
 import { getShanghaiDateKey } from '../utils/weeklySchedule';
 import { buildInitializationData, type InitializationResult, type SchoolDraftRow } from '../utils/initializationData';
@@ -292,11 +293,20 @@ export default function InitializationWizard({ open, onClose, onComplete, onFina
                     {logoDataUrl ? (
                       <img className="init-logo-preview" src={logoDataUrl} alt="学校图标" />
                     ) : (
-                      <span className="init-logo-empty">未上传</span>
+                      <>
+                        <span className="init-logo-empty" aria-hidden="true">
+                          <ImagePlus size={18} />
+                        </span>
+                        <span className="init-logo-empty-text">未上传</span>
+                      </>
                     )}
-                    <input type="file" accept="image/*" onChange={(event) => onLogoFile(event.target.files?.[0])} />
+                    <label className="init-logo-upload">
+                      <input type="file" accept="image/*" onChange={(event) => onLogoFile(event.target.files?.[0])} />
+                      <ImagePlus size={14} aria-hidden="true" />
+                      上传图标
+                    </label>
                     {logoDataUrl && (
-                      <button type="button" onClick={() => setLogoDataUrl('')}>
+                      <button type="button" className="init-logo-remove" onClick={() => setLogoDataUrl('')}>
                         移除
                       </button>
                     )}

@@ -541,3 +541,35 @@ git push origin main
 
 - 开发2 的数据库门禁主体（`9cd5570`/`341a29f`/`ba2169c`）已在之前 rebase 时进入本仓库历史；`9789bc3` 是最后剩余提交。
 - 开发3 的免费版 P0 批次（`8fbf345` ETag/轮询/心跳降频）先提交，再执行本次 cherry-pick，未卷入任何未提交状态。
+
+## 2026-09-05 19:10 开发 1 / 开发 3 合并验证
+
+### 合并内容
+
+| 任务 | 提交 | 说明 |
+|---|---|---|
+| 开发 1 / T-275-01 | `e2d62b0` | 将登录失败告警、API 错误响应、心跳请求体等线契约收敛到 `src/shared` |
+| 开发 3 / 免费版通信优化 | `8fbf345` | ETag 版本优先查询、自适应考试轮询、设备心跳降频和 jitter |
+| 数据库修复收口 | `dcd8b98` | 保留缺少 `name` 的旧年级/班级，避免误删 scope |
+
+### 合并后验证
+
+| 检查 | 结果 |
+|---|---|
+| `npm test` | 460/460 通过 |
+| `npm run typecheck:api` | 通过 |
+| `npm run lint` | 通过，0 errors |
+| `npm run format:check` | 通过 |
+| `npm run serve:build` | 通过 |
+| 前端 Vite 构建 | 通过，2249 modules |
+| `npm run test:integration` | 19/19 通过 |
+| `git diff --check` | 通过 |
+
+### 构建说明
+
+- 沙箱内直接运行 `npm run build` 仍受 esbuild 读取祖先目录权限限制。
+- 已改用 Vite Node API（`configFile: false`）完成生产构建验证；未修改业务源码。
+
+### 当前状态
+
+`upload/main` 当前 HEAD 为 `60bdff8`，包含开发 1 / 开发 3 和数据库修复收口。待推送到 `Novora-future/main`。

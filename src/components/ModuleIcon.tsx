@@ -2,6 +2,7 @@ import React from 'react';
 import {
   CalendarDays,
   ChartNoAxesCombined,
+  ClipboardList,
   GraduationCap,
   LayoutDashboard,
   MonitorCog,
@@ -13,6 +14,7 @@ import type { AdminTab } from '../types/exam';
 const ICONS: Record<AdminTab, LucideIcon> = {
   overview: ChartNoAxesCombined,
   dashboard: LayoutDashboard,
+  records: ClipboardList,
   major: GraduationCap,
   weekly: CalendarDays,
   classes: ShieldCheck,

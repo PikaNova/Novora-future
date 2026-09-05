@@ -55,6 +55,7 @@ import { AdminAnnounceDialog } from '../components/admin/AdminAnnounceDialog';
 import { AdminIncompletePrompt } from '../components/admin/AdminIncompletePrompt';
 import { AiImportModal } from '../components/admin/AiImportModal';
 import { GradeAdminSetupPromptModal } from '../components/admin/GradeAdminSetupPromptModal';
+import ExamRecordsPanel from '../components/ExamRecordsPanel';
 import {
   DeleteItemConfirm,
   DeleteMajorConfirm,
@@ -648,7 +649,7 @@ export default function AdminPage() {
         <div className="admin-content">
           <div
             key={adminTab}
-            className={`admin-body admin-tab-transition${(['overview', 'dashboard', 'classes', 'devices', 'users'] as AdminTab[]).includes(adminTab) ? ' admin-body--wide' : ''}`}
+            className={`admin-body admin-tab-transition${(['overview', 'dashboard', 'records', 'classes', 'devices', 'users'] as AdminTab[]).includes(adminTab) ? ' admin-body--wide' : ''}`}
           >
             <Suspense fallback={<LoadingState kind="loading" layout="panel" />}>
               {adminTab === 'overview' ? (
@@ -664,6 +665,8 @@ export default function AdminPage() {
                 />
               ) : adminTab === 'dashboard' ? (
                 <DashboardPanel />
+              ) : adminTab === 'records' ? (
+                <ExamRecordsPanel grades={visibleGrades} classes={visibleClasses} />
               ) : adminTab === 'weekly' ? (
                 <fieldset className="admin-permission-fieldset" disabled={!can('weekly.edit')}>
                   <WeeklyPanel

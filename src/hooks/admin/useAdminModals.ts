@@ -11,6 +11,7 @@ export const ADMIN_NAV: Array<{
 }> = [
   { id: 'overview', label: '仪表盘', mobileLabel: '仪表盘', permission: 'overview.read' },
   { id: 'dashboard', label: '数据大屏', mobileLabel: '大屏', permission: 'overview.read' },
+  { id: 'records', label: '考试管理', mobileLabel: '考试管理', permission: 'major.read' },
   { id: 'major', label: '大型考试', mobileLabel: '考试', permission: 'major.read' },
   { id: 'weekly', label: '周测计划', mobileLabel: '周测', permission: 'weekly.read' },
   { id: 'classes', label: '年级与班级', mobileLabel: '班级', permission: 'school.read' },
@@ -90,6 +91,7 @@ export function useAdminModals(params: {
     const permissionByTab: Record<AdminTab, string> = {
       overview: 'overview.read',
       dashboard: 'overview.read',
+      records: 'major.read',
       major: 'major.read',
       weekly: 'weekly.read',
       classes: 'school.read',

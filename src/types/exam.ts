@@ -14,7 +14,7 @@ export type { ExamRecordStatus as ExamStatus, ExamRecordDisplayStatus } from '..
 export type ScheduleMode = 'major-only' | 'weekly-only' | 'automatic';
 
 /** 后台当前编辑的模块（仅影响编辑界面，不决定大屏显示）。 */
-export type AdminTab = 'overview' | 'dashboard' | 'major' | 'weekly' | 'classes' | 'devices' | 'users';
+export type AdminTab = 'overview' | 'dashboard' | 'records' | 'major' | 'weekly' | 'classes' | 'devices' | 'users';
 
 export type DesignRuleScope = 'school' | 'grade' | 'class' | 'device';
 export interface DesignAssignmentRule {

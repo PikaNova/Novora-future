@@ -58,6 +58,7 @@ export function AdminTabBar({
       </div>
       {adminTab !== 'overview' &&
         adminTab !== 'dashboard' &&
+        adminTab !== 'records' &&
         adminTab !== 'devices' &&
         adminTab !== 'classes' &&
         adminTab !== 'users' && (

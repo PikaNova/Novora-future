@@ -20,6 +20,7 @@ type RecordRow = {
   description?: unknown;
   status?: unknown;
   items?: unknown;
+  item_count?: unknown;
   target_grade_ids?: unknown;
   target_class_ids?: unknown;
   source?: unknown;
@@ -70,6 +71,14 @@ function stringList(value: unknown): string[] {
     : [];
 }
 
+function queryList(value: unknown): string[] {
+  return text(value)
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, 500);
+}
+
 function recordStatus(row: RecordRow): ExamRecordStatus | null {
   return isExamRecordStatus(row.status) ? row.status : null;
 }
@@ -91,7 +100,11 @@ function recordJson(row: RecordRow, now: number): Record<string, unknown> {
     status: recordStatus(row) ?? 'draft',
     displayStatus: displayStatus(row, now),
     items: Array.isArray(row.items) ? row.items : [],
-    itemCount: Array.isArray(row.items) ? row.items.length : 0,
+    itemCount: Number.isFinite(Number(row.item_count))
+      ? Math.max(0, Math.trunc(Number(row.item_count)))
+      : Array.isArray(row.items)
+        ? row.items.length
+        : 0,
     targetGradeIds: stringList(row.target_grade_ids),
     targetClassIds: stringList(row.target_class_ids),
     source: row.source === 'quick' ? 'quick' : 'regular',
@@ -151,13 +164,32 @@ async function handleRecordList(req: VercelRequest, res: VercelResponse): Promis
   const pageSize = normalizePageSize(req.query?.pageSize);
   const requestedStatus = text(req.query?.status);
   const search = text(req.query?.q).trim().slice(0, 120).toLowerCase();
+  const gradeId = text(req.query?.gradeId).trim().slice(0, 128);
+  const classIds = queryList(req.query?.classIds);
+  const sourceFilter = text(req.query?.source).trim();
+  const timeFilter = text(req.query?.time).trim();
+  const createdByFilter = text(req.query?.createdBy).trim();
   const statusFilter = requestedStatus && requestedStatus !== 'all' ? requestedStatus : '';
   if (statusFilter && statusFilter !== 'ongoing' && !isExamRecordStatus(statusFilter)) {
     error(res, 400, 'INVALID_STATUS', '无效的考试状态');
     return;
   }
+  if (sourceFilter && sourceFilter !== 'regular' && sourceFilter !== 'quick') {
+    error(res, 400, 'INVALID_SOURCE', '无效的考试来源');
+    return;
+  }
+  if (timeFilter && timeFilter !== 'upcoming' && timeFilter !== 'past') {
+    error(res, 400, 'INVALID_TIME_FILTER', '无效的考试时间筛选');
+    return;
+  }
+  const createdByValue = createdByFilter ? Number(createdByFilter) : null;
+  if (createdByFilter && (createdByValue == null || !Number.isSafeInteger(createdByValue) || createdByValue < 0)) {
+    error(res, 400, 'INVALID_CREATED_BY', '无效的创建人编号');
+    return;
+  }
   const rows = (await sql`
-    SELECT id, runtime_major_id, name, description, status, items,
+    SELECT id, runtime_major_id, name, description, status,
+      COALESCE(jsonb_array_length(items), 0) AS item_count,
       target_grade_ids, target_class_ids, source, temporary, priority_over_schedule,
       config, created_by, created_at, updated_at, start_at, end_at,
       actual_start_at, actual_end_at, published_at, ended_at, archived_at,
@@ -170,6 +202,22 @@ async function handleRecordList(req: VercelRequest, res: VercelResponse): Promis
     if (!actorCanAccessRecord(actor, row)) return false;
     if (statusFilter && displayStatus(row, now) !== statusFilter) return false;
     if (search && !`${text(row.name)} ${text(row.id)}`.toLowerCase().includes(search)) return false;
+    const targetGradeIds = stringList(row.target_grade_ids);
+    const targetClassIds = stringList(row.target_class_ids);
+    const schoolWide = targetGradeIds.length === 0 && targetClassIds.length === 0;
+    if (
+      gradeId &&
+      !schoolWide &&
+      !targetGradeIds.includes(gradeId) &&
+      !classIds.some((id) => targetClassIds.includes(id))
+    )
+      return false;
+    if (sourceFilter && (row.source === 'quick' ? 'quick' : 'regular') !== sourceFilter) return false;
+    if (createdByValue != null && nullableNumber(row.created_by) !== createdByValue) return false;
+    const startAt = nullableNumber(row.start_at);
+    const endAt = nullableNumber(row.end_at);
+    if (timeFilter === 'upcoming' && (startAt == null || startAt < now)) return false;
+    if (timeFilter === 'past' && (endAt == null || endAt >= now)) return false;
     return true;
   });
   const start = (page - 1) * pageSize;

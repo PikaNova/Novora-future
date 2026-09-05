@@ -123,6 +123,7 @@ export function useAdminSyncEngine(params: {
     const ADMIN_NAV_PERMISSION: Record<AdminTab, string> = {
       overview: 'overview.read',
       dashboard: 'overview.read',
+      records: 'major.read',
       major: 'major.read',
       weekly: 'weekly.read',
       classes: 'school.read',
@@ -132,6 +133,7 @@ export function useAdminSyncEngine(params: {
     const ADMIN_NAV_LABEL: Record<AdminTab, string> = {
       overview: '仪表盘',
       dashboard: '数据大屏',
+      records: '考试管理',
       major: '大型考试',
       weekly: '周测计划',
       classes: '年级与班级',

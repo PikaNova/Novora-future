@@ -11,10 +11,7 @@ test('SEO fallback description stays in the recommended length range', () => {
 
 test('custom SEO description wins over school and product fallbacks', () => {
   assert.equal(buildSeoDescription('一中', '自定义站点描述'), '自定义站点描述');
-  assert.equal(
-    buildSeoDescription('一中', ''),
-    '一中考试安排与教室大屏管理平台',
-  );
+  assert.equal(buildSeoDescription('一中', ''), '一中考试安排与教室大屏管理平台');
 });
 
 test('static HTML exposes a crawlable H1 before React mounts', () => {

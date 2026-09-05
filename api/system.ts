@@ -6,12 +6,8 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { readFileSync } from 'node:fs';
 import { cpus, freemem, hostname, loadavg, totalmem } from 'node:os';
 import { authSql, ensureAuthTables, isAdminRecoveryConfigured, requireActor } from './_auth.js';
-<<<<<<< HEAD
 import { ensureTableOnce } from './_exams/db.js';
-import { assertRows, rowShape, isString, isNumberLike, isDatabaseInt8, type DatabaseInt8 } from './_validation.js';
-=======
 import { assertRows, rowShape, isString, isDatabaseInt8, type DatabaseInt8 } from './_validation.js';
->>>>>>> ec57db5 (fix: v2.7.4 correctness cleanup - hook deps, unused vars, regex annotations)
 import { requestId, sendDatabaseError } from './_apiError.js';
 import { loadSmtpConfig } from './emailAuth.js';
 import { drainOutbox } from './_emailQueue.js';

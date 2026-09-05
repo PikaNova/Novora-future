@@ -1,4 +1,4 @@
-// 后台顶部标签栏：主功能切换 + 运行模式/年级/班级筛选。状态由 AdminPage 持有。
+// 后台主导航栏：主功能切换 + 运行模式/年级/班级筛选。状态由 AdminPage 持有。
 import { ADMIN_NAV } from '../../hooks/admin/useAdminModals';
 import type { AdminTab, ScheduleMode } from '../../types/exam';
 import type { SchoolGrade, SchoolClass } from '../../types/school';
@@ -36,7 +36,10 @@ export function AdminTabBar({
   visibleClasses,
 }: AdminTabBarProps) {
   return (
-    <div className={`admin-tabbar${adminTab === 'major' || adminTab === 'weekly' ? ' has-context' : ''}`}>
+    <nav
+      className={`admin-tabbar${adminTab === 'major' || adminTab === 'weekly' ? ' has-context' : ''}`}
+      aria-label="管理功能"
+    >
       <div className="admin-tabbar__tabs">
         {ADMIN_NAV.filter((item) => item.id === 'users' || can(item.permission)).map((item) => (
           <button
@@ -120,6 +123,6 @@ export function AdminTabBar({
             </div>
           </>
         )}
-    </div>
+    </nav>
   );
 }

@@ -594,3 +594,30 @@ git push origin main
 - `upload/main` 当前 HEAD 为 `f238038`（v2.7.5 版本发布），开发 1 / 开发 3 与数据库修复已全部合入，v2.7.5 发布检查清单全绿。
 - 数据库门禁提交 `9789bc3` 已通过 cherry-pick（`dcd8b98`）进入主线；本清单文档 `4242765` 亦已合入。
 - `novora-remote-audit` 工作区使命完成，主线内容齐平后可归档。
+
+## 2026-09-05 v2.8.0 作者端 T-280-07 实施
+
+| 项目 | 状态 |
+|---|---|
+| 目标仓库 | `exam-board-telemetry/exam-board-telemetry-main`，`main` / `6b592de` / v1.16.0 |
+| 实例契约 | 已新增共享解析与摘要白名单 |
+| 采集/概览 API | 已统一字段清理、通道归类和 10 分钟在线窗口 |
+| 兼容性 | 保留旧 `X-Telemetry-Key`、短期 token 和现有 snake_case 概览字段 |
+| 测试 | 5/5 契约测试、TypeScript 检查、服务端构建通过 |
+| 前端构建 | Vite Node API workaround 通过；普通 `npm run build` 受沙箱 esbuild 权限限制 |
+| Git 状态 | 作者端修改尚未提交或推送 |
+
+本批次不修改学校端仓库，不引入考试正文、班级名单、用户数据或远程控制能力。
+
+## 2026-09-05 v2.8.0 学校服务端 T-280-01~03 收口
+
+| 项目 | 状态 |
+|---|---|
+| `exam_records` 模型与迁移 | 已完成；含首次幂等回填、索引、健康检查和组件版本 `exams=4` |
+| 单向投影与状态机 | 已完成；`exam_data.majors` 仍为权威来源，支持 `draft/published/ended/archived`，`ongoing` 列表层派生 |
+| 生命周期 API | 已完成；列表分页/搜索/状态/作用域过滤，发布、结束、归档、反归档、复制 |
+| 权限与一致性 | 已完成；权限、全局写槽、审计、幂等复制、`updated_at` 乐观并发保护 |
+| 验证 | `npm test` 467/467；API/测试 TypeScript、lint、serve build、Prettier 全部通过 |
+| 集成测试 | 未运行；当前环境未提供 `INTEGRATION_DATABASE_URL`，`127.0.0.1:15432` 无 PostgreSQL |
+
+复制幂等键复用时返回冲突，且命中历史幂等结果会再次执行作用域校验，避免跨作用域泄露结果。下一步建议进入管理 UI 列表（v2.8.1 T-281-03/04），或先补齐独立 PostgreSQL 后执行集成矩阵。

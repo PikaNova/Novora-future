@@ -630,160 +630,164 @@ export default function AdminPage() {
         onWizardOpen={() => setWizardOpen(true)}
         onExportJson={exportJson}
       />
-      <AdminTabBar
-        adminTab={adminTab}
-        can={can}
-        selectAdminTab={selectAdminTab}
-        visibleWeeklyPlans={visibleWeeklyPlans}
-        scheduleMode={scheduleMode}
-        handleScheduleModeChange={handleScheduleModeChange}
-        selectedGradeId={selectedGradeId}
-        changeSelectedGrade={changeSelectedGrade}
-        visibleGrades={visibleGrades}
-        selectedClassId={selectedClassId}
-        changeSelectedClass={changeSelectedClass}
-        visibleClasses={visibleClasses}
-      />
-      <div
-        key={adminTab}
-        className={`admin-body admin-tab-transition${(['overview', 'dashboard', 'classes', 'devices', 'users'] as AdminTab[]).includes(adminTab) ? ' admin-body--wide' : ''}`}
-      >
-        <Suspense fallback={<LoadingState kind="loading" layout="panel" />}>
-          {adminTab === 'overview' ? (
-            <OverviewPanel
-              user={adminUser}
-              grades={visibleGrades}
-              classes={visibleClasses}
-              majors={visibleMajors}
-              weeklyPlans={visibleWeeklyPlans}
-              syncLabel={SYNC_META[sync].label}
-              online={online}
-              onQuickPublish={canQuickPublish ? () => setQuickMajorOpen(true) : undefined}
-            />
-          ) : adminTab === 'dashboard' ? (
-            <DashboardPanel />
-          ) : adminTab === 'weekly' ? (
-            <fieldset className="admin-permission-fieldset" disabled={!can('weekly.edit')}>
-              <WeeklyPanel
-                weeklyPlans={visibleWeeklyPlans}
-                activeWeeklyPlanId={activeWeeklyPlanId}
-                activeWeeklyPlanIdByClassId={activeWeeklyPlanIdByClassId}
-                selectedGradeId={selectedGradeId}
-                selectedClassId={selectedClassId}
-                selectedClassName={visibleClasses.find((item) => item.id === selectedClassId)?.name ?? '当前班级'}
-                classOptions={visibleClasses.map((item) => ({
-                  id: item.id,
-                  gradeId: item.gradeId,
-                  label: `${visibleGrades.find((grade) => grade.id === item.gradeId)?.name ?? '未知年级'} · ${item.name}`,
-                }))}
-                scheduleMode={scheduleMode}
-                weeklyConflictPolicy={weeklyConflictPolicy}
-                majorItems={orderedScopedMajors.flatMap((major) => major.items)}
-                majorName={orderedScopedMajors.map((major) => major.name).join('、')}
-                onSavePlans={handleSaveWeeklyPlans}
-                onConflictPolicyChange={handleConflictPolicyChange}
-                canEditConflictPolicy={can('schedule.conflict_edit')}
-                onSelectScope={(gradeId, classId) => {
-                  setSelectedGradeId(gradeId);
-                  setSelectedClassId(classId);
-                }}
-                allowBatchApply={can('weekly.copy') && visibleClasses.length > 1}
-              />
-            </fieldset>
-          ) : adminTab === 'classes' ? (
-            <ClassManagementPanel
-              grades={visibleGrades}
-              classes={visibleClasses}
-              weeklyPlans={visibleWeeklyPlans}
-              majors={visibleMajors}
-              onAddGrade={addGrade}
-              onRemoveGrade={removeGrade}
-              onAddClass={addClass}
-              onAddClasses={addClasses}
-              onRemoveClass={removeClass}
-              onRemoveClasses={removeClasses}
-              onUpdateClassesTrack={updateClassesTrack}
-              canManageGrades={can('school.grade_manage')}
-              canManageClasses={can('school.class_manage')}
-            />
-          ) : adminTab === 'devices' ? (
-            <DeviceStatusPanel
-              canRevoke={can('device.revoke')}
-              canBind={can('device.bind')}
-              canEditDesign={hasAllScope && can('settings.edit')}
-            />
-          ) : adminTab === 'users' ? (
-            <UserManagementPanel
-              grades={visibleGrades}
-              classes={visibleClasses}
-              currentUser={adminUser}
-              forcePasswordChange={
-                adminUser.mustChangePassword || new URLSearchParams(location.search).get('password') === '1'
-              }
-              openBatchCreate={new URLSearchParams(location.search).get('batch') === '1'}
-            />
-          ) : (
-            <MajorTabPanel
-              grades={grades}
-              selectedGradeId={selectedGradeId}
-              orderedScopedMajors={orderedScopedMajors}
-              activeMajor={activeMajor}
-              items={items}
-              canQuickPublish={canQuickPublish}
-              can={can}
-              switchMajor={switchMajor}
-              isOwnQuickTemporaryMajor={isOwnQuickTemporaryMajor}
-              setQuickMajorOpen={setQuickMajorOpen}
-              setMajorModal={setMajorModal}
-              setMajorError={setMajorError}
-              hasScopedMajor={hasScopedMajor}
-              canDeleteActiveMajor={canDeleteActiveMajor}
-              majors={majors}
-              setDeleteMajorOpen={setDeleteMajorOpen}
-              activeMajorTrackSubjects={activeMajorTrackSubjects}
-              subjectTrackModeEnabled={subjectTrackModeEnabled}
-              activeMajorTrackScopedCount={activeMajorTrackScopedCount}
-              activeMajorUnsetTrackClassCount={activeMajorUnsetTrackClassCount}
-              quickScopedMajors={quickScopedMajors}
-              adminNow={adminNow}
-              visibleClasses={visibleClasses}
-              canEndQuickTemporaryMajorInScope={canEndQuickTemporaryMajorInScope}
-              extendQuickMajor={extendQuickMajor}
-              endQuickMajor={endQuickMajor}
-              promoteQuickMajor={promoteQuickMajor}
-              setQuickMajorDeleteTarget={setQuickMajorDeleteTarget}
-              canEditActiveMajor={canEditActiveMajor}
-              editing={editing}
-              editError={editError}
-              customSubjectActive={customSubjectActive}
-              setCustomSubjectActive={setCustomSubjectActive}
-              setEditing={setEditing}
-              setEditError={setEditError}
-              majorTimeFlowAnchorRef={majorTimeFlowAnchorRef}
-              openMajorStartTimeFlow={openMajorStartTimeFlow}
-              isLongEdit={isLongEdit}
-              longDurationConfirmed={longDurationConfirmed}
-              setLongDurationConfirmed={setLongDurationConfirmed}
-              commitEdit={commitEdit}
-              setMajorTimeFlowOpen={setMajorTimeFlowOpen}
-              setMajorTimeFlowInitialEnd={setMajorTimeFlowInitialEnd}
-              setMajorBatchAddOpen={setMajorBatchAddOpen}
-              majorConflictLabels={majorConflictLabels}
-              selectedItemIds={selectedItemIds}
-              collapsedList={collapsedList}
-              setDeleteSelectedOpen={setDeleteSelectedOpen}
-              openMajorImport={openMajorImport}
-              setMajorPrintOpen={setMajorPrintOpen}
-              setCollapsedList={setCollapsedList}
-              lastDeletedExam={lastDeletedExam}
-              restoreExam={restoreExam}
-              majorConflictItemKeys={majorConflictItemKeys}
-              setSelectedItemIds={setSelectedItemIds}
-              setExamEnabled={setExamEnabled}
-              setDeleteTarget={setDeleteTarget}
-            />
-          )}
-        </Suspense>
+      <div className="admin-workspace">
+        <AdminTabBar
+          adminTab={adminTab}
+          can={can}
+          selectAdminTab={selectAdminTab}
+          visibleWeeklyPlans={visibleWeeklyPlans}
+          scheduleMode={scheduleMode}
+          handleScheduleModeChange={handleScheduleModeChange}
+          selectedGradeId={selectedGradeId}
+          changeSelectedGrade={changeSelectedGrade}
+          visibleGrades={visibleGrades}
+          selectedClassId={selectedClassId}
+          changeSelectedClass={changeSelectedClass}
+          visibleClasses={visibleClasses}
+        />
+        <div className="admin-content">
+          <div
+            key={adminTab}
+            className={`admin-body admin-tab-transition${(['overview', 'dashboard', 'classes', 'devices', 'users'] as AdminTab[]).includes(adminTab) ? ' admin-body--wide' : ''}`}
+          >
+            <Suspense fallback={<LoadingState kind="loading" layout="panel" />}>
+              {adminTab === 'overview' ? (
+                <OverviewPanel
+                  user={adminUser}
+                  grades={visibleGrades}
+                  classes={visibleClasses}
+                  majors={visibleMajors}
+                  weeklyPlans={visibleWeeklyPlans}
+                  syncLabel={SYNC_META[sync].label}
+                  online={online}
+                  onQuickPublish={canQuickPublish ? () => setQuickMajorOpen(true) : undefined}
+                />
+              ) : adminTab === 'dashboard' ? (
+                <DashboardPanel />
+              ) : adminTab === 'weekly' ? (
+                <fieldset className="admin-permission-fieldset" disabled={!can('weekly.edit')}>
+                  <WeeklyPanel
+                    weeklyPlans={visibleWeeklyPlans}
+                    activeWeeklyPlanId={activeWeeklyPlanId}
+                    activeWeeklyPlanIdByClassId={activeWeeklyPlanIdByClassId}
+                    selectedGradeId={selectedGradeId}
+                    selectedClassId={selectedClassId}
+                    selectedClassName={visibleClasses.find((item) => item.id === selectedClassId)?.name ?? '当前班级'}
+                    classOptions={visibleClasses.map((item) => ({
+                      id: item.id,
+                      gradeId: item.gradeId,
+                      label: `${visibleGrades.find((grade) => grade.id === item.gradeId)?.name ?? '未知年级'} · ${item.name}`,
+                    }))}
+                    scheduleMode={scheduleMode}
+                    weeklyConflictPolicy={weeklyConflictPolicy}
+                    majorItems={orderedScopedMajors.flatMap((major) => major.items)}
+                    majorName={orderedScopedMajors.map((major) => major.name).join('、')}
+                    onSavePlans={handleSaveWeeklyPlans}
+                    onConflictPolicyChange={handleConflictPolicyChange}
+                    canEditConflictPolicy={can('schedule.conflict_edit')}
+                    onSelectScope={(gradeId, classId) => {
+                      setSelectedGradeId(gradeId);
+                      setSelectedClassId(classId);
+                    }}
+                    allowBatchApply={can('weekly.copy') && visibleClasses.length > 1}
+                  />
+                </fieldset>
+              ) : adminTab === 'classes' ? (
+                <ClassManagementPanel
+                  grades={visibleGrades}
+                  classes={visibleClasses}
+                  weeklyPlans={visibleWeeklyPlans}
+                  majors={visibleMajors}
+                  onAddGrade={addGrade}
+                  onRemoveGrade={removeGrade}
+                  onAddClass={addClass}
+                  onAddClasses={addClasses}
+                  onRemoveClass={removeClass}
+                  onRemoveClasses={removeClasses}
+                  onUpdateClassesTrack={updateClassesTrack}
+                  canManageGrades={can('school.grade_manage')}
+                  canManageClasses={can('school.class_manage')}
+                />
+              ) : adminTab === 'devices' ? (
+                <DeviceStatusPanel
+                  canRevoke={can('device.revoke')}
+                  canBind={can('device.bind')}
+                  canEditDesign={hasAllScope && can('settings.edit')}
+                />
+              ) : adminTab === 'users' ? (
+                <UserManagementPanel
+                  grades={visibleGrades}
+                  classes={visibleClasses}
+                  currentUser={adminUser}
+                  forcePasswordChange={
+                    adminUser.mustChangePassword || new URLSearchParams(location.search).get('password') === '1'
+                  }
+                  openBatchCreate={new URLSearchParams(location.search).get('batch') === '1'}
+                />
+              ) : (
+                <MajorTabPanel
+                  grades={grades}
+                  selectedGradeId={selectedGradeId}
+                  orderedScopedMajors={orderedScopedMajors}
+                  activeMajor={activeMajor}
+                  items={items}
+                  canQuickPublish={canQuickPublish}
+                  can={can}
+                  switchMajor={switchMajor}
+                  isOwnQuickTemporaryMajor={isOwnQuickTemporaryMajor}
+                  setQuickMajorOpen={setQuickMajorOpen}
+                  setMajorModal={setMajorModal}
+                  setMajorError={setMajorError}
+                  hasScopedMajor={hasScopedMajor}
+                  canDeleteActiveMajor={canDeleteActiveMajor}
+                  majors={majors}
+                  setDeleteMajorOpen={setDeleteMajorOpen}
+                  activeMajorTrackSubjects={activeMajorTrackSubjects}
+                  subjectTrackModeEnabled={subjectTrackModeEnabled}
+                  activeMajorTrackScopedCount={activeMajorTrackScopedCount}
+                  activeMajorUnsetTrackClassCount={activeMajorUnsetTrackClassCount}
+                  quickScopedMajors={quickScopedMajors}
+                  adminNow={adminNow}
+                  visibleClasses={visibleClasses}
+                  canEndQuickTemporaryMajorInScope={canEndQuickTemporaryMajorInScope}
+                  extendQuickMajor={extendQuickMajor}
+                  endQuickMajor={endQuickMajor}
+                  promoteQuickMajor={promoteQuickMajor}
+                  setQuickMajorDeleteTarget={setQuickMajorDeleteTarget}
+                  canEditActiveMajor={canEditActiveMajor}
+                  editing={editing}
+                  editError={editError}
+                  customSubjectActive={customSubjectActive}
+                  setCustomSubjectActive={setCustomSubjectActive}
+                  setEditing={setEditing}
+                  setEditError={setEditError}
+                  majorTimeFlowAnchorRef={majorTimeFlowAnchorRef}
+                  openMajorStartTimeFlow={openMajorStartTimeFlow}
+                  isLongEdit={isLongEdit}
+                  longDurationConfirmed={longDurationConfirmed}
+                  setLongDurationConfirmed={setLongDurationConfirmed}
+                  commitEdit={commitEdit}
+                  setMajorTimeFlowOpen={setMajorTimeFlowOpen}
+                  setMajorTimeFlowInitialEnd={setMajorTimeFlowInitialEnd}
+                  setMajorBatchAddOpen={setMajorBatchAddOpen}
+                  majorConflictLabels={majorConflictLabels}
+                  selectedItemIds={selectedItemIds}
+                  collapsedList={collapsedList}
+                  setDeleteSelectedOpen={setDeleteSelectedOpen}
+                  openMajorImport={openMajorImport}
+                  setMajorPrintOpen={setMajorPrintOpen}
+                  setCollapsedList={setCollapsedList}
+                  lastDeletedExam={lastDeletedExam}
+                  restoreExam={restoreExam}
+                  majorConflictItemKeys={majorConflictItemKeys}
+                  setSelectedItemIds={setSelectedItemIds}
+                  setExamEnabled={setExamEnabled}
+                  setDeleteTarget={setDeleteTarget}
+                />
+              )}
+            </Suspense>
+          </div>
+        </div>
       </div>
       <AdminMobileNav adminTab={adminTab} can={can} onSelectAdminTab={selectAdminTab} onOpenMyAccount={openMyAccount} />
       {gradeAdminSetupPromptOpen && (

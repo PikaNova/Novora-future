@@ -1,5 +1,8 @@
 import type { ExamItem, MajorExam } from './index.js';
 
+/** Persisted ExamRecord lifecycle states; ongoing is a derived display state. */
+export type { ExamRecordStatus as ExamStatus, ExamRecordDisplayStatus } from '../shared/examRecordContracts.js';
+
 /**
  * 周测（v1.24.0）相关类型定义。
  *

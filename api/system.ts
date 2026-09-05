@@ -74,6 +74,8 @@ const CORE_TABLES = [
   'email_config',
   'email_outbox',
   'write_throttle',
+  'exam_records',
+  'exam_record_operations',
   'app_schema_versions',
 ];
 const REQUIRED_TABLES = [
@@ -90,6 +92,8 @@ const REQUIRED_TABLES = [
   'device_instances',
   'classisland_plugin_instances',
   'device_commands',
+  'exam_records',
+  'exam_record_operations',
   'app_schema_versions',
   'app_schema_migration_logs',
 ];

@@ -8,6 +8,7 @@ export default tseslint.config(
   {
     ignores: [
       'dist/**',
+      'dist-ui-check/**',
       'node_modules/**',
       '.api-check/**',
       '.integration-check/**',

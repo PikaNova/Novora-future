@@ -33,7 +33,7 @@
 | 版本 | 主题 | 客户端 | 学校服务端 | 作者端 | 状态 |
 |---|---|---|---|---|---|
 | v2.7.x | 稳定与质量 | Hook/同步修复 | 集成门禁 | 无 | 已完成（v2.7.5） |
-| v2.8.x | 考试管理基础 | 考试 UI 重组 | ExamRecord + 状态机 | 基础实例/错误 | 未开始 |
+| v2.8.x | 考试管理基础 | 考试 UI 重组 | ExamRecord + 状态机 | 基础实例/错误 | 进行中 |
 | v2.9.x | 设备与错误体系 | 设备 ID + 心跳 | 设备注册 + 空间模型 | 错误中心 | 未开始 |
 | v2.10.x | 作者中心正式版 | 更新流程 | 更新 API | 实例/版本/发布 | 未开始 |
 | v2.11.x | 远程诊断 | 日志上报 | 日志存储 | 诊断/授权 | 未开始 |
@@ -82,13 +82,13 @@
 
 | 任务 ID | 端 | 任务 | 验收条件 |
 |---|---|---|---|
-| T-280-01 | 服务端 | 设计 `ExamRecord` 关系模型 | 字段含 id/name/description/status/start_at/end_at/actual_start_at/actual_end_at/runtimeMajorId/source/temporary/target_grade_ids/target_class_ids/config/created_by/created_at/updated_at/archived_at |
-| T-280-02 | 服务端 | 定义生命周期状态机 | `DRAFT → PUBLISHED → WAITING → RUNNING → FINISHED → ARCHIVED`；状态转换有唯一入口；禁止非法跳转 |
-| T-280-03 | 服务端 | 定义 `ExamRecord ↔ MajorExam` 关联 | 唯一 runtimeMajorId；删除/复制/归级行为有文档 |
+| T-280-01 | 服务端 | `exam_records` 关系模型、迁移门禁与首次回填 | 已创建表、索引、幂等回填；`majors` 仍为权威来源 |
+| T-280-02 | 服务端 | 单向投影与生命周期基础状态 | 已支持 `draft/published/ended/archived` 持久态；`ongoing` 作为后续列表层派生状态 |
+| T-280-03 | 服务端 | 生命周期 API 与 `ExamRecord ↔ MajorExam` 关联 | 已支持列表、发布/结束/归档/反归档、复制；转换有权限/审计/幂等保护 |
 | T-280-04 | 服务端 | 迁移与回滚脚本 | 空库/旧库/重复执行通过；回滚不丢数据 |
 | T-280-05 | 服务端 | `exam_data` 保留为运行投影 | 旧客户端读取契约不变 |
 | T-280-06 | 客户端 | `ExamStatus` 类型加入 `src/types/exam.ts` | 不推翻现有 MajorExam/WeeklyPlan |
-| T-280-07 | 作者端 | 基础实例概览（版本/在线/客户端数） | 不含考试正文 |
+| T-280-07 | 作者端 | 基础实例概览（版本/在线/客户端数） | 不含考试正文（契约收口进行中） |
 
 ### v2.8.1 考试管理列表
 

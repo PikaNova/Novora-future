@@ -6735,3 +6735,93 @@
 .init-documents__confirm {
   margin-top: 12px;
 }
+
+/* v2.8 admin shell: keep primary navigation in a persistent left rail. */
+.admin-workspace {
+  display: grid;
+  grid-template-columns: 232px minmax(0, 1fr);
+  flex: 1;
+  min-height: 0;
+}
+.admin-content {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+}
+.admin-workspace > .admin-tabbar {
+  position: sticky;
+  top: 0;
+  z-index: 24;
+  display: flex;
+  align-self: start;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 18px;
+  height: calc(100dvh - 58px);
+  min-height: 0;
+  padding: 18px 12px;
+  overflow-y: auto;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 0;
+  background: #111419;
+}
+.admin-workspace > .admin-tabbar .admin-tabbar__tabs {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+}
+.admin-workspace > .admin-tabbar .admin-tab {
+  width: 100%;
+  justify-content: flex-start;
+  text-align: left;
+}
+.admin-workspace > .admin-tabbar .admin-tabbar__modes {
+  display: grid;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.admin-workspace > .admin-tabbar .admin-tabbar__mode {
+  display: grid;
+  align-items: start;
+  gap: 6px;
+  opacity: 1;
+  color: rgba(240, 240, 240, 0.62);
+}
+.admin-workspace > .admin-tabbar .admin-tabbar__mode .admin-input {
+  width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 900px) and (min-width: 701px) {
+  .admin-workspace {
+    grid-template-columns: 208px minmax(0, 1fr);
+  }
+  .admin-workspace > .admin-tabbar {
+    height: calc(100dvh - 58px);
+  }
+  .admin-workspace > .admin-tabbar .admin-tab {
+    padding-inline: 9px;
+  }
+}
+
+@media (max-width: 700px) {
+  .admin-workspace {
+    display: block;
+  }
+  .admin-content {
+    overflow: visible;
+  }
+  .admin-workspace > .admin-tabbar {
+    display: grid;
+    flex-direction: initial;
+    height: auto;
+    max-height: none;
+    overflow: visible;
+    border-right: 0;
+  }
+  .admin-workspace > .admin-tabbar:not(.has-context) {
+    display: none;
+  }
+}

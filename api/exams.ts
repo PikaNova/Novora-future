@@ -28,6 +28,7 @@ import {
 import { handleDeviceBinding, handleDeviceHeartbeat } from './_exams/routes/deviceSelfRoutes.js';
 import { handleDesignPolicy, handleMajorBatchPresets, handleResetData } from './_exams/routes/settingsRoutes.js';
 import { handleDashboard } from './_exams/routes/dashboardRoutes.js';
+import { handleExamRecordRoute } from './_exams/routes/examRecordRoutes.js';
 
 type RouteHandler = (req: VercelRequest, res: VercelResponse, startedAt: number) => Promise<void>;
 
@@ -60,6 +61,8 @@ const POST_ONLY_ROUTES: Record<string, RouteHandler> = {
   'major-batch-presets': (req, res) => handleMajorBatchPresets(req, res),
   'reset-data': (req, res) => handleResetData(req, res),
 };
+
+const RECORD_ACTIONS = new Set(['record-publish', 'record-end', 'record-archive', 'record-unarchive', 'record-copy']);
 
 const GENERAL_RATE_LIMIT_WINDOW_MS = readRateLimitSetting(process.env.ENTRY_RATE_LIMIT_WINDOW_MS, 10_000);
 const GENERAL_RATE_LIMIT_MAX_REQUESTS = readRateLimitSetting(process.env.ENTRY_RATE_LIMIT_MAX_REQUESTS, 30);
@@ -121,6 +124,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (req.method === 'POST') {
+      if (RECORD_ACTIONS.has(action)) {
+        await handleExamRecordRoute(req, res, action);
+        return;
+      }
       const postOnlyHandler = POST_ONLY_ROUTES[action];
       if (postOnlyHandler) {
         await postOnlyHandler(req, res, startedAt);
@@ -129,6 +136,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (req.method === 'GET') {
+      if (String(req.query?.resource ?? '') === 'records') {
+        await handleExamRecordRoute(req, res);
+        return;
+      }
       await handleExamDataGet(req, res, startedAt);
       return;
     }

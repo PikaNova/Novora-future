@@ -13,6 +13,7 @@ import { examPayload } from '../payload.js';
 import { examEtag } from '../../../src/shared/examContracts.js';
 import { isolateQuickMajorCreate, sanitizeStaleSnapshot, validateMutation } from '../permissions.js';
 import { computeRemovedScopeIds } from '../scopeCleanup.js';
+import { projectCurrentExamRecords } from '../examRecordProjection.js';
 import type { ExamRow, UpdatedRow } from '../types.js';
 import {
   type AdminActor,
@@ -243,8 +244,9 @@ export async function handleExamDataPost(req: VercelRequest, res: VercelResponse
     ({ removedGradeIds, removedClassIds } = computeRemovedScopeIds(priorGrades, priorClasses, grades, classes));
   }
   if (!(await acquireWriteSlotOrReject(req, res))) return;
-  const runUpdate = async (): Promise<UpdatedRow[]> =>
-    (await sql`
+  const runUpdate = async (): Promise<UpdatedRow[]> => {
+    const results = await sql.transaction((transaction) => [
+      transaction`
       UPDATE exam_data
       SET items = ${JSON.stringify(items)}::jsonb,
           title = ${typeof title === 'string' ? title : ''},
@@ -266,7 +268,11 @@ export async function handleExamDataPost(req: VercelRequest, res: VercelResponse
       -- 显式 BIGINT：毫秒级 baseUpdatedAt 不能在与字面量 0 比较时被 PostgreSQL 推断为 INTEGER。
       WHERE id = 1 AND (${expectedVersion}::BIGINT <= 0 OR updated_at = ${expectedVersion}::BIGINT)
       RETURNING updated_at
-    `) as unknown as UpdatedRow[];
+    `,
+      projectCurrentExamRecords(transaction),
+    ]);
+    return (results[0] ?? []) as unknown as UpdatedRow[];
+  };
   let updatedRows: UpdatedRow[];
   try {
     updatedRows = await runUpdate();

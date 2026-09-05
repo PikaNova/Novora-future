@@ -1,7 +1,17 @@
 import { randomUUID } from 'node:crypto';
 import type { DbClient } from './_dbAdapter.js';
 
+/**
+ * The last schema version shared by the v2.7 components. Keep this export for
+ * callers that only need the legacy baseline; new migrations use the
+ * component-specific versions below.
+ */
 export const NOVORA_SCHEMA_VERSION = 3;
+
+export const SCHEMA_COMPONENT_VERSIONS: Record<SchemaComponent, number> = {
+  auth: 3,
+  exams: 4,
+};
 
 export type SchemaComponent = 'auth' | 'exams';
 
@@ -94,7 +104,7 @@ export async function recordSchemaMigration(
     error?: unknown;
   },
 ): Promise<string> {
-  const version = input.version ?? NOVORA_SCHEMA_VERSION;
+  const version = input.version ?? SCHEMA_COMPONENT_VERSIONS[input.component];
   const requestId = text(process.env.SCHEMA_MIGRATION_REQUEST_ID).slice(0, 128) || randomUUID();
   const completedAt = Date.now();
   const failed = input.error !== undefined;
@@ -167,10 +177,7 @@ export async function readSchemaMigrationState(sql: DbClient): Promise<SchemaMig
     });
   }
 
-  const expectedVersions: Record<SchemaComponent, number> = {
-    auth: NOVORA_SCHEMA_VERSION,
-    exams: NOVORA_SCHEMA_VERSION,
-  };
+  const expectedVersions: Record<SchemaComponent, number> = { ...SCHEMA_COMPONENT_VERSIONS };
   const matches = SCHEMA_COMPONENTS.every((component) => versions[component] === expectedVersions[component]);
   const currentValues = SCHEMA_COMPONENTS.map((component) => versions[component]).filter(
     (value): value is number => value != null,

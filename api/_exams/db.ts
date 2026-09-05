@@ -7,6 +7,7 @@ import { createDbClient, type DbClient } from '../_dbAdapter.js';
 import { SCHEMA_MIGRATION_LOCK_ID } from '../_auth.js';
 import { sendRateLimited } from '../_apiError.js';
 import { ensureSchemaMigrationTables, recordSchemaMigration } from '../_schemaMigration.js';
+import { projectCurrentExamRecords } from './examRecordProjection.js';
 
 // 性能：缓存 neon 客户端（同一 warm 实例复用）。
 let _sql: DbClient | null = null;
@@ -82,6 +83,42 @@ export function ensureTableOnce(): Promise<void> {
           transaction`ALTER TABLE exam_data ADD COLUMN IF NOT EXISTS major_batch_presets JSONB NOT NULL DEFAULT '{"subjectGroups":[],"timeGroups":[],"updatedAt":0}'`,
           transaction`ALTER TABLE exam_data ADD COLUMN IF NOT EXISTS exam_metadata JSONB NOT NULL DEFAULT '{}'`,
           transaction`ALTER TABLE exam_data ADD COLUMN IF NOT EXISTS lifecycle JSONB NOT NULL DEFAULT '{"status":"draft","createdAt":0,"startedAt":null,"endedAt":null}'`,
+          transaction`CREATE TABLE IF NOT EXISTS exam_records (
+          id TEXT PRIMARY KEY,
+          runtime_major_id TEXT NOT NULL,
+          name TEXT NOT NULL DEFAULT '',
+          description TEXT NOT NULL DEFAULT '',
+          status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'published', 'ended', 'archived')),
+          items JSONB NOT NULL DEFAULT '[]',
+          target_grade_ids JSONB NOT NULL DEFAULT '[]',
+          target_class_ids JSONB NOT NULL DEFAULT '[]',
+          source TEXT NOT NULL DEFAULT 'regular' CHECK (source IN ('regular', 'quick')),
+          temporary BOOLEAN NOT NULL DEFAULT FALSE,
+          priority_over_schedule BOOLEAN NOT NULL DEFAULT FALSE,
+          config JSONB NOT NULL DEFAULT '{}',
+          created_by BIGINT,
+          created_at BIGINT NOT NULL,
+          updated_at BIGINT NOT NULL,
+          start_at BIGINT,
+          end_at BIGINT,
+          actual_start_at BIGINT,
+          actual_end_at BIGINT,
+          published_at BIGINT,
+          ended_at BIGINT,
+          archived_at BIGINT,
+          version INTEGER NOT NULL DEFAULT 1,
+          sort_order INTEGER NOT NULL DEFAULT 0
+        )`,
+          transaction`CREATE INDEX IF NOT EXISTS idx_exam_records_status ON exam_records(status)`,
+          transaction`CREATE INDEX IF NOT EXISTS idx_exam_records_updated ON exam_records(updated_at DESC)`,
+          transaction`CREATE TABLE IF NOT EXISTS exam_record_operations (
+          idempotency_key TEXT PRIMARY KEY,
+          action TEXT NOT NULL,
+          source_record_id TEXT NOT NULL,
+          result_record_id TEXT NOT NULL,
+          created_at BIGINT NOT NULL
+        )`,
+          transaction`CREATE INDEX IF NOT EXISTS idx_exam_record_operations_created ON exam_record_operations(created_at DESC)`,
           transaction`CREATE TABLE IF NOT EXISTS device_instances (
           instance_id TEXT PRIMARY KEY,
           grade_id TEXT NOT NULL DEFAULT '',
@@ -158,8 +195,10 @@ export function ensureTableOnce(): Promise<void> {
         VALUES (1, 0)
         ON CONFLICT (id) DO NOTHING
       `;
+        await sql.transaction((transaction) => [projectCurrentExamRecords(transaction)]);
         await recordSchemaMigration(sql, {
           component: 'exams',
+          version: 4,
           description: 'exam snapshot, devices, plugins, commands, and write throttle',
           startedAt: migrationStartedAt,
         });

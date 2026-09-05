@@ -1,6 +1,6 @@
 # Novora v2.8.0 设计方案（评审稿）
 
-状态：草案，供评审；评审通过后按第 7 节任务拆分实施。
+状态：实施中（T-280-01/T-280-02/T-280-03 服务端已落地，管理 UI 待后续批次）。
 
 ## 1. 目标与非目标
 
@@ -49,12 +49,15 @@ CREATE INDEX IF NOT EXISTS idx_exam_records_status  ON exam_records(status);
 CREATE INDEX IF NOT EXISTS idx_exam_records_updated ON exam_records(updated_at DESC);
 ```
 
+实现补充：数据库还保留 `runtime_major_id`（与 `id` 一对一）、`sort_order` 和运行时间/实际时间字段，便于后续列表排序、状态派生和审计；`created_by` 使用 BIGINT 以兼容用户主键。
+
 - `id` 复用 `MajorExam.id`：前端数据结构零改动，映射层唯一。
 - `exam_data.majors` 仍是**权威存储**（outbox/三方合并契约不动）；`exam_records` 是服务端单向投影。
 
 ### 3.2 投影策略（方案 A：单向投影 + 状态提升）
 
 - 每次现有保存管道写 `majors` 成功后，**同事务**内从 `majors` 全量重建（幂等 upsert）`exam_records`；崩溃后下次保存自愈，另提供一致性自检接口。
+- v2.8.0 首批已实现表创建、旧快照首次回填，以及普通快照保存后的事务内 upsert；当前回填只新增/更新快照中出现的记录，不删除历史记录。
 - 状态字段持久化在 `exam_records`，转换动作**回写 `majors` 对应字段**（`endedAt`/`temporary`/`priorityOverSchedule` 等）并走现有保存管道，保证唯一写路径。
   - 结果：权威数据永远只有一份来源，投影永远可重建，无双写漂移。
   - 方案 B（exam_records 升级为权威、majors 降级为投影）列为 v2.8.x 后续演进，本版不做。
@@ -69,7 +72,7 @@ draft ──publish──> published ──(时间窗自动判定)──> ongoin
 
 - **持久化仅四态**：`draft / published / ended / archived`；`ongoing` 是按考试时间窗的计算派生态，不落库、不需要定时器。
 - 草稿：新建考试默认；现有"快速发布"直接产生 `published`（沿用 `quick` 语义）。
-- 转换全部写 `app_audit_logs`（`exam.record.publish|end|archive|unarchive|copy`），记录操作者与目标。
+- 转换全部写 `app_audit_logs`（`exam.record.publish|end|archive|unarchive|copy`），记录操作者与目标；复制使用 `Idempotency-Key` 防止重试产生重复考试。
 - 归档 = 软隐藏 + 保留历史；反归档回 `ended`。
 
 ## 4. 兼容矩阵（核心验收）
@@ -87,6 +90,7 @@ draft ──publish──> published ──(时间窗自动判定)──> ongoin
 
 - `GET /api/exams?resource=records&status=...&page=...`：列表/历史/归档查询（读 `exam_records`）。
 - `POST /api/exams` 新 action：`record-publish / record-end / record-archive / record-unarchive / record-copy`。
+- `GET` 列表响应只返回当前账号作用域内的记录，支持 `page`、`pageSize`、`status`、`q`；`ongoing` 根据发布考试时间窗派生，不写入数据库。
 - 全部走现有 `requireActor` + `writeAudit` + 权限（`major.edit` / `major.delete`）+ 全局写槽。
 
 ## 6. 迁移与回滚

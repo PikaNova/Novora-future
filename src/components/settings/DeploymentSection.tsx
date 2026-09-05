@@ -1,4 +1,3 @@
-import { Rocket } from 'lucide-react';
 import { APP_VERSION } from '../../services/telemetry';
 import { adminCan, type AdminUserContext } from '../../services/examService';
 import { useDeploymentSettings } from '../../hooks/settings/useDeploymentSettings';

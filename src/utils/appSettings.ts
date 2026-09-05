@@ -14,16 +14,11 @@ import { mirrorAppSettings } from '../services/offlineStore.js';
 import type { SchoolClass, SchoolGrade } from '../types/school.js';
 import type { TimeSyncSettings } from './settings/timeSync.js';
 import { DEFAULT_TIME_SYNC_SETTINGS } from './settings/timeSync.js';
-import type { TypographyFontId, TypographySettings } from './settings/typography.js';
+import type { TypographySettings } from './settings/typography.js';
 import { DEFAULT_TYPOGRAPHY } from './settings/typography.js';
 import type { MotionMode } from './settings/motion.js';
 import { DEFAULT_MOTION_MODE } from './settings/motion.js';
-import type {
-  MajorBatchSubjectGroup,
-  MajorBatchTimeSlot,
-  MajorBatchTimeGroup,
-  MajorBatchSettings,
-} from './settings/majorBatch.js';
+import type { MajorBatchSubjectGroup, MajorBatchTimeGroup, MajorBatchSettings } from './settings/majorBatch.js';
 import { DEFAULT_MAJOR_BATCH_SETTINGS, normalizeMajorBatchSettings } from './settings/majorBatch.js';
 import { DEFAULT_DESIGN_POLICY, normalizeDesignPolicy } from './settings/design.js';
 import type { InitializationState } from './settings/school.js';

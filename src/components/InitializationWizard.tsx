@@ -44,9 +44,9 @@ export default function InitializationWizard({ open, onClose, onComplete, onFina
   const [documents, setDocuments] = useState<Announcement[]>([]);
   const [documentsLoading, setDocumentsLoading] = useState(false);
   const [documentsError, setDocumentsError] = useState('');
-  const [documentGateEntered, setDocumentGateEntered] = useState(false);
+  const [_documentGateEntered, setDocumentGateEntered] = useState(false);
   const [readingStartedAt, setReadingStartedAt] = useState<number | null>(null);
-  const [readingRemaining, setReadingRemaining] = useState(10);
+  const [_readingRemaining, setReadingRemaining] = useState(10);
   const [documentRead, setDocumentRead] = useState(false);
   const [passwordDraft, setPasswordDraft] = useState({ current: '', next: '', confirm: '' });
   const [passwordError, setPasswordError] = useState('');

@@ -1,4 +1,4 @@
-import { ApiError, timeoutApiError } from './apiError';
+import { timeoutApiError } from './apiError';
 
 /**
  * 带超时控制的 fetch 封装。

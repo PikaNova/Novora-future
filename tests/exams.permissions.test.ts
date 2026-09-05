@@ -6,7 +6,7 @@ import {
   validateMutation,
   allScope,
 } from '../api/_exams/permissions.js';
-import type { AdminActor, AdminScope, Permission } from '../api/_auth.js';
+import type { AdminActor, AdminScope } from '../api/_auth.js';
 import type { ExamPayload } from '../api/_exams/payload.js';
 
 function makeActor(overrides: Partial<AdminActor> = {}): AdminActor {

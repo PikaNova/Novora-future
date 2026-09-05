@@ -217,7 +217,7 @@ function BoundExamPage() {
   } = useExamSync({
     intervalMs: 5000,
     minRefreshMs: 3000,
-    onUpdate: ({ items: newItems, title: newTitle, alerts: newAlerts }) => {
+    onUpdate: ({ title: newTitle, alerts: newAlerts }) => {
       setItems(getResolvedExamItems());
       if (newTitle) setTitle(newTitle);
       if (newAlerts) setAlerts(newAlerts);

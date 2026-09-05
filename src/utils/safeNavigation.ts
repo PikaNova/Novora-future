@@ -1,5 +1,6 @@
 const LOGIN_DESTINATIONS = new Set(['/', '/admin', '/settings']);
 // 登录跳转目标拦截控制字符，防止伪造空白字符绕过校验（no-control-regex 有意保留）
+// eslint-disable-next-line no-control-regex -- security boundary: reject C0 controls and DEL in redirect targets
 const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f]/;
 
 export function safeLoginDestination(value: string | null | undefined): string {

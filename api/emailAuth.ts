@@ -91,7 +91,7 @@ const isEmailUserRow = rowShape<EmailUserRow>({
   display_name: isString,
   role_id: isString,
   role_name: isString,
-  permissions: (value): value is unknown => true,
+  permissions: (_value): _value is unknown => true,
   status: isString,
   must_change_password: isBoolean,
   token_version: isNumberLike,
@@ -499,7 +499,7 @@ async function handleUnbind(req: VercelRequest, res: VercelResponse): Promise<vo
   res.json({ ok: true });
 }
 
-function smtpConfigFromBody(body: Record<string, unknown>, existingPassEnc: string): SmtpConfig | null {
+function smtpConfigFromBody(body: Record<string, unknown>, _existingPassEnc: string): SmtpConfig | null {
   const host = String(body.smtpHost ?? '').trim();
   const from = String(body.smtpFrom ?? '').trim();
   const port = Number(body.smtpPort ?? 465);

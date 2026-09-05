@@ -25,7 +25,6 @@ export default function Emergency({
     startHM,
     endHM,
     progressPct,
-    elapsedText,
     remainingText,
     countdownText,
     nextName,

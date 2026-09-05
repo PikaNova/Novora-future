@@ -149,25 +149,6 @@ function EntryRow({ entry, now, showCountdown }: { entry: DashboardEntry; now: n
   );
 }
 
-function BarRows({ rows, emptyText }: { rows: DistributionRow[]; emptyText: string }) {
-  if (!rows.length) return <EmptyState text={emptyText} />;
-  return (
-    <div className="dashboard-bars">
-      {rows.map((row) => (
-        <div className="dashboard-bar" key={row.label}>
-          <span className="dashboard-bar__label">{row.label}</span>
-          <span className="dashboard-bar__track">
-            <i style={{ width: row.percent + '%' }} />
-          </span>
-          <span className="dashboard-bar__meta">
-            {row.count} 场 · {row.percent}%
-          </span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 export default function DashboardPanel() {
   const navigate = useNavigate();
   const [now, setNow] = useState(Date.now());

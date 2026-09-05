@@ -25,7 +25,6 @@ export default function Editorial({
     startHM,
     endHM,
     progressPct,
-    elapsedText,
     remainingText,
     countdownText,
     nextName,

@@ -1,4 +1,4 @@
-﻿import { createDbClient, type DbClient } from './_dbAdapter.js';
+import { createDbClient, type DbClient } from './_dbAdapter.js';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createHmac, randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
@@ -866,105 +866,98 @@ export async function getActor(token: string | undefined): Promise<AdminActor | 
   if (!token) return null;
   const auth = await config();
   if (!auth) return null;
-  try {
-    const parts = Buffer.from(token, 'base64url').toString().split('.');
-    if (parts.length === 7 && parts[0] === 'g') {
-      const guestInstanceId = parts[1];
-      const guestGradeId = parts[2];
-      const guestClassId = parts[3];
-      const guestExpiresAt = Number(parts[4]);
-      const guestVersion = Number(parts[5]);
-      const guestReceived = parts[6];
-      if (
-        !Number.isFinite(guestExpiresAt) ||
-        !Number.isFinite(guestVersion) ||
-        !isTokenNotExpired(guestExpiresAt, Date.now()) ||
-        guestVersion !== auth.token_version
-      )
-        return null;
-      const expectedGuest = guestSignature(
-        guestInstanceId,
-        guestGradeId,
-        guestClassId,
-        guestExpiresAt,
-        guestVersion,
-        auth.token_secret,
-      );
-      const guestA = Buffer.from(guestReceived || '');
-      const guestB = Buffer.from(expectedGuest);
-      if (guestA.length !== guestB.length || !timingSafeEqual(guestA, guestB)) return null;
-      const deviceRows = assertRows(
-        await authSql()`SELECT revoked, grade_id, class_id, is_management FROM device_instances WHERE instance_id=${guestInstanceId} LIMIT 1`,
-        isGuestDeviceRow,
-        'device_instances',
-      );
-      const guestDevice = deviceRows[0];
-      if (!guestDevice || guestDevice.revoked !== false || guestDevice.is_management === true) return null;
-      if (String(guestDevice.grade_id) !== guestGradeId || String(guestDevice.class_id) !== guestClassId) return null;
-      const roleNameRows = assertRows(
-        await authSql()`SELECT name FROM app_roles WHERE id='viewer' LIMIT 1`,
-        isGuestRoleNameRow,
-        'app_roles',
-      );
-      const rolePermRows = assertRows(
-        await authSql()`SELECT permissions FROM app_roles WHERE id='viewer' LIMIT 1`,
-        rowShape<{ permissions: unknown }>({ permissions: (_value: unknown): _value is unknown => true }),
-        'app_roles',
-      );
-      return {
-        id: 0,
-        username: guestInstanceId,
-        displayName: '班级访客',
-        roleId: 'viewer',
-        roleName: roleNameRows[0]?.name ?? '班级访客',
-        permissions: parsePermissions(rolePermRows[0]?.permissions),
-        scopes: [{ type: 'class', gradeId: guestGradeId, classId: guestClassId }],
-        mustChangePassword: false,
-      };
-    }
-    let userId: number;
-    let expiresAt: number;
-    let version: number;
-    let received: string;
-    if (parts.length === 4) {
-      [userId, expiresAt, version] = parts.slice(0, 3).map(Number);
-      received = parts[3];
-      if (!Number.isFinite(userId) || !Number.isFinite(version) || !isTokenNotExpired(expiresAt, Date.now()))
-        return null;
-      const expected = signature(userId, expiresAt, version, auth.token_secret);
-      const a = Buffer.from(received || '');
-      const b = Buffer.from(expected);
-      if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
-    } else if (parts.length === 3) {
-      // v1.29.1 and earlier shared admin tokens map to the default admin account.
-      // Their version is global, so security-sensitive user changes invalidate
-      // every legacy shared token through invalidateLegacySharedToken().
-      [expiresAt, version] = parts.slice(0, 2).map(Number);
-      received = parts[2];
-      if (!isTokenNotExpired(expiresAt, Date.now()) || !isLegacySharedTokenVersionCurrent(version, auth.token_version))
-        return null;
-      const legacyExpected = createHmac('sha256', auth.token_secret)
-        .update(`${expiresAt}.${version}`)
-        .digest('base64url');
-      const a = Buffer.from(received || '');
-      const b = Buffer.from(legacyExpected);
-      if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
-      const adminRows = assertRows(
-        await authSql()`SELECT id FROM app_users WHERE LOWER(username)='admin' LIMIT 1`,
-        isUserIdRow,
-        'app_users',
-      );
-      userId = Number(adminRows[0]?.id);
-    } else return null;
-    const row = await userById(userId);
-    if (parts.length === 4 && !isUserTokenVersionCurrent(row, version)) return null;
-    if (!row || row.status !== 'active') return null;
-    return actorFromUserRow(row);
-  } catch (error) {
-    // Token validation uses explicit null returns above. Re-throw unexpected failures so a
-    // database outage is reported as such instead of being disguised as an expired login.
-    throw error;
+  const parts = Buffer.from(token, 'base64url').toString().split('.');
+  if (parts.length === 7 && parts[0] === 'g') {
+    const guestInstanceId = parts[1];
+    const guestGradeId = parts[2];
+    const guestClassId = parts[3];
+    const guestExpiresAt = Number(parts[4]);
+    const guestVersion = Number(parts[5]);
+    const guestReceived = parts[6];
+    if (
+      !Number.isFinite(guestExpiresAt) ||
+      !Number.isFinite(guestVersion) ||
+      !isTokenNotExpired(guestExpiresAt, Date.now()) ||
+      guestVersion !== auth.token_version
+    )
+      return null;
+    const expectedGuest = guestSignature(
+      guestInstanceId,
+      guestGradeId,
+      guestClassId,
+      guestExpiresAt,
+      guestVersion,
+      auth.token_secret,
+    );
+    const guestA = Buffer.from(guestReceived || '');
+    const guestB = Buffer.from(expectedGuest);
+    if (guestA.length !== guestB.length || !timingSafeEqual(guestA, guestB)) return null;
+    const deviceRows = assertRows(
+      await authSql()`SELECT revoked, grade_id, class_id, is_management FROM device_instances WHERE instance_id=${guestInstanceId} LIMIT 1`,
+      isGuestDeviceRow,
+      'device_instances',
+    );
+    const guestDevice = deviceRows[0];
+    if (!guestDevice || guestDevice.revoked !== false || guestDevice.is_management === true) return null;
+    if (String(guestDevice.grade_id) !== guestGradeId || String(guestDevice.class_id) !== guestClassId) return null;
+    const roleNameRows = assertRows(
+      await authSql()`SELECT name FROM app_roles WHERE id='viewer' LIMIT 1`,
+      isGuestRoleNameRow,
+      'app_roles',
+    );
+    const rolePermRows = assertRows(
+      await authSql()`SELECT permissions FROM app_roles WHERE id='viewer' LIMIT 1`,
+      rowShape<{ permissions: unknown }>({ permissions: (_value: unknown): _value is unknown => true }),
+      'app_roles',
+    );
+    return {
+      id: 0,
+      username: guestInstanceId,
+      displayName: '班级访客',
+      roleId: 'viewer',
+      roleName: roleNameRows[0]?.name ?? '班级访客',
+      permissions: parsePermissions(rolePermRows[0]?.permissions),
+      scopes: [{ type: 'class', gradeId: guestGradeId, classId: guestClassId }],
+      mustChangePassword: false,
+    };
   }
+  let userId: number;
+  let expiresAt: number;
+  let version: number;
+  let received: string;
+  if (parts.length === 4) {
+    [userId, expiresAt, version] = parts.slice(0, 3).map(Number);
+    received = parts[3];
+    if (!Number.isFinite(userId) || !Number.isFinite(version) || !isTokenNotExpired(expiresAt, Date.now())) return null;
+    const expected = signature(userId, expiresAt, version, auth.token_secret);
+    const a = Buffer.from(received || '');
+    const b = Buffer.from(expected);
+    if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
+  } else if (parts.length === 3) {
+    // v1.29.1 and earlier shared admin tokens map to the default admin account.
+    // Their version is global, so security-sensitive user changes invalidate
+    // every legacy shared token through invalidateLegacySharedToken().
+    [expiresAt, version] = parts.slice(0, 2).map(Number);
+    received = parts[2];
+    if (!isTokenNotExpired(expiresAt, Date.now()) || !isLegacySharedTokenVersionCurrent(version, auth.token_version))
+      return null;
+    const legacyExpected = createHmac('sha256', auth.token_secret)
+      .update(`${expiresAt}.${version}`)
+      .digest('base64url');
+    const a = Buffer.from(received || '');
+    const b = Buffer.from(legacyExpected);
+    if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
+    const adminRows = assertRows(
+      await authSql()`SELECT id FROM app_users WHERE LOWER(username)='admin' LIMIT 1`,
+      isUserIdRow,
+      'app_users',
+    );
+    userId = Number(adminRows[0]?.id);
+  } else return null;
+  const row = await userById(userId);
+  if (parts.length === 4 && !isUserTokenVersionCurrent(row, version)) return null;
+  if (!row || row.status !== 'active') return null;
+  return actorFromUserRow(row);
 }
 
 export async function verifyToken(token: string | undefined): Promise<boolean> {

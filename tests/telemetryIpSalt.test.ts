@@ -36,7 +36,7 @@ test('ensureTelemetryIpSalt generates, persists, and rereads one database salt',
 
 test('resolveIpSalt uses an optional environment override before the persistent server value', () => {
   const source = functionSource(configSource, 'resolveIpSalt');
-  assert.match(configSource, /import \{ ensureTelemetryIpSalt \} from '.\/\_auth\.js';/);
+  assert.match(configSource, /import \{ ensureTelemetryIpSalt \} from '.\/_auth\.js';/);
   assert.match(source, /process\.env\.TELEMETRY_IP_SALT/);
   assert.match(source, /ensureTelemetryIpSalt\(\)/);
 });

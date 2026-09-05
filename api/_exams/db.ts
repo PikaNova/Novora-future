@@ -163,9 +163,21 @@ export function ensureTableOnce(): Promise<void> {
           action TEXT NOT NULL,
           minutes INTEGER,
           created_at BIGINT NOT NULL,
-          acknowledged_at BIGINT
+          status TEXT NOT NULL DEFAULT 'pending',
+          idempotency_key TEXT NOT NULL DEFAULT '',
+          expires_at BIGINT,
+          claimed_at BIGINT,
+          acknowledged_at BIGINT,
+          failure_reason TEXT NOT NULL DEFAULT ''
         )`,
-          transaction`CREATE INDEX IF NOT EXISTS device_commands_pending_idx ON device_commands(instance_id, acknowledged_at, created_at)`,
+          transaction`ALTER TABLE device_commands ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'pending'`,
+          transaction`ALTER TABLE device_commands ADD COLUMN IF NOT EXISTS idempotency_key TEXT NOT NULL DEFAULT ''`,
+          transaction`ALTER TABLE device_commands ADD COLUMN IF NOT EXISTS expires_at BIGINT`,
+          transaction`ALTER TABLE device_commands ADD COLUMN IF NOT EXISTS claimed_at BIGINT`,
+          transaction`ALTER TABLE device_commands ADD COLUMN IF NOT EXISTS failure_reason TEXT NOT NULL DEFAULT ''`,
+          transaction`UPDATE device_commands SET status='acknowledged' WHERE acknowledged_at IS NOT NULL AND status='pending'`,
+          transaction`CREATE UNIQUE INDEX IF NOT EXISTS device_commands_idempotency_idx ON device_commands(instance_id, idempotency_key) WHERE idempotency_key <> ''`,
+          transaction`CREATE INDEX IF NOT EXISTS device_commands_pending_idx ON device_commands(instance_id, status, created_at)`,
         ]);
         await Promise.all([
           ensureUpdatedAtBigIntOnce(),

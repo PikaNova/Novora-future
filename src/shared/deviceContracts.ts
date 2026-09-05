@@ -5,6 +5,7 @@ export const DEVICE_HEARTBEAT_ACTIVE_INTERVAL_MS = 30_000;
 export const DEVICE_HEARTBEAT_IDLE_INTERVAL_MS = 60_000;
 
 export type DeviceCommandAction = 'pause' | 'resume' | 'extend' | 'end';
+export type DeviceCommandStatus = 'pending' | 'claimed' | 'acknowledged' | 'failed' | 'expired';
 
 export interface DeviceBinding {
   gradeId: string;
@@ -28,6 +29,60 @@ export interface DeviceCommand {
   action: DeviceCommandAction;
   minutes?: number;
   createdAt: number;
+  status?: DeviceCommandStatus;
+  idempotencyKey?: string;
+  expiresAt?: number;
+  claimedAt?: number;
+  acknowledgedAt?: number;
+  failureReason?: string;
+}
+
+export const DEVICE_COMMAND_STATUSES = new Set<DeviceCommandStatus>([
+  'pending',
+  'claimed',
+  'acknowledged',
+  'failed',
+  'expired',
+]);
+
+export function isDeviceCommandStatus(value: unknown): value is DeviceCommandStatus {
+  return typeof value === 'string' && DEVICE_COMMAND_STATUSES.has(value as DeviceCommandStatus);
+}
+
+const DEVICE_COMMAND_TRANSITIONS: Record<DeviceCommandStatus, readonly DeviceCommandStatus[]> = {
+  pending: ['claimed', 'acknowledged', 'failed', 'expired'],
+  claimed: ['acknowledged', 'failed', 'expired'],
+  acknowledged: [],
+  failed: [],
+  expired: [],
+};
+
+export function canTransitionDeviceCommand(
+  from: DeviceCommandStatus,
+  to: DeviceCommandStatus,
+): boolean {
+  return DEVICE_COMMAND_TRANSITIONS[from]?.includes(to) ?? false;
+}
+
+export function transitionDeviceCommand(
+  command: DeviceCommand,
+  to: DeviceCommandStatus,
+  now = Date.now(),
+  failureReason?: string,
+): DeviceCommand | null {
+  const from = command.status ?? 'pending';
+  if (!canTransitionDeviceCommand(from, to)) return null;
+  return {
+    ...command,
+    status: to,
+    ...(to === 'claimed' ? { claimedAt: now } : {}),
+    ...(to === 'acknowledged' ? { acknowledgedAt: now } : {}),
+    ...(to === 'failed' ? { failureReason: failureReason?.slice(0, 500) || '设备执行失败' } : {}),
+  };
+}
+
+export function isDeviceCommandExpired(command: Pick<DeviceCommand, 'expiresAt'>, now = Date.now()): boolean {
+  return typeof command.expiresAt === 'number' && Number.isFinite(command.expiresAt) && command.expiresAt <= now;
 }
 
 /** 设备心跳请求体（不含 action/instanceId，由发送方附加）。 */
@@ -40,6 +95,8 @@ export type DeviceHeartbeatInput = {
   examStart?: string;
   examEnd?: string;
   acknowledgedCommandId?: string;
+  failedCommandId?: string;
+  commandFailureReason?: string;
 };
 
 export interface DeviceBindingInfo extends DeviceBinding {
@@ -117,11 +174,20 @@ export function parseDeviceCommand(value: unknown): DeviceCommand | null {
   const createdAt = asFiniteNumber(source.createdAt);
   if (!id || !isDeviceCommandAction(source.action) || createdAt === undefined) return null;
   const minutes = asFiniteNumber(source.minutes);
+  const expiresAt = asFiniteNumber(source.expiresAt);
+  const claimedAt = asFiniteNumber(source.claimedAt);
+  const acknowledgedAt = asFiniteNumber(source.acknowledgedAt);
   return {
     id,
     action: source.action,
     createdAt,
     ...(minutes === undefined ? {} : { minutes }),
+    ...(isDeviceCommandStatus(source.status) ? { status: source.status } : {}),
+    ...(typeof source.idempotencyKey === 'string' ? { idempotencyKey: source.idempotencyKey } : {}),
+    ...(expiresAt === undefined ? {} : { expiresAt }),
+    ...(claimedAt === undefined ? {} : { claimedAt }),
+    ...(acknowledgedAt === undefined ? {} : { acknowledgedAt }),
+    ...(typeof source.failureReason === 'string' ? { failureReason: source.failureReason } : {}),
   };
 }
 

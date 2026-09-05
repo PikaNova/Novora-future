@@ -30,6 +30,7 @@
     "api/login.ts",
     "api/emailAuth.ts",
     "api/_emailQueue.ts",
+    "src/shared/seo.ts",
     "api/system.ts",
     "src/utils/renderMarkdown.ts",
     "api/globals.d.ts",

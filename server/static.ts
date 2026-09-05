@@ -101,7 +101,9 @@ function injectSeo(html: string, info: SeoInfo, origin: string): string {
   );
   const head = info.keywords ? `\n  <meta name="keywords" content="${escapeHtml(info.keywords)}">` : '';
   const og = `\n  ${head}\n  <meta property="og:title" content="${escapeHtml(title)}">\n  <meta property="og:description" content="${escapeHtml(description)}">\n  <meta property="og:type" content="website">\n  <meta property="og:url" content="${escapeHtml(siteUrl + '/')}">\n  <link rel="canonical" href="${escapeHtml(siteUrl + '/')}">`;
-  return out.replace('</head>', og + '\n  </head>');
+  const h1 = `<h1 class="seo-fallback">${escapeHtml(title)}</h1>`;
+  const withH1 = out.replace(/<h1 class="seo-fallback">[\s\S]*?<\/h1>/, h1);
+  return withH1.replace('</head>', og + '\n  </head>');
 }
 
 function resolveSafePath(pathname: string): string | null {

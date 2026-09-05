@@ -570,6 +570,27 @@ git push origin main
 - 沙箱内直接运行 `npm run build` 仍受 esbuild 读取祖先目录权限限制。
 - 已改用 Vite Node API（`configFile: false`）完成生产构建验证；未修改业务源码。
 
-### 当前状态
+## 2026-09-05 18:50 并行合并协调启动
 
-`upload/main` 当前 HEAD 为 `60bdff8`，包含开发 1 / 开发 3 和数据库修复收口。待推送到 `Novora-future/main`。
+### 状态
+
+| 项目 | 状态 |
+|---|---|
+| 数据库门禁修复 | 本地 `main` 已有 `9789bc3`，待推送 |
+| 开发 1 | 运行中，分支待登记 |
+| 开发 3 | 运行中，分支待登记 |
+| 收口清单 | `workspace/v2-7-5-integration-checklist.md` |
+| 本会话改动 | 仅新增合并协调文档，不改业务代码 |
+
+### 协调规则
+
+- 开发 1 / 开发 3 各自使用独立分支，不共用 `main` 工作区。
+- 合并顺序：先推送 `main` 数据库修复，再合并开发 1、开发 3。
+- 每次合并后必须完整执行单元、类型、构建、lint、format 和真实数据库集成测试。
+- Agent 推送仍被 `SEC_E_NO_CREDENTIALS` 拦截；用户可直接执行 `git push origin main`。
+
+### 当前状态（v2.7.5 收口后更新）
+
+- `upload/main` 当前 HEAD 为 `f238038`（v2.7.5 版本发布），开发 1 / 开发 3 与数据库修复已全部合入，v2.7.5 发布检查清单全绿。
+- 数据库门禁提交 `9789bc3` 已通过 cherry-pick（`dcd8b98`）进入主线；本清单文档 `4242765` 亦已合入。
+- `novora-remote-audit` 工作区使命完成，主线内容齐平后可归档。

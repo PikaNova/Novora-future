@@ -6,6 +6,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createDbClient, type DbClient } from '../_dbAdapter.js';
 import { SCHEMA_MIGRATION_LOCK_ID } from '../_auth.js';
 import { sendRateLimited } from '../_apiError.js';
+import { ensureSchemaMigrationTables, recordSchemaMigration } from '../_schemaMigration.js';
 
 // 性能：缓存 neon 客户端（同一 warm 实例复用）。
 let _sql: DbClient | null = null;
@@ -42,9 +43,12 @@ export function ensureTableOnce(): Promise<void> {
   if (!migratePromise) {
     migratePromise = (async () => {
       const sql = database();
-      await sql.transaction((transaction) => [
-        transaction`SELECT pg_advisory_xact_lock(${SCHEMA_MIGRATION_LOCK_ID})`,
-        transaction`CREATE TABLE IF NOT EXISTS exam_data (
+      const migrationStartedAt = Date.now();
+      await ensureSchemaMigrationTables(sql, SCHEMA_MIGRATION_LOCK_ID);
+      try {
+        await sql.transaction((transaction) => [
+          transaction`SELECT pg_advisory_xact_lock(${SCHEMA_MIGRATION_LOCK_ID})`,
+          transaction`CREATE TABLE IF NOT EXISTS exam_data (
           id INTEGER PRIMARY KEY DEFAULT 1,
           items JSONB NOT NULL DEFAULT '[]',
           title TEXT NOT NULL DEFAULT '',
@@ -63,20 +67,22 @@ export function ensureTableOnce(): Promise<void> {
           updated_at BIGINT NOT NULL DEFAULT 0,
           CHECK (id = 1)
         )`,
-        transaction`ALTER TABLE exam_data ADD COLUMN IF NOT EXISTS majors JSONB NOT NULL DEFAULT '[]'`,
-        transaction`ALTER TABLE exam_data ADD COLUMN IF NOT EXISTS active_major_id TEXT NOT NULL DEFAULT ''`,
-        transaction`ALTER TABLE exam_data ADD COLUMN IF NOT EXISTS alerts JSONB`,
-        transaction`ALTER TABLE exam_data ADD COLUMN IF NOT EXISTS weekly_plans JSONB NOT NULL DEFAULT '[]'`,
-        transaction`ALTER TABLE exam_data ADD COLUMN IF NOT EXISTS schedule_mode TEXT NOT NULL DEFAULT 'major-only'`,
-        transaction`ALTER TABLE exam_data ADD COLUMN IF NOT EXISTS active_weekly_plan_id TEXT NOT NULL DEFAULT ''`,
-        transaction`ALTER TABLE exam_data ADD COLUMN IF NOT EXISTS active_weekly_plan_by_class JSONB NOT NULL DEFAULT '{}'`,
-        transaction`ALTER TABLE exam_data ADD COLUMN IF NOT EXISTS weekly_conflict_policy JSONB`,
-        transaction`ALTER TABLE exam_data ADD COLUMN IF NOT EXISTS grades JSONB NOT NULL DEFAULT '[]'`,
-        transaction`ALTER TABLE exam_data ADD COLUMN IF NOT EXISTS classes JSONB NOT NULL DEFAULT '[]'`,
-        transaction`ALTER TABLE exam_data ADD COLUMN IF NOT EXISTS initialization JSONB NOT NULL DEFAULT '{}'`,
-        transaction`ALTER TABLE exam_data ADD COLUMN IF NOT EXISTS design_policy JSONB NOT NULL DEFAULT '{"rules":[],"updatedAt":0}'`,
-        transaction`ALTER TABLE exam_data ADD COLUMN IF NOT EXISTS major_batch_presets JSONB NOT NULL DEFAULT '{"subjectGroups":[],"timeGroups":[],"updatedAt":0}'`,
-        transaction`CREATE TABLE IF NOT EXISTS device_instances (
+          transaction`ALTER TABLE exam_data ADD COLUMN IF NOT EXISTS majors JSONB NOT NULL DEFAULT '[]'`,
+          transaction`ALTER TABLE exam_data ADD COLUMN IF NOT EXISTS active_major_id TEXT NOT NULL DEFAULT ''`,
+          transaction`ALTER TABLE exam_data ADD COLUMN IF NOT EXISTS alerts JSONB`,
+          transaction`ALTER TABLE exam_data ADD COLUMN IF NOT EXISTS weekly_plans JSONB NOT NULL DEFAULT '[]'`,
+          transaction`ALTER TABLE exam_data ADD COLUMN IF NOT EXISTS schedule_mode TEXT NOT NULL DEFAULT 'major-only'`,
+          transaction`ALTER TABLE exam_data ADD COLUMN IF NOT EXISTS active_weekly_plan_id TEXT NOT NULL DEFAULT ''`,
+          transaction`ALTER TABLE exam_data ADD COLUMN IF NOT EXISTS active_weekly_plan_by_class JSONB NOT NULL DEFAULT '{}'`,
+          transaction`ALTER TABLE exam_data ADD COLUMN IF NOT EXISTS weekly_conflict_policy JSONB`,
+          transaction`ALTER TABLE exam_data ADD COLUMN IF NOT EXISTS grades JSONB NOT NULL DEFAULT '[]'`,
+          transaction`ALTER TABLE exam_data ADD COLUMN IF NOT EXISTS classes JSONB NOT NULL DEFAULT '[]'`,
+          transaction`ALTER TABLE exam_data ADD COLUMN IF NOT EXISTS initialization JSONB NOT NULL DEFAULT '{}'`,
+          transaction`ALTER TABLE exam_data ADD COLUMN IF NOT EXISTS design_policy JSONB NOT NULL DEFAULT '{"rules":[],"updatedAt":0}'`,
+          transaction`ALTER TABLE exam_data ADD COLUMN IF NOT EXISTS major_batch_presets JSONB NOT NULL DEFAULT '{"subjectGroups":[],"timeGroups":[],"updatedAt":0}'`,
+          transaction`ALTER TABLE exam_data ADD COLUMN IF NOT EXISTS exam_metadata JSONB NOT NULL DEFAULT '{}'`,
+          transaction`ALTER TABLE exam_data ADD COLUMN IF NOT EXISTS lifecycle JSONB NOT NULL DEFAULT '{"status":"draft","createdAt":0,"startedAt":null,"endedAt":null}'`,
+          transaction`CREATE TABLE IF NOT EXISTS device_instances (
           instance_id TEXT PRIMARY KEY,
           grade_id TEXT NOT NULL DEFAULT '',
           class_id TEXT NOT NULL DEFAULT '',
@@ -96,7 +102,7 @@ export function ensureTableOnce(): Promise<void> {
           last_seen_at BIGINT NOT NULL DEFAULT 0,
           updated_at BIGINT NOT NULL
         )`,
-        transaction`CREATE TABLE IF NOT EXISTS classisland_plugin_instances (
+          transaction`CREATE TABLE IF NOT EXISTS classisland_plugin_instances (
           plugin_instance_id TEXT PRIMARY KEY,
           client_secret_hash TEXT NOT NULL,
           pair_token_hash TEXT,
@@ -109,40 +115,63 @@ export function ensureTableOnce(): Promise<void> {
           created_at BIGINT NOT NULL,
           updated_at BIGINT NOT NULL
         )`,
-        transaction`CREATE TABLE IF NOT EXISTS write_throttle (
+          transaction`CREATE TABLE IF NOT EXISTS write_throttle (
           id INTEGER PRIMARY KEY DEFAULT 1,
           next_allowed_at BIGINT NOT NULL DEFAULT 0,
           CHECK (id = 1)
         )`,
-      ]);
-      await Promise.all([
-        ensureUpdatedAtBigIntOnce(),
-        sql`ALTER TABLE device_instances ADD COLUMN IF NOT EXISTS temporary_command JSONB`,
-        sql`ALTER TABLE device_instances ADD COLUMN IF NOT EXISTS is_management BOOLEAN NOT NULL DEFAULT FALSE`,
-        sql`ALTER TABLE device_instances ADD COLUMN IF NOT EXISTS management_actor_id BIGINT NOT NULL DEFAULT 0`,
-        sql`ALTER TABLE device_instances ADD COLUMN IF NOT EXISTS management_role_name TEXT NOT NULL DEFAULT ''`,
-        sql`ALTER TABLE device_instances ADD COLUMN IF NOT EXISTS management_scope_label TEXT NOT NULL DEFAULT ''`,
-        sql`ALTER TABLE classisland_plugin_instances ADD COLUMN IF NOT EXISTS client_secret_hash TEXT NOT NULL DEFAULT ''`,
-        sql`ALTER TABLE classisland_plugin_instances ADD COLUMN IF NOT EXISTS pair_token_hash TEXT`,
-        sql`ALTER TABLE classisland_plugin_instances ADD COLUMN IF NOT EXISTS pair_expires_at BIGINT`,
-        sql`ALTER TABLE classisland_plugin_instances ADD COLUMN IF NOT EXISTS grade_id TEXT NOT NULL DEFAULT ''`,
-        sql`ALTER TABLE classisland_plugin_instances ADD COLUMN IF NOT EXISTS class_id TEXT NOT NULL DEFAULT ''`,
-        sql`ALTER TABLE classisland_plugin_instances ADD COLUMN IF NOT EXISTS viewer_instance_id TEXT NOT NULL DEFAULT ''`,
-        sql`ALTER TABLE classisland_plugin_instances ADD COLUMN IF NOT EXISTS paired BOOLEAN NOT NULL DEFAULT FALSE`,
-        sql`ALTER TABLE classisland_plugin_instances ADD COLUMN IF NOT EXISTS viewer_last_seen_at BIGINT NOT NULL DEFAULT 0`,
-        sql`ALTER TABLE classisland_plugin_instances ADD COLUMN IF NOT EXISTS created_at BIGINT NOT NULL DEFAULT 0`,
-        sql`ALTER TABLE classisland_plugin_instances ADD COLUMN IF NOT EXISTS updated_at BIGINT NOT NULL DEFAULT 0`,
-      ]);
-      await sql`
+          transaction`CREATE TABLE IF NOT EXISTS device_commands (
+          id TEXT PRIMARY KEY,
+          instance_id TEXT NOT NULL REFERENCES device_instances(instance_id) ON DELETE CASCADE,
+          action TEXT NOT NULL,
+          minutes INTEGER,
+          created_at BIGINT NOT NULL,
+          acknowledged_at BIGINT
+        )`,
+          transaction`CREATE INDEX IF NOT EXISTS device_commands_pending_idx ON device_commands(instance_id, acknowledged_at, created_at)`,
+        ]);
+        await Promise.all([
+          ensureUpdatedAtBigIntOnce(),
+          sql`ALTER TABLE device_instances ADD COLUMN IF NOT EXISTS temporary_command JSONB`,
+          sql`ALTER TABLE device_instances ADD COLUMN IF NOT EXISTS is_management BOOLEAN NOT NULL DEFAULT FALSE`,
+          sql`ALTER TABLE device_instances ADD COLUMN IF NOT EXISTS management_actor_id BIGINT NOT NULL DEFAULT 0`,
+          sql`ALTER TABLE device_instances ADD COLUMN IF NOT EXISTS management_role_name TEXT NOT NULL DEFAULT ''`,
+          sql`ALTER TABLE device_instances ADD COLUMN IF NOT EXISTS management_scope_label TEXT NOT NULL DEFAULT ''`,
+          sql`ALTER TABLE classisland_plugin_instances ADD COLUMN IF NOT EXISTS client_secret_hash TEXT NOT NULL DEFAULT ''`,
+          sql`ALTER TABLE classisland_plugin_instances ADD COLUMN IF NOT EXISTS pair_token_hash TEXT`,
+          sql`ALTER TABLE classisland_plugin_instances ADD COLUMN IF NOT EXISTS pair_expires_at BIGINT`,
+          sql`ALTER TABLE classisland_plugin_instances ADD COLUMN IF NOT EXISTS grade_id TEXT NOT NULL DEFAULT ''`,
+          sql`ALTER TABLE classisland_plugin_instances ADD COLUMN IF NOT EXISTS class_id TEXT NOT NULL DEFAULT ''`,
+          sql`ALTER TABLE classisland_plugin_instances ADD COLUMN IF NOT EXISTS viewer_instance_id TEXT NOT NULL DEFAULT ''`,
+          sql`ALTER TABLE classisland_plugin_instances ADD COLUMN IF NOT EXISTS paired BOOLEAN NOT NULL DEFAULT FALSE`,
+          sql`ALTER TABLE classisland_plugin_instances ADD COLUMN IF NOT EXISTS viewer_last_seen_at BIGINT NOT NULL DEFAULT 0`,
+          sql`ALTER TABLE classisland_plugin_instances ADD COLUMN IF NOT EXISTS created_at BIGINT NOT NULL DEFAULT 0`,
+          sql`ALTER TABLE classisland_plugin_instances ADD COLUMN IF NOT EXISTS updated_at BIGINT NOT NULL DEFAULT 0`,
+        ]);
+        await sql`
         INSERT INTO exam_data (id, items, title, updated_at)
         VALUES (1, '[]', '', 0)
         ON CONFLICT (id) DO NOTHING
       `;
-      await sql`
+        await sql`
         INSERT INTO write_throttle (id, next_allowed_at)
         VALUES (1, 0)
         ON CONFLICT (id) DO NOTHING
       `;
+        await recordSchemaMigration(sql, {
+          component: 'exams',
+          description: 'exam snapshot, devices, plugins, commands, and write throttle',
+          startedAt: migrationStartedAt,
+        });
+      } catch (error) {
+        await recordSchemaMigration(sql, {
+          component: 'exams',
+          description: 'exam snapshot, devices, plugins, commands, and write throttle',
+          startedAt: migrationStartedAt,
+          error,
+        }).catch(() => undefined);
+        throw error;
+      }
     })().catch((err) => {
       migratePromise = null;
       throw err;

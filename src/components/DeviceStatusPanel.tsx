@@ -175,17 +175,31 @@ export default function DeviceStatusPanel({
   const removedFiltered = useMemo(() => filtered.filter(isRemovedGroup), [filtered]);
   const categoryFiltered = deviceCategory === 'removed' ? removedFiltered : activeFiltered;
 
-  const dashboardOnline = (item: DeviceGroup) =>
-    !!item.dashboard && !item.dashboard.revoked && now - item.dashboard.lastSeenAt <= ONLINE_MS;
-  const pluginOnline = (plugin: PluginBindingInfo) => plugin.paired && now - plugin.pluginLastSeenAt <= ONLINE_MS;
-  const viewerOnline = (plugin: PluginBindingInfo) => plugin.paired && now - plugin.viewerLastSeenAt <= ONLINE_MS;
-  const groupOnline = (item: DeviceGroup) =>
-    dashboardOnline(item) || item.plugins.some((plugin) => pluginOnline(plugin) || viewerOnline(plugin));
-  const groupLastSeenAt = (item: DeviceGroup) =>
-    Math.max(
-      item.dashboard?.lastSeenAt || 0,
-      ...item.plugins.flatMap((plugin) => [plugin.pluginLastSeenAt, plugin.viewerLastSeenAt]),
-    );
+  const dashboardOnline = useCallback(
+    (item: DeviceGroup) => !!item.dashboard && !item.dashboard.revoked && now - item.dashboard.lastSeenAt <= ONLINE_MS,
+    [now],
+  );
+  const pluginOnline = useCallback(
+    (plugin: PluginBindingInfo) => plugin.paired && now - plugin.pluginLastSeenAt <= ONLINE_MS,
+    [now],
+  );
+  const viewerOnline = useCallback(
+    (plugin: PluginBindingInfo) => plugin.paired && now - plugin.viewerLastSeenAt <= ONLINE_MS,
+    [now],
+  );
+  const groupOnline = useCallback(
+    (item: DeviceGroup) =>
+      dashboardOnline(item) || item.plugins.some((plugin) => pluginOnline(plugin) || viewerOnline(plugin)),
+    [dashboardOnline, pluginOnline, viewerOnline],
+  );
+  const groupLastSeenAt = useCallback(
+    (item: DeviceGroup) =>
+      Math.max(
+        item.dashboard?.lastSeenAt || 0,
+        ...item.plugins.flatMap((plugin) => [plugin.pluginLastSeenAt, plugin.viewerLastSeenAt]),
+      ),
+    [],
+  );
   const orderedFiltered = useMemo(
     () =>
       [...categoryFiltered].sort((a, b) => {
@@ -196,7 +210,7 @@ export default function DeviceStatusPanel({
         if (recentFirst !== 0) return recentFirst;
         return (a.instanceId || a.key).localeCompare(b.instanceId || b.key, 'zh-CN');
       }),
-    [categoryFiltered, now],
+    [categoryFiltered, groupLastSeenAt, groupOnline],
   );
   const currentGroup = groups.find((item) => item.instanceId === currentInstanceId);
   const displayedGroups = currentGroup

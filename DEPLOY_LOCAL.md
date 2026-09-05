@@ -68,6 +68,8 @@ npm start 只启动已编译的服务（server-build/server/serve.js），适合
 | GITHUB_REPO / GITHUB_TOKEN | 可选                                          | 更新检查；留空使用默认公开仓库或自动禁用                                                        |
 | VERCEL_DEPLOY_HOOK_URL     | 可选                                          | 本地留空，部署按钮自动隐藏/返回未配置                                                           |
 | ENTRY_RATE_LIMIT_*         | 可选                                          | 入口限流阈值，有安全默认值                                                                      |
+| INTEGRATION_DATABASE_URL   | 测试专用                                      | 独立一次性 PostgreSQL 连接串；集成测试会清空该库，禁止使用生产 `DATABASE_URL`                   |
+| INTEGRATION_TEST_CONFIRM   | 测试专用                                      | 必须设置为 `novora-disposable` 才会启动集成测试                                                 |
 | VITE_SPEED_INSIGHTS        | 可选                                          | 本地构建设为 false 关闭 Vercel Speed Insights（.env.example 默认 false；Docker 构建默认 false） |
 
 ## 公告图片说明

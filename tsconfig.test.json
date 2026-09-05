@@ -71,6 +71,12 @@
     "src/utils/deviceScope.ts",
     "src/utils/trackClassIds.ts",
     "src/utils/retryCountdown.ts",
-    "src/hooks/useRetryCountdown.ts"
+    "src/hooks/useRetryCountdown.ts",
+    "src/hooks/useExamNotify.ts",
+    "src/hooks/useAlertOverlay.ts",
+    "src/shared/typeGuards.ts",
+    "src/shared/deviceContracts.ts",
+    "src/shared/examContracts.ts",
+    "src/utils/deviceCommandReceipt.ts"
   ]
 }

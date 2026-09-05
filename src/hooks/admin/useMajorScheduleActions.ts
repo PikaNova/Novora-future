@@ -8,6 +8,7 @@ import { classesInMajorScope as sharedClassesInMajorScope, computeAutoTrackClass
 import type { InitializationState } from '../../utils/settings/school';
 import { getAppSettings, updateExamSettings, updateAlertsSettings, genMajorId } from '../../utils/appSettings';
 import { getCloudSnapshot, saveExamsToServer, type AdminUserContext } from '../../services/examService';
+import type { ExamSavePayload } from '../../shared/examContracts';
 import { threeWayMergeExam } from '../../utils/examMerge';
 import { clearPendingExamSync, getPendingExamSync, queuePendingExamSync } from '../../services/examOutbox';
 import { recordSyncConflict } from '../../services/offlineStore';
@@ -101,7 +102,7 @@ export function useMajorScheduleActions(params: {
 
   useEffect(() => {
     if (majorModal) setMajorModalStep(0);
-  }, [majorModal !== null]);
+  }, [majorModal]);
 
   useEffect(() => {
     if (!adminUser || !visibleGrades.length) return;
@@ -216,18 +217,21 @@ export function useMajorScheduleActions(params: {
     updateExamSettings({ selectedGradeId, selectedClassId: classId });
   };
 
-  const buildPayload = (ms: MajorExam[], activeId: string) => {
-    const active = ms.find((m) => m.id === activeId) ?? ms[0];
-    return {
-      items: active?.items ?? [],
-      title: active?.name ?? '',
-      majors: ms,
-      activeMajorId: activeId,
-      alerts: alertsRef.current,
-      ...weeklyStateRef.current,
-      initialization: initializationRef.current,
-    };
-  };
+  const buildPayload = useCallback(
+    (ms: MajorExam[], activeId: string): ExamSavePayload => {
+      const active = ms.find((m) => m.id === activeId) ?? ms[0];
+      return {
+        items: active?.items ?? [],
+        title: active?.name ?? '',
+        majors: ms,
+        activeMajorId: activeId,
+        alerts: alertsRef.current,
+        ...weeklyStateRef.current,
+        initialization: initializationRef.current,
+      };
+    },
+    [alertsRef, weeklyStateRef, initializationRef],
+  );
 
   const pushToServerExec = useCallback(
     async (ms: MajorExam[], activeId: string, syncLabel = '保存考试安排') => {
@@ -254,7 +258,7 @@ export function useMajorScheduleActions(params: {
           baseUpdatedAt: currentBaseUpdatedAt,
           clientQueueKey: 'admin-exam-save',
           clientSyncLabel: attempt === 0 ? syncLabel : `${syncLabel} · 合并后重试(${attempt})`,
-        } as never);
+        });
         if (isStalePush()) return;
         if (result === 'unauthorized') {
           navigate('/login?next=/admin', { replace: true });
@@ -270,15 +274,9 @@ export function useMajorScheduleActions(params: {
             return;
           }
           const local = { ...currentPayload, updatedAt: currentBaseUpdatedAt };
-          const merged = threeWayMergeExam(
-            (currentBaseline ?? result.remote) as never,
-            local as never,
-            result.remote as never,
-          );
+          const merged = threeWayMergeExam(currentBaseline ?? result.remote, local, result.remote);
           if (merged.conflictCount) void recordSyncConflict(merged.conflictCount, local, result.remote);
-          const { alerts: mergedAlerts, ...mergedExam } = merged.payload as typeof payload & {
-            alerts?: AlertsSettings;
-          };
+          const { alerts: mergedAlerts, ...mergedExam } = merged.payload;
           const normalizedMergedExam = {
             ...mergedExam,
             weeklyConflictPolicy:
@@ -301,16 +299,16 @@ export function useMajorScheduleActions(params: {
           updateExamSettings({
             ...normalizedMergedExam,
             updatedAt: result.remote.updatedAt,
-          } as never);
+          });
           if (mergedAlerts) {
             updateAlertsSettings({
               ...mergedAlerts,
               updatedAt: result.remote.updatedAt,
-            } as never);
+            });
             setAlerts(getAppSettings().alerts);
           }
           totalConflicts += merged.conflictCount;
-          currentPayload = merged.payload as typeof payload;
+          currentPayload = merged.payload;
           currentBaseUpdatedAt = result.remote.updatedAt;
           currentBaseline = result.remote;
           if (attempt < MAX_ATTEMPTS - 1) {
@@ -341,24 +339,22 @@ export function useMajorScheduleActions(params: {
         }
         pendingRef.current = false;
         clearPendingExamSync(expectedSavedAt);
-        const { alerts: pAlerts, ...examPayload } = currentPayload as typeof payload & {
-          alerts?: AlertsSettings;
-        };
+        const { alerts: pAlerts, ...examPayload } = currentPayload;
         updateExamSettings({
           ...examPayload,
           weeklyConflictPolicy:
             (examPayload as { weeklyConflictPolicy?: unknown }).weeklyConflictPolicy ??
             weeklyStateRef.current.weeklyConflictPolicy,
           updatedAt: result,
-        } as never);
-        if (pAlerts) updateAlertsSettings({ ...pAlerts, updatedAt: result } as never);
+        });
+        if (pAlerts) updateAlertsSettings({ ...pAlerts, updatedAt: result });
         setSync('saved');
         if (totalConflicts)
           notify('warning', `已合并本机与云端修改；${totalConflicts} 个同字段冲突保留本机值。`, '数据冲突已处理');
         return;
       }
     },
-    [navigate],
+    [buildPayload, navigate, pendingRef, setAlerts, setSync, stateRef, weeklyStateRef],
   );
 
   const pushToServer = useCallback(
@@ -367,7 +363,7 @@ export function useMajorScheduleActions(params: {
       examPushChainRef.current = run.catch(() => {});
       return run;
     },
-    [pushToServerExec],
+    [examPushChainRef, pushToServerExec],
   );
 
   const commit = useCallback(
@@ -377,8 +373,8 @@ export function useMajorScheduleActions(params: {
       setActiveMajorId(activeId);
       const now = Date.now();
       const { alerts: pAlerts, ...examPayload } = buildPayload(ms, activeId);
-      updateExamSettings({ ...examPayload, updatedAt: now } as never);
-      if (pAlerts) updateAlertsSettings({ ...pAlerts, updatedAt: now } as never);
+      updateExamSettings({ ...examPayload, updatedAt: now });
+      if (pAlerts) updateAlertsSettings({ ...pAlerts, updatedAt: now });
       queuePendingExamSync({
         payload: { ...examPayload, alerts: pAlerts ?? null },
         baseSnapshot: getCloudSnapshot(),
@@ -395,7 +391,7 @@ export function useMajorScheduleActions(params: {
         void pushToServer(ms, activeId, syncLabel);
       }, 650);
     },
-    [pushToServer],
+    [buildPayload, pendingRef, pushToServer, saveTimer, setSync, stateRef],
   );
 
   const commitItems = useCallback(
@@ -403,7 +399,7 @@ export function useMajorScheduleActions(params: {
       const ms = stateRef.current.majors.map((m) => (m.id === editingMajorId ? { ...m, items: nextItems } : m));
       commit(ms, stateRef.current.activeMajorId, false, syncLabel);
     },
-    [commit, editingMajorId],
+    [commit, editingMajorId, stateRef],
   );
   const commitBatchMajorItems = (nextItems: ExamItem[]) => {
     commitItems(normalizeExamItems(nextItems), '批量更新分考试');

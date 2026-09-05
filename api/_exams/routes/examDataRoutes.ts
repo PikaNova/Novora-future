@@ -39,7 +39,7 @@ export async function handleBootstrap(req: VercelRequest, res: VercelResponse, s
   const selectBootstrap = async (): Promise<ExamRow[]> =>
     (await sql`
       SELECT items, title, majors, active_major_id, alerts, weekly_plans, schedule_mode,
-             active_weekly_plan_id, active_weekly_plan_by_class, weekly_conflict_policy, grades, classes, initialization, design_policy, major_batch_presets, updated_at,
+             active_weekly_plan_id, active_weekly_plan_by_class, weekly_conflict_policy, grades, classes, initialization, design_policy, major_batch_presets, exam_metadata, lifecycle, updated_at,
              (SELECT grade_id FROM device_instances WHERE instance_id = ${instanceId}) AS bound_grade_id,
              (SELECT class_id FROM device_instances WHERE instance_id = ${instanceId}) AS bound_class_id,
              (SELECT revoked FROM device_instances WHERE instance_id = ${instanceId}) AS binding_revoked,
@@ -82,7 +82,7 @@ export async function handleExamDataGet(req: VercelRequest, res: VercelResponse,
   // 现在每次 GET 都直接查库，只用 ETag 做协商缓存（304），保证任何时刻返回的
   // 都是当次真实查询到的最新数据。
   const selectRow = async (): Promise<ExamRow[]> =>
-    (await sql`SELECT items, title, majors, active_major_id, alerts, weekly_plans, schedule_mode, active_weekly_plan_id, active_weekly_plan_by_class, weekly_conflict_policy, grades, classes, initialization, design_policy, major_batch_presets, updated_at FROM exam_data WHERE id = 1`) as unknown as ExamRow[];
+    (await sql`SELECT items, title, majors, active_major_id, alerts, weekly_plans, schedule_mode, active_weekly_plan_id, active_weekly_plan_by_class, weekly_conflict_policy, grades, classes, initialization, design_policy, major_batch_presets, exam_metadata, lifecycle, updated_at FROM exam_data WHERE id = 1`) as unknown as ExamRow[];
   let rows: ExamRow[];
   try {
     rows = await selectRow();
@@ -134,7 +134,7 @@ export async function handleExamDataPost(req: VercelRequest, res: VercelResponse
     let currentRows: ExamRow[];
     try {
       currentRows =
-        (await sql`SELECT items, title, majors, active_major_id, alerts, weekly_plans, schedule_mode, active_weekly_plan_id, active_weekly_plan_by_class, weekly_conflict_policy, grades, classes, initialization, design_policy, major_batch_presets, updated_at FROM exam_data WHERE id=1`) as unknown as ExamRow[];
+        (await sql`SELECT items, title, majors, active_major_id, alerts, weekly_plans, schedule_mode, active_weekly_plan_id, active_weekly_plan_by_class, weekly_conflict_policy, grades, classes, initialization, design_policy, major_batch_presets, exam_metadata, lifecycle, updated_at FROM exam_data WHERE id=1`) as unknown as ExamRow[];
     } catch (error) {
       if (!missingRelation(error)) throw error;
       await ensureTableOnce();
@@ -142,6 +142,17 @@ export async function handleExamDataPost(req: VercelRequest, res: VercelResponse
         (await sql`SELECT items, title, majors, active_major_id, alerts, weekly_plans, schedule_mode, active_weekly_plan_id, active_weekly_plan_by_class, weekly_conflict_policy, grades, classes, initialization, design_policy, major_batch_presets, updated_at FROM exam_data WHERE id=1`) as unknown as ExamRow[];
     }
     const currentPayload = examPayload(currentRows[0] ?? {});
+    // Scope 删除后，旧 token 仍可能在有效期内；无 scope 的受限账号不得借助
+    // stale-snapshot 清洗把越权写请求伪装成“无变化”并获得 200。
+    if (actor && !actor.permissions.includes('*') && actor.scopes.length === 0) {
+      res.status(403).json({
+        ok: false,
+        code: 'PERMISSION_DENIED',
+        error: '当前账号已没有可管理的数据范围',
+        requestId: res.getHeader('X-Request-Id'),
+      });
+      return;
+    }
     if (action === 'initialize') {
       const alreadyInitialized =
         Number((currentPayload.initialization as { completedAt?: unknown } | null)?.completedAt ?? 0) > 0 ||
@@ -197,6 +208,8 @@ export async function handleExamDataPost(req: VercelRequest, res: VercelResponse
     grades,
     classes,
     initialization,
+    metadata,
+    lifecycle,
     baseUpdatedAt,
   } = req.body ?? {};
   const expectedVersion = Number(baseUpdatedAt ?? 0);
@@ -233,6 +246,8 @@ export async function handleExamDataPost(req: VercelRequest, res: VercelResponse
           grades = COALESCE(${Array.isArray(grades) ? JSON.stringify(grades) : null}::jsonb, grades),
           classes = COALESCE(${Array.isArray(classes) ? JSON.stringify(classes) : null}::jsonb, classes),
           initialization = COALESCE(${initialization && typeof initialization === 'object' ? JSON.stringify(initialization) : null}::jsonb, initialization),
+          exam_metadata = COALESCE(${metadata && typeof metadata === 'object' ? JSON.stringify(metadata) : null}::jsonb, exam_metadata),
+          lifecycle = COALESCE(${lifecycle && typeof lifecycle === 'object' ? JSON.stringify(lifecycle) : null}::jsonb, lifecycle),
           weekly_conflict_policy = COALESCE(${weeklyConflictPolicy && typeof weeklyConflictPolicy === 'object' ? JSON.stringify(weeklyConflictPolicy) : null}::jsonb, weekly_conflict_policy),
           updated_at = ${updatedAt}
       -- 显式 BIGINT：毫秒级 baseUpdatedAt 不能在与字面量 0 比较时被 PostgreSQL 推断为 INTEGER。
@@ -256,7 +271,7 @@ export async function handleExamDataPost(req: VercelRequest, res: VercelResponse
   }
   if (!updatedRows?.length) {
     const rows =
-      (await sql`SELECT items, title, majors, active_major_id, alerts, weekly_plans, schedule_mode, active_weekly_plan_id, active_weekly_plan_by_class, weekly_conflict_policy, grades, classes, initialization, design_policy, major_batch_presets, updated_at FROM exam_data WHERE id = 1`) as unknown as ExamRow[];
+      (await sql`SELECT items, title, majors, active_major_id, alerts, weekly_plans, schedule_mode, active_weekly_plan_id, active_weekly_plan_by_class, weekly_conflict_policy, grades, classes, initialization, design_policy, major_batch_presets, exam_metadata, lifecycle, updated_at FROM exam_data WHERE id = 1`) as unknown as ExamRow[];
     const row = rows[0] ?? {};
     const { ok: _ok, ...remote } = examPayload(row);
     res.status(409).json({

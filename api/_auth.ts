@@ -20,6 +20,7 @@ import {
   rowShape,
   type DatabaseInt8,
 } from './_validation.js';
+import { ensureSchemaMigrationTables, recordSchemaMigration } from './_schemaMigration.js';
 
 const scrypt = promisify(scryptCallback);
 const BOOTSTRAP_PASSWORD = process.env.ADMIN_PASSWORD || '';
@@ -220,9 +221,12 @@ export async function ensureAuthTables(): Promise<void> {
   if (!setupPromise)
     setupPromise = (async () => {
       const sql = authSql();
-      await sql.transaction((transaction) => [
-        transaction`SELECT pg_advisory_xact_lock(${SCHEMA_MIGRATION_LOCK_ID})`,
-        transaction`CREATE TABLE IF NOT EXISTS app_auth (
+      const migrationStartedAt = Date.now();
+      await ensureSchemaMigrationTables(sql, SCHEMA_MIGRATION_LOCK_ID);
+      try {
+        await sql.transaction((transaction) => [
+          transaction`SELECT pg_advisory_xact_lock(${SCHEMA_MIGRATION_LOCK_ID})`,
+          transaction`CREATE TABLE IF NOT EXISTS app_auth (
         id INTEGER PRIMARY KEY DEFAULT 1,
         password_hash TEXT NOT NULL,
         password_salt TEXT NOT NULL,
@@ -232,15 +236,15 @@ export async function ensureAuthTables(): Promise<void> {
         updated_at BIGINT NOT NULL,
         CHECK (id = 1)
       )`,
-        transaction`ALTER TABLE app_auth ADD COLUMN IF NOT EXISTS recovery_key_hash TEXT`,
-        transaction`ALTER TABLE app_auth ADD COLUMN IF NOT EXISTS recovery_key_salt TEXT`,
-        transaction`CREATE TABLE IF NOT EXISTS app_telemetry_config (
+          transaction`ALTER TABLE app_auth ADD COLUMN IF NOT EXISTS recovery_key_hash TEXT`,
+          transaction`ALTER TABLE app_auth ADD COLUMN IF NOT EXISTS recovery_key_salt TEXT`,
+          transaction`CREATE TABLE IF NOT EXISTS app_telemetry_config (
         id INTEGER PRIMARY KEY DEFAULT 1,
         ip_salt TEXT NOT NULL,
         created_at BIGINT NOT NULL,
         CHECK (id = 1)
       )`,
-        transaction`CREATE TABLE IF NOT EXISTS app_roles (
+          transaction`CREATE TABLE IF NOT EXISTS app_roles (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
         description TEXT NOT NULL DEFAULT '',
@@ -249,7 +253,7 @@ export async function ensureAuthTables(): Promise<void> {
         created_at BIGINT NOT NULL,
         updated_at BIGINT NOT NULL
       )`,
-        transaction`CREATE TABLE IF NOT EXISTS app_users (
+          transaction`CREATE TABLE IF NOT EXISTS app_users (
         id BIGSERIAL PRIMARY KEY,
         username TEXT NOT NULL,
         display_name TEXT NOT NULL,
@@ -263,8 +267,8 @@ export async function ensureAuthTables(): Promise<void> {
         created_at BIGINT NOT NULL,
         updated_at BIGINT NOT NULL
       )`,
-        transaction`CREATE UNIQUE INDEX IF NOT EXISTS idx_app_users_username_lower ON app_users (LOWER(username))`,
-        transaction`CREATE TABLE IF NOT EXISTS app_user_scopes (
+          transaction`CREATE UNIQUE INDEX IF NOT EXISTS idx_app_users_username_lower ON app_users (LOWER(username))`,
+          transaction`CREATE TABLE IF NOT EXISTS app_user_scopes (
         id BIGSERIAL PRIMARY KEY,
         user_id BIGINT NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
         scope_type TEXT NOT NULL,
@@ -272,7 +276,7 @@ export async function ensureAuthTables(): Promise<void> {
         class_id TEXT NOT NULL DEFAULT '',
         UNIQUE(user_id, scope_type, grade_id, class_id)
       )`,
-        transaction`CREATE TABLE IF NOT EXISTS app_audit_logs (
+          transaction`CREATE TABLE IF NOT EXISTS app_audit_logs (
         id BIGSERIAL PRIMARY KEY,
         user_id BIGINT,
         username TEXT NOT NULL DEFAULT '',
@@ -284,10 +288,10 @@ export async function ensureAuthTables(): Promise<void> {
         detail JSONB,
         created_at BIGINT NOT NULL
       )`,
-        transaction`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS email TEXT`,
-        transaction`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS email_bound_at BIGINT`,
-        transaction`CREATE UNIQUE INDEX IF NOT EXISTS idx_app_users_email ON app_users (email) WHERE email IS NOT NULL`,
-        transaction`CREATE TABLE IF NOT EXISTS email_verification_codes (
+          transaction`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS email TEXT`,
+          transaction`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS email_bound_at BIGINT`,
+          transaction`CREATE UNIQUE INDEX IF NOT EXISTS idx_app_users_email ON app_users (email) WHERE email IS NOT NULL`,
+          transaction`CREATE TABLE IF NOT EXISTS email_verification_codes (
         id BIGSERIAL PRIMARY KEY,
         email TEXT NOT NULL,
         purpose TEXT NOT NULL DEFAULT 'login',
@@ -297,9 +301,9 @@ export async function ensureAuthTables(): Promise<void> {
         created_at BIGINT NOT NULL,
         ip TEXT NOT NULL DEFAULT ''
       )`,
-        transaction`CREATE INDEX IF NOT EXISTS idx_email_codes_email ON email_verification_codes (email)`,
-        transaction`CREATE INDEX IF NOT EXISTS idx_email_codes_expires ON email_verification_codes (expires_at)`,
-        transaction`CREATE TABLE IF NOT EXISTS email_config (
+          transaction`CREATE INDEX IF NOT EXISTS idx_email_codes_email ON email_verification_codes (email)`,
+          transaction`CREATE INDEX IF NOT EXISTS idx_email_codes_expires ON email_verification_codes (expires_at)`,
+          transaction`CREATE TABLE IF NOT EXISTS email_config (
         id INTEGER PRIMARY KEY DEFAULT 1,
         smtp_host TEXT NOT NULL DEFAULT '',
         smtp_port INTEGER NOT NULL DEFAULT 465,
@@ -313,8 +317,8 @@ export async function ensureAuthTables(): Promise<void> {
         updated_at BIGINT NOT NULL DEFAULT 0,
         CHECK (id = 1)
       )`,
-        transaction`ALTER TABLE email_config ADD COLUMN IF NOT EXISTS init_bind_policy TEXT NOT NULL DEFAULT 'optional'`,
-        transaction`CREATE TABLE IF NOT EXISTS email_outbox (
+          transaction`ALTER TABLE email_config ADD COLUMN IF NOT EXISTS init_bind_policy TEXT NOT NULL DEFAULT 'optional'`,
+          transaction`CREATE TABLE IF NOT EXISTS email_outbox (
         id BIGSERIAL PRIMARY KEY,
         email TEXT NOT NULL,
         purpose TEXT NOT NULL DEFAULT 'login',
@@ -328,44 +332,58 @@ export async function ensureAuthTables(): Promise<void> {
         sent_at BIGINT,
         updated_at BIGINT NOT NULL
       )`,
-        transaction`CREATE INDEX IF NOT EXISTS idx_email_outbox_due ON email_outbox (status, next_attempt_at)`,
-        transaction`CREATE TABLE IF NOT EXISTS mail_throttle (
+          transaction`CREATE INDEX IF NOT EXISTS idx_email_outbox_due ON email_outbox (status, next_attempt_at)`,
+          transaction`CREATE TABLE IF NOT EXISTS mail_throttle (
         id INTEGER PRIMARY KEY DEFAULT 1,
         last_sent_at BIGINT NOT NULL DEFAULT 0,
         CHECK (id = 1)
       )`,
-      ]);
-      const now = Date.now();
-      await authSql()`INSERT INTO mail_throttle (id, last_sent_at) VALUES (1, 0) ON CONFLICT (id) DO NOTHING`;
-      await Promise.all(
-        BUILTIN_ROLES.map(
-          (role) => sql`INSERT INTO app_roles (id, name, description, permissions, built_in, created_at, updated_at)
+        ]);
+        const now = Date.now();
+        await authSql()`INSERT INTO mail_throttle (id, last_sent_at) VALUES (1, 0) ON CONFLICT (id) DO NOTHING`;
+        await Promise.all(
+          BUILTIN_ROLES.map(
+            (role) => sql`INSERT INTO app_roles (id, name, description, permissions, built_in, created_at, updated_at)
       VALUES (${role.id}, ${role.name}, ${role.description}, ${JSON.stringify(role.permissions)}::jsonb, TRUE, ${now}, ${now})
       ON CONFLICT (id) DO UPDATE SET name=EXCLUDED.name, description=EXCLUDED.description, permissions=EXCLUDED.permissions, built_in=TRUE, updated_at=EXCLUDED.updated_at`,
-        ),
-      );
-      // v1.32：精简旧内置角色。教务管理员降为全范围年级管理员，设备管理员迁移为巡考员（viewer）。
-      await sql`UPDATE app_users SET role_id='grade_admin', token_version=token_version+1, updated_at=${now} WHERE role_id='academic_admin'`;
-      await sql`UPDATE app_users SET role_id='viewer', token_version=token_version+1, updated_at=${now} WHERE role_id='device_admin'`;
-      await sql`DELETE FROM app_roles WHERE id IN ('academic_admin','device_admin') AND NOT EXISTS (SELECT 1 FROM app_users WHERE app_users.role_id=app_roles.id)`;
-      await sql`UPDATE app_roles SET name='班级访客', description='未登录设备可查看本班考试安排、周测与教室大屏，可导出核对，不修改任何数据。', updated_at=${now} WHERE id='viewer'`;
-      // 已经完成过旧版密码初始化的数据库可直接生成默认超级管理员，无需再次输入或重置数据。
-      const [legacyRowsRaw, userCountRowsRaw] = await Promise.all([
-        sql`SELECT password_hash, password_salt FROM app_auth WHERE id=1`,
-        sql`SELECT COUNT(*)::int AS count FROM app_users`,
-      ]);
-      const legacyRows = assertRows(legacyRowsRaw, isPasswordSaltRow, 'app_auth');
-      const userCountRows = assertRows(userCountRowsRaw, isCountRow, 'app_users');
-      if (legacyRows[0] && Number(userCountRows[0]?.count) === 0) {
-        const created = assertRows(
-          await sql`INSERT INTO app_users (username, display_name, password_hash, password_salt, role_id, status, must_change_password, token_version, created_at, updated_at)
+          ),
+        );
+        // v1.32：精简旧内置角色。教务管理员降为全范围年级管理员，设备管理员迁移为巡考员（viewer）。
+        await sql`UPDATE app_users SET role_id='grade_admin', token_version=token_version+1, updated_at=${now} WHERE role_id='academic_admin'`;
+        await sql`UPDATE app_users SET role_id='viewer', token_version=token_version+1, updated_at=${now} WHERE role_id='device_admin'`;
+        await sql`DELETE FROM app_roles WHERE id IN ('academic_admin','device_admin') AND NOT EXISTS (SELECT 1 FROM app_users WHERE app_users.role_id=app_roles.id)`;
+        await sql`UPDATE app_roles SET name='班级访客', description='未登录设备可查看本班考试安排、周测与教室大屏，可导出核对，不修改任何数据。', updated_at=${now} WHERE id='viewer'`;
+        // 已经完成过旧版密码初始化的数据库可直接生成默认超级管理员，无需再次输入或重置数据。
+        const [legacyRowsRaw, userCountRowsRaw] = await Promise.all([
+          sql`SELECT password_hash, password_salt FROM app_auth WHERE id=1`,
+          sql`SELECT COUNT(*)::int AS count FROM app_users`,
+        ]);
+        const legacyRows = assertRows(legacyRowsRaw, isPasswordSaltRow, 'app_auth');
+        const userCountRows = assertRows(userCountRowsRaw, isCountRow, 'app_users');
+        if (legacyRows[0] && Number(userCountRows[0]?.count) === 0) {
+          const created = assertRows(
+            await sql`INSERT INTO app_users (username, display_name, password_hash, password_salt, role_id, status, must_change_password, token_version, created_at, updated_at)
         VALUES ('admin', '超级管理员', ${legacyRows[0].password_hash}, ${legacyRows[0].password_salt}, 'super_admin', 'active', FALSE, 1, ${now}, ${now})
         ON CONFLICT DO NOTHING RETURNING id`,
-          isUserIdRow,
-          'app_users',
-        );
-        if (created[0])
-          await sql`INSERT INTO app_user_scopes (user_id, scope_type, grade_id, class_id) VALUES (${created[0].id}, 'all', '', '') ON CONFLICT DO NOTHING`;
+            isUserIdRow,
+            'app_users',
+          );
+          if (created[0])
+            await sql`INSERT INTO app_user_scopes (user_id, scope_type, grade_id, class_id) VALUES (${created[0].id}, 'all', '', '') ON CONFLICT DO NOTHING`;
+        }
+        await recordSchemaMigration(sql, {
+          component: 'auth',
+          description: 'authentication tables, roles, and bootstrap data',
+          startedAt: migrationStartedAt,
+        });
+      } catch (error) {
+        await recordSchemaMigration(sql, {
+          component: 'auth',
+          description: 'authentication tables, roles, and bootstrap data',
+          startedAt: migrationStartedAt,
+          error,
+        }).catch(() => undefined);
+        throw error;
       }
     })().catch((error) => {
       setupPromise = null;

@@ -6,6 +6,7 @@ import { examPayload } from '../payload.js';
 import { allScope } from '../permissions.js';
 import { actorScopeLabel } from '../plugin.js';
 import type { ExamRow } from '../types.js';
+import type { DeviceInstanceRow, PluginInstanceRow } from '../../../src/shared/deviceContracts.js';
 import { type AdminActor, canAccessClass, isPasswordRequired, requireActor, writeAudit } from '../../_auth.js';
 
 export async function handleDeviceBindings(req: VercelRequest, res: VercelResponse): Promise<void> {
@@ -25,11 +26,9 @@ export async function handleDeviceBindings(req: VercelRequest, res: VercelRespon
   }
   await ensureTableOnce();
   const [deviceRows, pluginRows] = await Promise.all([
-    sql`SELECT * FROM device_instances ORDER BY updated_at DESC LIMIT 2001` as unknown as Promise<
-      Array<Record<string, any>>
-    >,
+    sql`SELECT * FROM device_instances ORDER BY updated_at DESC LIMIT 2001` as unknown as Promise<DeviceInstanceRow[]>,
     sql`SELECT plugin_instance_id, grade_id, class_id, viewer_instance_id, paired, viewer_last_seen_at, updated_at FROM classisland_plugin_instances ORDER BY updated_at DESC LIMIT 2001` as unknown as Promise<
-      Array<Record<string, any>>
+      PluginInstanceRow[]
     >,
   ]);
   const currentManagement =
@@ -302,9 +301,7 @@ export async function handleDeviceRoleUpdate(req: VercelRequest, res: VercelResp
     return;
   }
 
-  const targetClass = (payload.classes as Array<Record<string, unknown>>).find(
-    (item) => String(item.id ?? '') === classId && String(item.gradeId ?? '') === gradeId,
-  );
+  const targetClass = payload.classes.find((item) => item.id === classId && item.gradeId === gradeId);
   if (!gradeId || !classId || !targetClass) {
     res.status(400).json({ ok: false, error: '请选择有效的年级和班级' });
     return;
@@ -396,7 +393,11 @@ export async function handleDeviceCommand(req: VercelRequest, res: VercelRespons
     minutes: commandAction === 'extend' ? Math.min(120, Math.max(1, Number(req.body?.minutes) || 5)) : undefined,
     createdAt: Date.now(),
   };
-  await sql`UPDATE device_instances SET temporary_command=${JSON.stringify(command)}::jsonb, updated_at=${Date.now()} WHERE instance_id=${instanceId}`;
+  await sql.transaction((transaction) => [
+    transaction`INSERT INTO device_commands (id, instance_id, action, minutes, created_at)
+      VALUES (${command.id}, ${instanceId}, ${command.action}, ${command.minutes ?? null}, ${command.createdAt})`,
+    transaction`UPDATE device_instances SET temporary_command=${JSON.stringify(command)}::jsonb, updated_at=${Date.now()} WHERE instance_id=${instanceId}`,
+  ]);
   await writeAudit(deviceActor, `device.temporary.${commandAction}`, 'device', instanceId);
   res.status(200).json({ ok: true, command });
   return;

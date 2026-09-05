@@ -12,26 +12,9 @@ import {
   hasPermission as sharedHasPermission,
   type PermissionScope,
 } from '../shared/permissionRules';
+import { parseExamPayload, type ExamPayload } from '../shared/examContracts';
 
-export interface ExamPayload {
-  items: ExamItem[];
-  title: string;
-  majors: MajorExam[];
-  activeMajorId: string;
-  alerts: AlertsSettings | null;
-  scheduleMode?: ScheduleMode;
-  weeklyPlans?: WeeklyPlan[];
-  activeWeeklyPlanId?: string | null;
-  activeWeeklyPlanIdByClassId?: Record<string, string | null>;
-  grades?: SchoolGrade[];
-  classes?: SchoolClass[];
-  initialization?: ExamSettings['initialization'];
-  weeklyConflictPolicy?: WeeklyConflictPolicy | null;
-  designPolicy?: DesignPolicy;
-  majorBatchPresets?: { subjectGroups: unknown[]; timeGroups: unknown[]; updatedAt: number };
-  binding?: { gradeId: string; classId: string; revoked: boolean; isManagement?: boolean } | null;
-  updatedAt: number;
-}
+export type { ExamPayload };
 
 const API_URL = '/api/exams';
 const LOGIN_URL = '/api/login';
@@ -58,49 +41,6 @@ export function takeGeneratedRecoveryKey(): string | null {
   return value;
 }
 
-function toPayload(data: any): ExamPayload {
-  return {
-    items: Array.isArray(data?.items) ? data.items : [],
-    title: typeof data?.title === 'string' ? data.title : '',
-    majors: Array.isArray(data?.majors) ? data.majors : [],
-    activeMajorId: typeof data?.activeMajorId === 'string' ? data.activeMajorId : '',
-    alerts: data?.alerts && typeof data.alerts === 'object' ? data.alerts : null,
-    scheduleMode: typeof data?.scheduleMode === 'string' ? (data.scheduleMode as ScheduleMode) : undefined,
-    weeklyPlans: Array.isArray(data?.weeklyPlans) ? (data.weeklyPlans as WeeklyPlan[]) : undefined,
-    activeWeeklyPlanId:
-      typeof data?.activeWeeklyPlanId === 'string'
-        ? data.activeWeeklyPlanId
-        : data?.activeWeeklyPlanId === null
-          ? null
-          : undefined,
-    activeWeeklyPlanIdByClassId:
-      data?.activeWeeklyPlanIdByClassId && typeof data.activeWeeklyPlanIdByClassId === 'object'
-        ? (data.activeWeeklyPlanIdByClassId as Record<string, string | null>)
-        : undefined,
-    grades: Array.isArray(data?.grades) ? data.grades : undefined,
-    classes: Array.isArray(data?.classes) ? data.classes : undefined,
-    initialization: data?.initialization && typeof data.initialization === 'object' ? data.initialization : undefined,
-    weeklyConflictPolicy:
-      data?.weeklyConflictPolicy && typeof data.weeklyConflictPolicy === 'object'
-        ? (data.weeklyConflictPolicy as WeeklyConflictPolicy)
-        : undefined,
-    designPolicy:
-      data?.designPolicy && typeof data.designPolicy === 'object' ? (data.designPolicy as DesignPolicy) : undefined,
-    majorBatchPresets:
-      data?.majorBatchPresets && typeof data.majorBatchPresets === 'object' && !Array.isArray(data.majorBatchPresets)
-        ? {
-            subjectGroups: Array.isArray(data.majorBatchPresets.subjectGroups)
-              ? data.majorBatchPresets.subjectGroups
-              : [],
-            timeGroups: Array.isArray(data.majorBatchPresets.timeGroups) ? data.majorBatchPresets.timeGroups : [],
-            updatedAt: Number(data.majorBatchPresets.updatedAt ?? 0),
-          }
-        : undefined,
-    binding: data?.binding && typeof data.binding === 'object' ? data.binding : null,
-    updatedAt: Number(data?.updatedAt ?? 0),
-  };
-}
-
 function rememberCloudSnapshot(payload: ExamPayload): void {
   try {
     localStorage.setItem(CLOUD_VERSION_KEY, String(payload.updatedAt));
@@ -114,7 +54,7 @@ function rememberCloudSnapshot(payload: ExamPayload): void {
 export function getCloudSnapshot(): ExamPayload | null {
   try {
     const parsed = JSON.parse(localStorage.getItem(CLOUD_SNAPSHOT_KEY) || 'null');
-    return parsed && typeof parsed === 'object' ? toPayload(parsed) : null;
+    return parsed && typeof parsed === 'object' ? parseExamPayload(parsed) : null;
   } catch {
     return null;
   }
@@ -171,7 +111,7 @@ export async function fetchExamsFromServer(bootstrapInstanceId?: string): Promis
         });
         return null;
       }
-      const fullPayload = toPayload(fullData);
+      const fullPayload = parseExamPayload(fullData);
       rememberCloudSnapshot(fullPayload);
       return fullPayload;
     }
@@ -192,7 +132,7 @@ export async function fetchExamsFromServer(bootstrapInstanceId?: string): Promis
       });
       return null;
     }
-    const payload = toPayload(data);
+    const payload = parseExamPayload(data);
     rememberCloudSnapshot(payload);
     lastExamApiError = null;
     return payload;
@@ -263,7 +203,7 @@ async function saveExamsToServerNow(input: SaveExamsInput): Promise<SaveExamsRes
     if (res.status === 409) {
       const data = await res.json().catch(() => null);
       if (data?.code === 'DATA_CONFLICT' || data?.remote)
-        return { kind: 'conflict', remote: data?.remote ? toPayload(data.remote) : null };
+        return { kind: 'conflict', remote: data?.remote ? parseExamPayload(data.remote) : null };
       const replay = new Response(JSON.stringify(data), { status: res.status, headers: res.headers });
       const error = await apiErrorFromResponse(replay, '云端拒绝了本次保存');
       lastExamApiError = error;

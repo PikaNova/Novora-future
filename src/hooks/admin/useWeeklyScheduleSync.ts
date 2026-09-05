@@ -16,6 +16,7 @@ import { clearPendingExamSync, getPendingExamSync, queuePendingExamSync } from '
 import { updateExamSettings } from '../../utils/appSettings';
 import { notify } from '../../services/notify';
 import { formatApiError } from '../../services/apiError';
+import type { ExamSavePayload } from '../../shared/examContracts';
 import type { SyncState } from './adminPageUtils';
 import { syncMajorStateRef } from './adminPageUtils';
 
@@ -46,7 +47,7 @@ export function useWeeklyScheduleSync(params: {
   pendingRef: MutableRefObject<boolean>;
   examPushChainRef: MutableRefObject<Promise<void>>;
   weeklySaveTimer: MutableRefObject<ReturnType<typeof setTimeout> | null>;
-  buildPayloadRef: MutableRefObject<(ms: MajorExam[], activeId: string) => Record<string, unknown>>;
+  buildPayloadRef: MutableRefObject<(ms: MajorExam[], activeId: string) => ExamSavePayload>;
   setMajorsRef: MutableRefObject<(ms: MajorExam[]) => void>;
   setActiveMajorIdRef: MutableRefObject<(id: string) => void>;
   setSync: (state: SyncState) => void;
@@ -110,7 +111,7 @@ export function useWeeklyScheduleSync(params: {
         const basePayload =
           queued?.payload ?? buildPayloadRef.current(stateRef.current.majors, stateRef.current.activeMajorId);
         queuePendingExamSync({
-          payload: { ...basePayload, ...weekly } as never,
+          payload: { ...basePayload, ...weekly },
           baseSnapshot: queued?.baseSnapshot ?? getCloudSnapshot(),
           savedAt: Date.now(),
         });
@@ -127,10 +128,7 @@ export function useWeeklyScheduleSync(params: {
         (queuedBaseSnapshot?.updatedAt ?? 0) >= (liveBaseSnapshot?.updatedAt ?? 0)
           ? (queuedBaseSnapshot ?? liveBaseSnapshot)
           : (liveBaseSnapshot ?? queuedBaseSnapshot);
-      const payload = { ...base, ...weekly } as Record<string, unknown> & {
-        majors: MajorExam[];
-        activeMajorId: string;
-      };
+      const payload: ExamSavePayload = { ...base, ...weekly };
       const expectedSavedAt = queued?.savedAt;
       const isStaleWeeklyPush = () => expectedSavedAt != null && getPendingExamSync()?.savedAt !== expectedSavedAt;
       const result = await saveExamsToServer({
@@ -138,7 +136,7 @@ export function useWeeklyScheduleSync(params: {
         baseUpdatedAt: baseSnapshot?.updatedAt ?? 0,
         clientQueueKey: 'admin-exam-save',
         clientSyncLabel: syncLabel,
-      } as never);
+      });
       if (isStaleWeeklyPush()) return;
       if (result === 'unauthorized') {
         navigate('/login?next=/admin', { replace: true });
@@ -151,20 +149,25 @@ export function useWeeklyScheduleSync(params: {
             updatedAt: baseSnapshot?.updatedAt ?? 0,
           };
           const merged = threeWayMergeExam(
-            baseline as never,
-            { ...payload, updatedAt: baseSnapshot?.updatedAt ?? 0 } as never,
-            result.remote as never,
+            baseline,
+            { ...payload, updatedAt: baseSnapshot?.updatedAt ?? 0 },
+            result.remote,
           );
+          const mergedPending = {
+            payload: merged.payload,
+            baseSnapshot: result.remote,
+            savedAt: Date.now(),
+          };
           await retryBackoffDelay(0);
           const retry = await saveExamsToServer({
             ...merged.payload,
             baseUpdatedAt: result.remote.updatedAt,
             clientQueueKey: 'admin-exam-save',
             clientSyncLabel: `${syncLabel} · 合并后重试`,
-          } as never);
+          });
           if (isStaleWeeklyPush()) return;
           if (typeof retry === 'number') {
-            const mergedPayload = merged.payload as unknown as typeof payload & Partial<WeeklyState>;
+            const mergedPayload = merged.payload;
             const mergedWeekly: WeeklyState = {
               scheduleMode: mergedPayload.scheduleMode ?? weekly.scheduleMode,
               weeklyPlans: mergedPayload.weeklyPlans ?? weekly.weeklyPlans,
@@ -192,12 +195,13 @@ export function useWeeklyScheduleSync(params: {
               ...mergedPayload,
               ...mergedWeekly,
               updatedAt: retry,
-            } as never);
+            });
             pendingRef.current = false;
             clearPendingExamSync(queued?.savedAt);
             setSync('saved');
             return;
           }
+          queuePendingExamSync(mergedPending);
         }
         pendingRef.current = true;
         setSync('error');
@@ -209,7 +213,7 @@ export function useWeeklyScheduleSync(params: {
       if (typeof result !== 'number') {
         pendingRef.current = true;
         queuePendingExamSync({
-          payload: payload as never,
+          payload,
           baseSnapshot: baseSnapshot ?? null,
           savedAt: queued?.savedAt ?? Date.now(),
         });
@@ -225,10 +229,10 @@ export function useWeeklyScheduleSync(params: {
       }
       pendingRef.current = false;
       clearPendingExamSync(queued?.savedAt);
-      updateExamSettings({ ...payload, updatedAt: result } as never);
+      updateExamSettings({ ...payload, updatedAt: result });
       setSync('saved');
     },
-    [navigate],
+    [buildPayloadRef, navigate, pendingRef, setActiveMajorIdRef, setMajorsRef, setSync, stateRef],
   );
 
   const pushWeeklyToServer = useCallback(
@@ -237,7 +241,7 @@ export function useWeeklyScheduleSync(params: {
       examPushChainRef.current = run.catch(() => {});
       return run;
     },
-    [pushWeeklyToServerExec],
+    [examPushChainRef, pushWeeklyToServerExec],
   );
 
   const commitWeekly = useCallback(
@@ -252,12 +256,12 @@ export function useWeeklyScheduleSync(params: {
       setWeeklyConflictPolicy(next.weeklyConflictPolicy);
       weeklyStateRef.current = next;
       const now = Date.now();
-      updateExamSettings({ ...next, updatedAt: now } as never);
+      updateExamSettings({ ...next, updatedAt: now });
       const queued = getPendingExamSync();
       const basePayload =
         queued?.payload ?? buildPayloadRef.current(stateRef.current.majors, stateRef.current.activeMajorId);
       queuePendingExamSync({
-        payload: { ...basePayload, ...next } as never,
+        payload: { ...basePayload, ...next },
         baseSnapshot: queued?.baseSnapshot ?? getCloudSnapshot(),
         savedAt: now,
       });
@@ -272,7 +276,7 @@ export function useWeeklyScheduleSync(params: {
         void pushWeeklyToServer(next, syncLabel);
       }, 650);
     },
-    [pushWeeklyToServer],
+    [buildPayloadRef, pendingRef, pushWeeklyToServer, setSync, stateRef, weeklySaveTimer],
   );
 
   const handleScheduleModeChange = (mode: ScheduleMode) => commitWeekly({ scheduleMode: mode }, true);

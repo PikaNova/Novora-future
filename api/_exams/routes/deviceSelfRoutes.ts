@@ -2,6 +2,7 @@
 // 从 api/exams.ts 拆分而来，逻辑与对外行为保持不变。
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { acquireWriteSlotOrReject, database, ensureTableOnce, missingRelation } from '../db.js';
+import { parseDeviceCommand } from '../../../src/shared/deviceContracts.js';
 
 export async function handleDeviceBinding(req: VercelRequest, res: VercelResponse): Promise<void> {
   const sql = database();
@@ -125,8 +126,10 @@ export async function handleDeviceHeartbeat(req: VercelRequest, res: VercelRespo
       .slice(0, max);
   const run = async () => {
     const acknowledgedCommandId = value('acknowledgedCommandId', 128);
-    if (acknowledgedCommandId)
+    if (acknowledgedCommandId) {
+      await sql`UPDATE device_commands SET acknowledged_at=${now} WHERE id=${acknowledgedCommandId} AND instance_id=${instanceId} AND acknowledged_at IS NULL`;
       await sql`UPDATE device_instances SET temporary_command=NULL WHERE instance_id=${instanceId} AND temporary_command->>'id'=${acknowledgedCommandId}`;
+    }
     await sql`INSERT INTO device_instances (instance_id, page, client_version, status, current_exam, current_subject, exam_start, exam_end, last_seen_at, updated_at)
       VALUES (${instanceId}, ${value('page')}, ${value('clientVersion', 40)}, ${value('status', 40)}, ${value('currentExam')}, ${value('currentSubject')}, ${value('examStart', 40)}, ${value('examEnd', 40)}, ${now}, ${now})
       ON CONFLICT (instance_id) DO UPDATE SET page=EXCLUDED.page, client_version=EXCLUDED.client_version, status=EXCLUDED.status, current_exam=EXCLUDED.current_exam, current_subject=EXCLUDED.current_subject, exam_start=EXCLUDED.exam_start, exam_end=EXCLUDED.exam_end, last_seen_at=EXCLUDED.last_seen_at, updated_at=EXCLUDED.updated_at`;
@@ -139,6 +142,14 @@ export async function handleDeviceHeartbeat(req: VercelRequest, res: VercelRespo
         temporary_command?: unknown;
       }>;
     const device = rows[0];
+    const pending =
+      (await sql`SELECT id, action, minutes, created_at FROM device_commands WHERE instance_id=${instanceId} AND acknowledged_at IS NULL ORDER BY created_at ASC LIMIT 1`) as unknown as Array<{
+        id: string;
+        action: string;
+        minutes: number | null;
+        created_at: number | string;
+      }>;
+    const queued = pending[0] ? parseDeviceCommand(pending[0]) : null;
     const hasBinding = !!device && (device.revoked === true || device.is_management === true || !!device.class_id);
     res.status(200).json({
       ok: true,
@@ -151,7 +162,7 @@ export async function handleDeviceHeartbeat(req: VercelRequest, res: VercelRespo
             isManagement: device.is_management === true,
           }
         : null,
-      command: device?.temporary_command ?? null,
+      command: queued ?? parseDeviceCommand(device?.temporary_command) ?? null,
     });
   };
   try {

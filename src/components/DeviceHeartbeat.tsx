@@ -15,6 +15,7 @@ import { notify } from '../services/notify';
 import { pluginInstanceFromSearch, sendPluginViewerHeartbeat } from '../services/pluginPairing';
 import { updateExamSettings } from '../utils/appSettings';
 import { logoutAdmin } from '../services/examService';
+import { resolveDeviceCommandReceipt } from '../utils/deviceCommandReceipt';
 
 export default function DeviceHeartbeat() {
   const { pathname, search } = useLocation();
@@ -83,21 +84,15 @@ export default function DeviceHeartbeat() {
             return;
           }
         }
-        if (!result.command || result.command.id === acknowledgedCommandId) return;
-        if (result.command.action === 'pause') setTemporaryExamPaused(true);
-        if (result.command.action === 'resume') setTemporaryExamPaused(false);
-        if (result.command.action === 'extend') extendTemporaryExam(result.command.minutes || 5);
-        if (result.command.action === 'end') endTemporaryExam();
-        acknowledgedCommandId = result.command.id;
-        const actionLabel =
-          result.command.action === 'pause'
-            ? '暂停'
-            : result.command.action === 'resume'
-              ? '继续'
-              : result.command.action === 'extend'
-                ? `延长 ${result.command.minutes || 5} 分钟`
-                : '结束';
-        notify(result.command.action === 'end' ? 'warning' : 'success', `后台已${actionLabel}本机临时考试。`);
+        const receipt = resolveDeviceCommandReceipt(result.command, acknowledgedCommandId);
+        if (!receipt) return;
+        const { command } = receipt;
+        if (command.action === 'pause') setTemporaryExamPaused(true);
+        if (command.action === 'resume') setTemporaryExamPaused(false);
+        if (command.action === 'extend') extendTemporaryExam(command.minutes || 5);
+        if (command.action === 'end') endTemporaryExam();
+        acknowledgedCommandId = command.id;
+        notify(receipt.tone, receipt.message);
         window.setTimeout(send, 250);
       });
     };

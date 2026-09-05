@@ -8,7 +8,7 @@ import {
   updateAlertsSettings,
   type ExamSettings,
 } from '../utils/appSettings';
-import { fetchExamsFromServer, getLastExamApiError } from '../services/examService';
+import { fetchExamsFromServer, getLastExamApiError, type ExamPayload } from '../services/examService';
 import { flushPendingExamSync, getPendingExamSync } from '../services/examOutbox';
 import { getResolvedExamItems } from '../utils/appSchedule';
 import type { DeviceBinding } from '../services/classBinding';
@@ -91,50 +91,30 @@ export function useExamSync({
     setSyncState(typeof navigator !== 'undefined' && !navigator.onLine ? 'offline' : pending ? 'pending' : 'local');
   }, []);
 
-  const applyPayload = useCallback(
-    (payload: {
-      items: ExamItem[];
-      title: string;
-      alerts: AlertsSettings | null;
-      majors: any[];
-      activeMajorId: string;
-      updatedAt: number;
-      scheduleMode?: any;
-      weeklyPlans?: any;
-      activeWeeklyPlanId?: any;
-      activeWeeklyPlanIdByClassId?: any;
-      grades?: any;
-      classes?: any;
-      initialization?: any;
-      weeklyConflictPolicy?: any;
-      designPolicy?: any;
-      majorBatchPresets?: any;
-    }) => {
-      const updates: Record<string, unknown> = {
-        items: payload.items,
-        title: payload.title,
-        updatedAt: payload.updatedAt,
-      };
-      if (payload.majors && payload.majors.length) updates.majors = payload.majors;
-      if (payload.activeMajorId) updates.activeMajorId = payload.activeMajorId;
-      if (payload.scheduleMode !== undefined) updates.scheduleMode = payload.scheduleMode;
-      if (payload.weeklyPlans !== undefined) updates.weeklyPlans = payload.weeklyPlans;
-      if (payload.activeWeeklyPlanId !== undefined) updates.activeWeeklyPlanId = payload.activeWeeklyPlanId;
-      if (payload.activeWeeklyPlanIdByClassId !== undefined)
-        updates.activeWeeklyPlanIdByClassId = payload.activeWeeklyPlanIdByClassId;
-      if (payload.grades !== undefined) updates.grades = payload.grades;
-      if (payload.classes !== undefined) updates.classes = payload.classes;
-      if (payload.initialization !== undefined) updates.initialization = payload.initialization;
-      if (payload.weeklyConflictPolicy !== undefined) updates.weeklyConflictPolicy = payload.weeklyConflictPolicy;
-      if (payload.designPolicy !== undefined) updates.designPolicy = payload.designPolicy;
-      if (payload.majorBatchPresets !== undefined) updates.majorBatchPresets = payload.majorBatchPresets;
-      updateExamSettings(updates as Partial<ExamSettings>);
-      if (payload.alerts) updateAlertsSettings(payload.alerts);
-      const s = getAppSettings();
-      onUpdateRef.current?.({ items: getResolvedExamItems(), title: s.exam.title, alerts: s.alerts });
-    },
-    [],
-  );
+  const applyPayload = useCallback((payload: ExamPayload) => {
+    const updates: Record<string, unknown> = {
+      items: payload.items,
+      title: payload.title,
+      updatedAt: payload.updatedAt,
+    };
+    if (payload.majors && payload.majors.length) updates.majors = payload.majors;
+    if (payload.activeMajorId) updates.activeMajorId = payload.activeMajorId;
+    if (payload.scheduleMode !== undefined) updates.scheduleMode = payload.scheduleMode;
+    if (payload.weeklyPlans !== undefined) updates.weeklyPlans = payload.weeklyPlans;
+    if (payload.activeWeeklyPlanId !== undefined) updates.activeWeeklyPlanId = payload.activeWeeklyPlanId;
+    if (payload.activeWeeklyPlanIdByClassId !== undefined)
+      updates.activeWeeklyPlanIdByClassId = payload.activeWeeklyPlanIdByClassId;
+    if (payload.grades !== undefined) updates.grades = payload.grades;
+    if (payload.classes !== undefined) updates.classes = payload.classes;
+    if (payload.initialization !== undefined) updates.initialization = payload.initialization;
+    if (payload.weeklyConflictPolicy !== undefined) updates.weeklyConflictPolicy = payload.weeklyConflictPolicy;
+    if (payload.designPolicy !== undefined) updates.designPolicy = payload.designPolicy;
+    if (payload.majorBatchPresets !== undefined) updates.majorBatchPresets = payload.majorBatchPresets;
+    updateExamSettings(updates as Partial<ExamSettings>);
+    if (payload.alerts) updateAlertsSettings(payload.alerts);
+    const s = getAppSettings();
+    onUpdateRef.current?.({ items: getResolvedExamItems(), title: s.exam.title, alerts: s.alerts });
+  }, []);
 
   const refresh = useCallback(
     async (force = false) => {

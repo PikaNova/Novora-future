@@ -24,20 +24,26 @@ class MemoryStorage {
   }
 }
 
-(globalThis as any).localStorage = new MemoryStorage();
+const testGlobals = globalThis as typeof globalThis & {
+  localStorage?: MemoryStorage;
+  fetch?: typeof fetch;
+  __APP_VERSION__?: string;
+  __COMMIT_SHA__?: string;
+};
+testGlobals.localStorage = new MemoryStorage();
 Object.defineProperty(globalThis, 'navigator', {
   value: { onLine: true },
   configurable: true,
 });
-(globalThis as any).__APP_VERSION__ = 'test';
-(globalThis as any).__COMMIT_SHA__ = 'test';
+testGlobals.__APP_VERSION__ = 'test';
+testGlobals.__COMMIT_SHA__ = 'test';
 
 const { queuePendingExamSync, getPendingExamSync, flushPendingExamSync } =
   await import('../src/services/examOutbox.js');
 const { __resetSyncQueueForTests } = await import('../src/services/syncQueue.js');
 
 function setTestOwner(): void {
-  (globalThis as any).localStorage.setItem(
+  testGlobals.localStorage?.setItem(
     'admin_user_context',
     JSON.stringify({
       id: 1,
@@ -74,11 +80,11 @@ function rateLimitedResponse(): Response {
 
 test('RATE_LIMITED uses a one-second first retry instead of the normal server delay', async () => {
   __resetSyncQueueForTests();
-  (globalThis as any).localStorage.clear();
+  testGlobals.localStorage?.clear();
   setTestOwner();
   queuePendingExamSync(pending());
   const originalFetch = globalThis.fetch;
-  (globalThis as any).fetch = async () => rateLimitedResponse();
+  testGlobals.fetch = async () => rateLimitedResponse();
 
   try {
     const before = Date.now();
@@ -89,18 +95,18 @@ test('RATE_LIMITED uses a one-second first retry instead of the normal server de
     const delay = (saved.nextRetryAt ?? 0) - before;
     assert.ok(delay > 0 && delay <= 1_200, `expected about 1s, got ${delay}ms`);
   } finally {
-    (globalThis as any).fetch = originalFetch;
-    (globalThis as any).localStorage.clear();
+    testGlobals.fetch = originalFetch;
+    testGlobals.localStorage?.clear();
   }
 });
 
 test('RATE_LIMITED retry growth is capped at eight seconds', async () => {
   __resetSyncQueueForTests();
-  (globalThis as any).localStorage.clear();
+  testGlobals.localStorage?.clear();
   setTestOwner();
   queuePendingExamSync(pending(3));
   const originalFetch = globalThis.fetch;
-  (globalThis as any).fetch = async () => rateLimitedResponse();
+  testGlobals.fetch = async () => rateLimitedResponse();
 
   try {
     const before = Date.now();
@@ -111,7 +117,7 @@ test('RATE_LIMITED retry growth is capped at eight seconds', async () => {
     const delay = (saved.nextRetryAt ?? 0) - before;
     assert.ok(delay > 6_000 && delay <= 8_200, `expected 8s cap, got ${delay}ms`);
   } finally {
-    (globalThis as any).fetch = originalFetch;
-    (globalThis as any).localStorage.clear();
+    testGlobals.fetch = originalFetch;
+    testGlobals.localStorage?.clear();
   }
 });

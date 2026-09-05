@@ -23,9 +23,14 @@ class MemoryStorage {
   }
 }
 
-(globalThis as any).localStorage = new MemoryStorage();
-(globalThis as any).__APP_VERSION__ = 'test';
-(globalThis as any).__COMMIT_SHA__ = 'test';
+const testGlobals = globalThis as typeof globalThis & {
+  localStorage?: MemoryStorage;
+  __APP_VERSION__?: string;
+  __COMMIT_SHA__?: string;
+};
+testGlobals.localStorage = new MemoryStorage();
+testGlobals.__APP_VERSION__ = 'test';
+testGlobals.__COMMIT_SHA__ = 'test';
 
 const { apiErrorFromResponse, getSyncNotifyTitle } = await import('../src/services/apiError.js');
 

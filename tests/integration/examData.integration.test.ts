@@ -26,7 +26,10 @@ const adminPassword = process.env.ADMIN_PASSWORD ?? '';
 let admin: Login;
 
 function makeRes() {
-  const calls: { statusCode?: number; body?: any; headers: Record<string, unknown> } = { headers: {} };
+  const calls: { statusCode?: number; body: Record<string, unknown>; headers: Record<string, unknown> } = {
+    body: {},
+    headers: {},
+  };
   const res: VercelResponse = {
     setHeader(name: string, value: unknown) {
       calls.headers[name] = value;
@@ -41,12 +44,12 @@ function makeRes() {
     },
     json(body: unknown) {
       calls.statusCode ??= 200;
-      calls.body = body;
+      calls.body = body as Record<string, unknown>;
       return res;
     },
     send(body: unknown) {
       calls.statusCode ??= 200;
-      calls.body = body;
+      calls.body = body as Record<string, unknown>;
       return res;
     },
     end() {
@@ -158,7 +161,12 @@ async function createUser(username: string, roleId: string, scopes: Scope[]): Pr
   return { id, token: login.token };
 }
 
-async function seedExam(input: { grades?: any[]; classes?: any[]; majors?: any[]; weeklyPlans?: any[] }) {
+async function seedExam(input: {
+  grades?: Array<Record<string, unknown>>;
+  classes?: Array<Record<string, unknown>>;
+  majors?: Array<Record<string, unknown>>;
+  weeklyPlans?: Array<Record<string, unknown>>;
+}) {
   const sql = database();
   const updatedAt = Date.now();
   await sql`
@@ -675,7 +683,7 @@ test('top-level handler: concurrent reads return the same current snapshot', asy
     [200, 200, 200, 200, 200],
     'concurrent read statuses',
   );
-  const parsed = responses.map(({ calls }) => JSON.parse(calls.body));
+  const parsed = responses.map(({ calls }) => JSON.parse(calls.body as unknown as string));
   const updatedAts = new Set(parsed.map((body) => body.updatedAt));
   assert.equal(updatedAts.size, 1, 'concurrent reads must return the same updatedAt');
   assert.deepEqual(

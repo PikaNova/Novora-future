@@ -89,7 +89,7 @@ async function fetchLatest(repo: string): Promise<LatestInfo> {
     8000,
   );
   if (relRes.ok) {
-    const r: any = await relRes.json();
+    const r = (await relRes.json()) as { tag_name?: unknown; body?: unknown; published_at?: unknown };
     const tag = typeof r?.tag_name === 'string' ? r.tag_name : null;
     if (tag) {
       return {
@@ -108,9 +108,9 @@ async function fetchLatest(repo: string): Promise<LatestInfo> {
     8000,
   );
   if (tagRes.ok) {
-    const tags: any = await tagRes.json();
+    const tags = (await tagRes.json()) as Array<{ name?: unknown }>;
     if (Array.isArray(tags) && tags.length > 0) {
-      const names = tags.map((t: any) => String(t?.name || '')).filter(Boolean);
+      const names = tags.map((t) => String(t?.name || '')).filter(Boolean);
       names.sort((a, b) => cmpSemver(b, a)); // 降序，取最大
       const top = names[0];
       if (top) {

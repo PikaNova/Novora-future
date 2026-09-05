@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertTriangle, CircleAlert, Info, X } from 'lucide-react';
 import { APP_DIALOG_EVENT, type AppDialogRequest } from '../services/appDialog';
 
@@ -10,6 +10,19 @@ export default function AppDialogHost() {
   const confirmRef = useRef<HTMLButtonElement>(null);
   const previousFocus = useRef<HTMLElement | null>(null);
   const active = queue[0];
+
+  const settle = useCallback(
+    (confirmed: boolean) => {
+      if (!active) return;
+      active.resolve(confirmed);
+      setQueue((current) => {
+        const next = current.filter((item) => item.id !== active.id);
+        if (!next.length) window.setTimeout(() => previousFocus.current?.focus(), 0);
+        return next;
+      });
+    },
+    [active],
+  );
 
   useEffect(() => {
     const receive = (event: Event) => {
@@ -50,17 +63,7 @@ export default function AppDialogHost() {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [active?.id]);
-
-  const settle = (confirmed: boolean) => {
-    if (!active) return;
-    active.resolve(confirmed);
-    setQueue((current) => {
-      const next = current.filter((item) => item.id !== active.id);
-      if (!next.length) window.setTimeout(() => previousFocus.current?.focus(), 0);
-      return next;
-    });
-  };
+  }, [active, settle]);
 
   if (!active) return null;
   const tone = active.tone ?? 'info';

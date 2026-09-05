@@ -143,7 +143,7 @@ export default function SchedulePrintPreview({
         };
       });
     });
-  }, [documents, mode, weekCount, weekStart]);
+  }, [documents, mode, weekCount, weekEnd, weekStart]);
   useEffect(() => {
     [titleFont, bodyFont, numericFont].forEach((id) => {
       const selected = FONT_OPTIONS.find((font) => font.id === id);

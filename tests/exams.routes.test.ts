@@ -15,13 +15,13 @@ import { handleDeviceBinding, handleDeviceHeartbeat } from '../api/_exams/routes
 process.env.DATABASE_URL = process.env.DATABASE_URL || 'postgresql://test:test@127.0.0.1:5432/novora_test';
 
 function makeRes() {
-  const calls: { statusCode?: number; body?: any; headers: Record<string, unknown> } = {
+  const calls: { statusCode?: number; body: Record<string, unknown>; headers: Record<string, unknown> } = {
     statusCode: undefined,
-    body: undefined,
+    body: {},
     headers: {},
   };
   const res: VercelResponse = {
-    setHeader(name: string, value: any) {
+    setHeader(name: string, value: unknown) {
       calls.headers[name] = value;
       return res;
     },
@@ -33,11 +33,11 @@ function makeRes() {
       return res;
     },
     json(body: unknown) {
-      calls.body = body;
+      calls.body = body as Record<string, unknown>;
       return res;
     },
     send(body: unknown) {
-      calls.body = body;
+      calls.body = body as Record<string, unknown>;
       return res;
     },
     end() {},

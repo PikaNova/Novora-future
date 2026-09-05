@@ -121,6 +121,7 @@ function reportIfStabilityIssue(error: ApiError, apiEndpoint?: string): void {
   void reportError({
     message: error.message,
     errorName: error.code,
+    type: error.status === 0 ? 'network' : error.code.startsWith('DATABASE_') ? 'database' : 'api',
     level: 'error',
     apiEndpoint,
     httpStatus: error.status,

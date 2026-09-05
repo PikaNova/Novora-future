@@ -1,9 +1,18 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getAuthorConfig, getIngestToken, shouldSample } from './_authorClient.js';
 import { telemetryConfig } from './_telemetryConfig.js';
+import {
+  buildErrorReportFingerprint,
+  normalizeErrorReportLevel,
+  normalizeErrorReportType,
+  sanitizeErrorReportContext,
+  sanitizeErrorReportPayload,
+  sanitizeErrorReportPath,
+  sanitizeErrorReportStack,
+  sanitizeErrorReportText,
+} from '../src/shared/errorReportContracts.js';
 
 const ERROR_REPORT_URL = telemetryConfig.errorReportUrl;
-const ALLOWED_LEVELS = new Set(['error', 'warning', 'info']);
 
 function str(value: unknown, max = 2000): string | null {
   if (value == null) return null;
@@ -47,30 +56,47 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return;
     }
 
-    const level = str(body.level, 16);
-    const context =
-      body.context && typeof body.context === 'object' && !Array.isArray(body.context) ? body.context : null;
-    const payload = {
+    const type = normalizeErrorReportType(body.type || (body.apiEndpoint ? 'api' : undefined));
+    const errorName = sanitizeErrorReportText(body.errorName, 120);
+    const sanitizedMessage = sanitizeErrorReportText(message);
+    const route = sanitizeErrorReportPath(body.route);
+    const apiEndpoint = sanitizeErrorReportPath(body.apiEndpoint, 160);
+    const sanitized = sanitizeErrorReportPayload({
       instanceId,
-      message,
-      errorName: str(body.errorName, 200),
-      stack: str(body.stack, config.maxStackLength),
-      fingerprint: str(body.fingerprint, 256),
-      level: level && ALLOWED_LEVELS.has(level) ? level : 'error',
-      route: str(body.route, 256),
-      action: str(body.action, 200),
-      apiEndpoint: str(body.apiEndpoint, 256),
+      type,
+      level: normalizeErrorReportLevel(body.level),
+      fingerprint: buildErrorReportFingerprint({
+        type,
+        errorName,
+        message: sanitizedMessage || message,
+        route,
+        apiEndpoint,
+      }),
+      errorName,
+      message: sanitizedMessage || message,
+      stack: sanitizeErrorReportStack(str(body.stack, config.maxStackLength)),
+      route,
+      action: sanitizeErrorReportText(body.action, 100),
+      apiEndpoint,
       httpStatus: num(body.httpStatus),
-      context,
-      appVersion: str(body.appVersion, 32),
-      clientChannel: str(body.clientChannel, 16) || 'novora-client',
-      schoolName: str(body.schoolName, 80),
-      province: str(body.province, 40),
-      host: str(body.host, 128),
-      userAgent: str(body.userAgent, 512) || str(req.headers['user-agent'], 512),
-      tz: str(body.tz, 64),
-      lang: str(body.lang, 32),
+      context: sanitizeErrorReportContext(body.context),
+      appVersion: sanitizeErrorReportText(body.appVersion, 32) || 'unknown',
       clientTs: num(body.clientTs),
+      schoolName: sanitizeErrorReportText(body.schoolName, 80),
+      province: sanitizeErrorReportText(body.province, 40),
+      host: sanitizeErrorReportText(body.host, 128),
+      userAgent:
+        sanitizeErrorReportText(body.userAgent, 512) || sanitizeErrorReportText(req.headers['user-agent'], 512),
+      tz: sanitizeErrorReportText(body.tz, 64),
+      lang: sanitizeErrorReportText(body.lang, 32),
+    });
+    if (!sanitized) {
+      res.status(400).json({ ok: false, error: 'invalid error report payload' });
+      return;
+    }
+    const payload = {
+      ...sanitized,
+      // The author service receives only the bounded, sanitized software summary.
     };
 
     const token = await getIngestToken('v2', instanceId);

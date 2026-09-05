@@ -16,6 +16,18 @@ export interface DeviceCommand {
   createdAt: number;
 }
 
+/** 设备心跳请求体（不含 action/instanceId，由发送方附加）。 */
+export type DeviceHeartbeatInput = {
+  page?: string;
+  clientVersion?: string;
+  status?: string;
+  currentExam?: string;
+  currentSubject?: string;
+  examStart?: string;
+  examEnd?: string;
+  acknowledgedCommandId?: string;
+};
+
 export interface DeviceBindingInfo extends DeviceBinding {
   instanceId: string;
   managementRoleName?: string;

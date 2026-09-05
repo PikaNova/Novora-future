@@ -10,6 +10,7 @@ import {
   type DeviceBinding,
   type DeviceBindingInfo,
   type DeviceCommand,
+  type DeviceHeartbeatInput,
   type DeviceSetupConflict,
   type PluginBindingInfo,
 } from '../shared/deviceContracts';
@@ -396,9 +397,7 @@ export async function sendDeviceCommand(
 }
 
 export async function sendDeviceHeartbeat(
-  input: Omit<DeviceBindingInfo, 'instanceId' | 'gradeId' | 'classId' | 'revoked' | 'lastSeenAt' | 'updatedAt'> & {
-    acknowledgedCommandId?: string;
-  },
+  input: DeviceHeartbeatInput,
 ): Promise<{ revoked: boolean; binding: DeviceBinding | null; command: DeviceCommand | null }> {
   if (heartbeatInFlight) return { revoked: false, binding: null, command: null };
   heartbeatInFlight = true;

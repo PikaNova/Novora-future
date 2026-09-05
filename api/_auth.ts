@@ -10,6 +10,7 @@ import {
   type Permission,
   type PermissionScope,
 } from '../src/shared/permissionRules.js';
+import type { LoginFailureAlert } from '../src/shared/authContracts.js';
 import {
   assertRows,
   isBoolean,
@@ -721,12 +722,7 @@ export async function issueGuestToken(
 }
 
 export type LoginAttemptRow = { action: string; created_at: DatabaseInt8 };
-export type LoginFailureAlert = {
-  username: string;
-  failureCount: number;
-  windowStart: number;
-  latestFailureAt: number;
-};
+export type { LoginFailureAlert };
 const isLoginAttemptRow = rowShape<LoginAttemptRow>({ action: isString, created_at: isDatabaseInt8 });
 const isLoginAttemptWithUsernameRow = rowShape<LoginAttemptRow & { username: string }>({
   action: isString,

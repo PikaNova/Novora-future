@@ -1,3 +1,4 @@
+import type { LoginFailureAlert } from '../shared/authContracts.js';
 import type { AdminScope } from './examService';
 
 export type ManagedUser = {
@@ -34,13 +35,6 @@ export type AuditLog = {
   classId: string;
   detail: unknown;
   createdAt: number;
-};
-
-export type LoginFailureAlert = {
-  username: string;
-  failureCount: number;
-  windowStart: number;
-  latestFailureAt: number;
 };
 
 const token = () => localStorage.getItem('admin_auth_token') || '';

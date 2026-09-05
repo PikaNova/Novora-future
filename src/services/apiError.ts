@@ -1,4 +1,5 @@
 import { reportError } from './errorReport';
+import type { ApiErrorResponse } from '../shared/apiErrorContract.js';
 
 export type ApiErrorDetail = {
   status: number;
@@ -128,7 +129,7 @@ function reportIfStabilityIssue(error: ApiError, apiEndpoint?: string): void {
 }
 
 export async function apiErrorFromResponse(response: Response, fallback: string): Promise<ApiError> {
-  const data = await response.json().catch(() => null);
+  const data = (await response.json().catch(() => null)) as ApiErrorResponse | null;
   const code =
     typeof data?.code === 'string'
       ? data.code

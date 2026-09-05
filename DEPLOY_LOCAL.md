@@ -22,6 +22,7 @@ docker compose up -d --build
 ```
 
 - compose 会自动注入 DATABASE_URL 指向内嵌的 db 服务（postgres://novora:novora@db:5432/novora），.env 里的 DATABASE_URL 会被覆盖，可留空
+- 宿主机端口由 .env 的 `PORT` 控制（如 `PORT=13000` 时访问 `http://<主机IP>:13000`）；容器内固定监听 3000，反向代理指向 `http://127.0.0.1:<PORT>`
 - 数据持久化在 Docker 卷 novora_pgdata，删除容器不丢数据
 - 首次启动 ensureAuthTables() 会自动建全部表，无需手工执行 SQL
 

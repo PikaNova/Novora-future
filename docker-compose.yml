@@ -41,6 +41,9 @@
     ports:
       - '${PORT:-3000}:3000'
     environment:
+      # 容器内固定监听 3000（覆盖 .env 里的 PORT，避免与端口映射错位）；
+      # 宿主机端口仍由 .env 的 PORT 控制。
+      PORT: 3000
       DATABASE_URL: postgres://${POSTGRES_USER:-novora}:${POSTGRES_PASSWORD:-novora}@db:5432/${POSTGRES_DB:-novora}
     env_file:
       - .env

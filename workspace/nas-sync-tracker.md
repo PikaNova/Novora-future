@@ -395,3 +395,89 @@ git pull origin main
 ### 老仓库核验
 
 本次只向 `Novora-future` 推送，没有向 `https://github.com/PikaNova/Novora.git` 执行任何推送、tag 删除、分支覆盖或历史重写。
+
+## 2026-09-05 17:30 v2.7.5 数据库门禁进展
+
+### 状态
+
+| 项目 | 状态 |
+|---|---|
+| 任务 | v2.7.5 / `T-275-04`、`T-275-05`、`T-275-06` |
+| 代码实现 | 已完成 |
+| 单元测试 | 通过，453/453 |
+| API / 集成 / 测试 TypeScript 检查 | 通过 |
+| 本地服务构建 | 通过 |
+| lint | 0 errors / 82 warnings |
+| Prettier | 通过 |
+| 真实数据库集成测试 | 未运行；缺少独立 `INTEGRATION_DATABASE_URL`，本机没有 Docker |
+| 前端 Vite 构建 | 当前沙箱内 esbuild 读取祖先目录被拒绝；已记录为环境限制 |
+
+### 改动
+
+- 新增 `api/_schemaMigration.ts`，当前 schema 版本为 `3`。
+- 新增 `app_schema_versions` 与 `app_schema_migration_logs`。
+- auth 与 exams 迁移的成功/失败都会记录 request id、耗时和错误摘要。
+- `/api/health` 和 `/api/status` 报告 schema 版本、最近迁移日志；版本不匹配返回 degraded。
+- 新增 `tests/integration/schemaMigration.integration.test.ts`，覆盖版本、日志、request id、幂等迁移和 BIGINT 时间戳。
+- `scripts/run-integration-tests.cjs` 新增防护：`INTEGRATION_DATABASE_URL` 禁止与生产 `DATABASE_URL` 相同。
+- Docker Compose 新增 `db-integration` 服务，使用 `test` profile、独立数据库 `novora_integration`、独立数据卷。
+- README、`DEPLOY_LOCAL.md` 和 `.env.example` 已记录独立数据库启动/清理方式。
+- 系统状态页显示 auth/exams schema 版本。
+
+### 待完成
+
+1. 启动独立数据库：
+   ```bash
+   docker compose --profile test up -d db-integration
+   ```
+2. 设置：
+   ```bash
+   export INTEGRATION_DATABASE_URL='postgres://novora:novora@localhost:15432/novora_integration'
+   export INTEGRATION_TEST_CONFIRM=novora-disposable
+   ```
+3. 运行：
+   ```bash
+   npm run test:integration
+   ```
+4. 通过后再更新任务状态并统一上传到 `Novora-future/main`。
+
+本节记录的是本地工作区进度；截至记录时间，v2.7.5 数据库门禁代码尚未作为新提交推送到远程 `main`。
+
+## 2026-09-05 17:46 数据库门禁合并完成
+
+### 合并结果
+
+| 项目 | 状态 |
+|---|---|
+| 冲突文件 | `api/_exams/db.ts` |
+| 解决方式 | 保留 `feature/v2-7-5-db-gate` 的迁移日志包装 |
+| merge commit | `341a29f merge: v2.7.5 database gate` |
+| 当前分支 | `Novora-future` 本地 `main` |
+| 推送状态 | 未推送；本机 Git 凭据返回 `SEC_E_NO_CREDENTIALS` |
+
+### 合并后验证
+
+| 检查 | 结果 |
+|---|---|
+| `npm test` | 通过，453/453 |
+| `npm run typecheck:api` | 通过 |
+| `npx tsc -p tsconfig.integration.json` | 通过 |
+| `npm run serve:build` | 通过 |
+| `npm run lint` | 通过，0 errors / 82 warnings |
+| `npm run format:check` | 通过 |
+| `git diff --cached --check` | 通过 |
+| 真实数据库集成测试 | 未运行；缺少独立 `INTEGRATION_DATABASE_URL`，本机没有 Docker |
+| Vite build | 未通过；当前沙箱内 esbuild 读取祖先目录被拒绝 |
+
+### 质量检查调整
+
+- `.integration-check/` 已加入 `.prettierignore`，避免集成编译产物影响格式检查。
+- `workspace/` 已加入 `eslint.config.js` 忽略清单，避免 NAS 工作区脚本阻塞 Novora 源码 lint。
+- `.github/workflows/docker-image.yml` 已格式化。
+
+### 待执行推送
+
+```powershell
+cd 'C:\Users\Administrator\Documents\Codex\2026-07-23\nihao-2\novora-remote-audit'
+git push origin main
+```

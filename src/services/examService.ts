@@ -419,10 +419,36 @@ export type LoginSession = {
   user: AdminUserContext | null;
 };
 
+function parseAdminUserContext(data: unknown): AdminUserContext | null {
+  if (!data || typeof data !== 'object') return null;
+  const u = data as Record<string, unknown>;
+  if (typeof u.id !== 'number' || !Number.isFinite(u.id)) return null;
+  if (typeof u.username !== 'string' || !u.username) return null;
+  if (typeof u.displayName !== 'string' || typeof u.roleId !== 'string' || typeof u.roleName !== 'string') return null;
+  if (!Array.isArray(u.permissions) || !u.permissions.every((p) => typeof p === 'string')) return null;
+  if (!Array.isArray(u.scopes)) return null;
+  const scopes: AdminScope[] = [];
+  for (const scope of u.scopes) {
+    const s = scope && typeof scope === 'object' ? (scope as Record<string, unknown>) : null;
+    if (!s || (s.type !== 'all' && s.type !== 'grade' && s.type !== 'class')) return null;
+    if (typeof s.gradeId !== 'string' || typeof s.classId !== 'string') return null;
+    scopes.push({ type: s.type, gradeId: s.gradeId, classId: s.classId });
+  }
+  return {
+    id: u.id,
+    username: u.username,
+    displayName: u.displayName,
+    roleId: u.roleId,
+    roleName: u.roleName,
+    permissions: u.permissions,
+    scopes,
+    mustChangePassword: u.mustChangePassword === true,
+  };
+}
+
 export function getAdminUser(): AdminUserContext | null {
   try {
-    const user = JSON.parse(localStorage.getItem(ADMIN_USER_KEY) || 'null');
-    return user && typeof user === 'object' && Array.isArray(user.permissions) ? (user as AdminUserContext) : null;
+    return parseAdminUserContext(JSON.parse(localStorage.getItem(ADMIN_USER_KEY) || 'null'));
   } catch {
     return null;
   }
@@ -476,8 +502,10 @@ export async function refreshAdminUser(): Promise<AdminUserContext | null> {
     }
     const data = await res.json();
     if (!data?.user) return null;
-    localStorage.setItem(ADMIN_USER_KEY, JSON.stringify(data.user));
-    return data.user as AdminUserContext;
+    const user = parseAdminUserContext(data.user);
+    if (!user) return null;
+    localStorage.setItem(ADMIN_USER_KEY, JSON.stringify(user));
+    return user;
   } catch {
     return getAdminUser();
   }
@@ -503,7 +531,7 @@ export async function loginAdmin(username: string, password: string): Promise<Lo
       return null;
     }
     const token = typeof data.token === 'string' && data.token ? data.token : null;
-    const user = data.user && typeof data.user === 'object' ? (data.user as AdminUserContext) : null;
+    const user = parseAdminUserContext(data.user);
     if (token) {
       localStorage.setItem(TOKEN_KEY, token);
       localStorage.setItem(TOKEN_EXPIRES_KEY, String(data.expiresAt ?? 0));
@@ -545,7 +573,7 @@ export async function guestLogin(
       return null;
     }
     const token = typeof data.token === 'string' && data.token ? data.token : null;
-    const user = data.user && typeof data.user === 'object' ? (data.user as AdminUserContext) : null;
+    const user = parseAdminUserContext(data.user);
     storeAdminSession(token, Number(data.expiresAt ?? 0), user);
     lastAuthApiError = null;
     return { token: token ?? '', user };

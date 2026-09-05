@@ -6,9 +6,12 @@ import {
   BarChart3,
   CalendarClock,
   CalendarDays,
+  CheckCircle2,
   Database,
   GraduationCap,
   MonitorCheck,
+  RefreshCw,
+  ShieldCheck,
   X,
   Zap,
 } from 'lucide-react';
@@ -18,7 +21,8 @@ import type { WeeklyPlan } from '../types/exam';
 import type { SchoolClass, SchoolGrade } from '../types/school';
 import { fetchExamsFromServer, type AdminUserContext, type ExamPayload } from '../services/examService';
 import { fetchDeviceBindings, type DeviceBindingInfo } from '../services/classBinding';
-import { fetchAuditOverview, type AuditLog, type LoginFailureAlert } from '../services/adminUsers';
+import { fetchAuditOverview, type AuditLog } from '../services/adminUsers';
+import type { LoginFailureAlert } from '../shared/authContracts';
 import { getQuickMajorDisplayStatus } from '../utils/majorDisplayStatus';
 import { DEVICE_ONLINE_WINDOW_MS } from '../shared/deviceContracts';
 import '../styles/admin-design.css';
@@ -263,8 +267,13 @@ export default function OverviewPanel({
         <div className="ovd__title">
           <span>项目运行情况</span>
           <h2>{user.roleId === 'super_admin' ? '全校仪表盘' : '管理年级仪表盘'}</h2>
+          <p>实时掌握考试、设备和数据同步状态</p>
         </div>
         <div className="ovd__actions">
+          <span className="ovd-refresh">
+            <RefreshCw size={13} aria-hidden="true" />
+            更新于 {new Date(now).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
+          </span>
           <strong className={`ovd-sync${online ? ' is-ok' : ' is-warn'}`}>
             <i aria-hidden="true" />
             {syncLabel}
@@ -329,6 +338,51 @@ export default function OverviewPanel({
             </em>
           </span>
         </button>
+      </section>
+
+      <section className="ovd-health" aria-label="运行健康">
+        <div className={`ovd-health__item${online ? ' is-ok' : ' is-warn'}`}>
+          <span className="ovd-health__icon">
+            <ShieldCheck size={16} />
+          </span>
+          <span>
+            <small>数据同步</small>
+            <strong>{online ? '运行正常' : '等待联网'}</strong>
+          </span>
+          <em>{syncLabel}</em>
+        </div>
+        <div className={`ovd-health__item${deviceError ? ' is-warn' : ' is-ok'}`}>
+          <span className="ovd-health__icon">
+            <MonitorCheck size={16} />
+          </span>
+          <span>
+            <small>设备心跳</small>
+            <strong>{deviceError ? '读取异常' : '连接正常'}</strong>
+          </span>
+          <em>
+            {onlineDevices.length}/{devices.length || 0} 在线
+          </em>
+        </div>
+        <div className={`ovd-health__item${majorConflicts.length ? ' is-danger' : ' is-ok'}`}>
+          <span className="ovd-health__icon">
+            <CheckCircle2 size={16} />
+          </span>
+          <span>
+            <small>考试排期</small>
+            <strong>{majorConflicts.length ? '需要检查' : '无冲突'}</strong>
+          </span>
+          <em>{activeMajors.length} 场进行中或待执行</em>
+        </div>
+        <div className="ovd-health__item">
+          <span className="ovd-health__icon">
+            <Database size={16} />
+          </span>
+          <span>
+            <small>授权范围</small>
+            <strong>{scope.gradeIds.size} 个年级</strong>
+          </span>
+          <em>{scope.classIds.size} 个班级可见</em>
+        </div>
       </section>
 
       <section className="ovd-quick" aria-label="快捷入口">

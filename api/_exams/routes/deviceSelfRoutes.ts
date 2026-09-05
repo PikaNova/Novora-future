@@ -126,9 +126,15 @@ export async function handleDeviceHeartbeat(req: VercelRequest, res: VercelRespo
       .slice(0, max);
   const run = async () => {
     const acknowledgedCommandId = value('acknowledgedCommandId', 128);
+    const failedCommandId = value('failedCommandId', 128);
+    const commandFailureReason = value('commandFailureReason', 500);
     if (acknowledgedCommandId) {
-      await sql`UPDATE device_commands SET acknowledged_at=${now} WHERE id=${acknowledgedCommandId} AND instance_id=${instanceId} AND acknowledged_at IS NULL`;
+      await sql`UPDATE device_commands SET status='acknowledged', acknowledged_at=${now}, failure_reason='' WHERE id=${acknowledgedCommandId} AND instance_id=${instanceId} AND status IN ('pending','claimed')`;
       await sql`UPDATE device_instances SET temporary_command=NULL WHERE instance_id=${instanceId} AND temporary_command->>'id'=${acknowledgedCommandId}`;
+    }
+    if (failedCommandId) {
+      await sql`UPDATE device_commands SET status='failed', failure_reason=${commandFailureReason || '设备执行失败'} WHERE id=${failedCommandId} AND instance_id=${instanceId} AND status IN ('pending','claimed')`;
+      await sql`UPDATE device_instances SET temporary_command=NULL WHERE instance_id=${instanceId} AND temporary_command->>'id'=${failedCommandId}`;
     }
     await sql`INSERT INTO device_instances (instance_id, page, client_version, status, current_exam, current_subject, exam_start, exam_end, last_seen_at, updated_at)
       VALUES (${instanceId}, ${value('page')}, ${value('clientVersion', 40)}, ${value('status', 40)}, ${value('currentExam')}, ${value('currentSubject')}, ${value('examStart', 40)}, ${value('examEnd', 40)}, ${now}, ${now})
@@ -142,14 +148,32 @@ export async function handleDeviceHeartbeat(req: VercelRequest, res: VercelRespo
         temporary_command?: unknown;
       }>;
     const device = rows[0];
-    const pending =
-      (await sql`SELECT id, action, minutes, created_at FROM device_commands WHERE instance_id=${instanceId} AND acknowledged_at IS NULL ORDER BY created_at ASC LIMIT 1`) as unknown as Array<{
-        id: string;
-        action: string;
-        minutes: number | null;
-        created_at: number | string;
-      }>;
-    const queued = pending[0] ? parseDeviceCommand(pending[0]) : null;
+    let pending: Array<Record<string, unknown>> = [];
+    const commandResults = await sql.transaction((transaction) => [
+      transaction`UPDATE device_commands SET status='expired', failure_reason='命令已过期' WHERE instance_id=${instanceId} AND status IN ('pending','claimed') AND expires_at IS NOT NULL AND expires_at <= ${now}`,
+      transaction`UPDATE device_commands SET status='claimed', claimed_at=${now}
+        WHERE id = (
+          SELECT id FROM device_commands
+          WHERE instance_id=${instanceId} AND status='pending' AND (expires_at IS NULL OR expires_at > ${now})
+          ORDER BY created_at ASC FOR UPDATE SKIP LOCKED LIMIT 1
+        )
+        RETURNING id, action, minutes, created_at, status, idempotency_key, expires_at, claimed_at, acknowledged_at, failure_reason`,
+    ]);
+    pending = commandResults[1] as unknown as Array<Record<string, unknown>>;
+    const queued = pending[0]
+      ? parseDeviceCommand({
+          id: pending[0].id,
+          action: pending[0].action,
+          minutes: pending[0].minutes,
+          createdAt: pending[0].created_at,
+          status: pending[0].status,
+          idempotencyKey: pending[0].idempotency_key,
+          expiresAt: pending[0].expires_at,
+          claimedAt: pending[0].claimed_at,
+          acknowledgedAt: pending[0].acknowledged_at,
+          failureReason: pending[0].failure_reason,
+        })
+      : null;
     const hasBinding = !!device && (device.revoked === true || device.is_management === true || !!device.class_id);
     res.status(200).json({
       ok: true,

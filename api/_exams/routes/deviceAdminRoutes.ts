@@ -8,6 +8,8 @@ import { actorScopeLabel } from '../plugin.js';
 import type { ExamRow } from '../types.js';
 import {
   DEVICE_ONLINE_WINDOW_MS,
+  type DeviceCommandAction,
+  type DeviceCommand,
   type DeviceInstanceRow,
   type PluginInstanceRow,
 } from '../../../src/shared/deviceContracts.js';
@@ -390,20 +392,75 @@ export async function handleDeviceCommand(req: VercelRequest, res: VercelRespons
       return;
     }
   }
+  const idempotencyKey = String(req.body?.idempotencyKey ?? '')
+    .trim()
+    .slice(0, 160);
+  if (idempotencyKey) {
+    const existing = (await sql`SELECT id, action, minutes, created_at, status, idempotency_key, expires_at, claimed_at, acknowledged_at, failure_reason
+      FROM device_commands WHERE instance_id=${instanceId} AND idempotency_key=${idempotencyKey} LIMIT 1`) as unknown as Array<Record<string, unknown>>;
+    if (existing[0]) {
+      const command = {
+        id: String(existing[0].id),
+        action: existing[0].action as DeviceCommandAction,
+        ...(existing[0].minutes == null ? {} : { minutes: Number(existing[0].minutes) }),
+        createdAt: Number(existing[0].created_at),
+        status: String(existing[0].status) as DeviceCommand['status'],
+        idempotencyKey,
+        expiresAt: Number(existing[0].expires_at),
+        ...(existing[0].claimed_at == null ? {} : { claimedAt: Number(existing[0].claimed_at) }),
+        ...(existing[0].acknowledged_at == null ? {} : { acknowledgedAt: Number(existing[0].acknowledged_at) }),
+        ...(String(existing[0].failure_reason ?? '') ? { failureReason: String(existing[0].failure_reason) } : {}),
+      } satisfies DeviceCommand;
+      res.status(200).json({ ok: true, command });
+      return;
+    }
+  }
   if (!(await acquireWriteSlotOrReject(req, res))) return;
-  const command = {
-    id: `cmd_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-    action: commandAction,
+  const createdAt = Date.now();
+  const expiresAt = Math.min(
+    createdAt + 24 * 60 * 60 * 1000,
+    Math.max(createdAt + 60_000, Number(req.body?.expiresAt) || createdAt + 15 * 60 * 1000),
+  );
+  const command: DeviceCommand = {
+    id: `cmd_${createdAt}_${Math.random().toString(36).slice(2, 7)}`,
+    action: commandAction as DeviceCommandAction,
     minutes: commandAction === 'extend' ? Math.min(120, Math.max(1, Number(req.body?.minutes) || 5)) : undefined,
-    createdAt: Date.now(),
+    createdAt,
+    status: 'pending' as const,
+    ...(idempotencyKey ? { idempotencyKey } : {}),
+    expiresAt,
   };
-  await sql.transaction((transaction) => [
-    transaction`INSERT INTO device_commands (id, instance_id, action, minutes, created_at)
-      VALUES (${command.id}, ${instanceId}, ${command.action}, ${command.minutes ?? null}, ${command.createdAt})`,
-    transaction`UPDATE device_instances SET temporary_command=${JSON.stringify(command)}::jsonb, updated_at=${Date.now()} WHERE instance_id=${instanceId}`,
+  let persisted: DeviceCommand = command;
+  const transactionResults = await sql.transaction((transaction) => [
+    transaction`INSERT INTO device_commands (id, instance_id, action, minutes, created_at, status, idempotency_key, expires_at)
+      VALUES (${command.id}, ${instanceId}, ${command.action}, ${command.minutes ?? null}, ${command.createdAt}, 'pending', ${idempotencyKey}, ${expiresAt})
+      ON CONFLICT (instance_id, idempotency_key) WHERE idempotency_key <> '' DO NOTHING
+      RETURNING id, action, minutes, created_at, status, idempotency_key, expires_at`,
   ]);
-  await writeAudit(deviceActor, `device.temporary.${commandAction}`, 'device', instanceId);
-  res.status(200).json({ ok: true, command });
+  const inserted = transactionResults[0] as unknown as Array<Record<string, unknown>>;
+  if (inserted[0]) {
+    await sql`UPDATE device_instances SET temporary_command=${JSON.stringify(command)}::jsonb, updated_at=${Date.now()} WHERE instance_id=${instanceId}`;
+  }
+  if (!inserted[0] && idempotencyKey) {
+    const existing = (await sql`SELECT id, action, minutes, created_at, status, idempotency_key, expires_at, claimed_at, acknowledged_at, failure_reason
+      FROM device_commands WHERE instance_id=${instanceId} AND idempotency_key=${idempotencyKey} LIMIT 1`) as unknown as Array<Record<string, unknown>>;
+    if (existing[0]) {
+      persisted = {
+        id: String(existing[0].id),
+        action: existing[0].action as DeviceCommandAction,
+        ...(existing[0].minutes == null ? {} : { minutes: Number(existing[0].minutes) }),
+        createdAt: Number(existing[0].created_at),
+        status: String(existing[0].status) as DeviceCommand['status'],
+        idempotencyKey,
+        expiresAt: Number(existing[0].expires_at),
+        ...(existing[0].claimed_at == null ? {} : { claimedAt: Number(existing[0].claimed_at) }),
+        ...(existing[0].acknowledged_at == null ? {} : { acknowledgedAt: Number(existing[0].acknowledged_at) }),
+        ...(String(existing[0].failure_reason ?? '') ? { failureReason: String(existing[0].failure_reason) } : {}),
+      } satisfies DeviceCommand;
+    }
+  }
+  await writeAudit(deviceActor, `device.command.${commandAction}`, 'device', instanceId);
+  res.status(200).json({ ok: true, command: persisted });
   return;
 }
 

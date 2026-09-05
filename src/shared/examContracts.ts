@@ -39,6 +39,11 @@ export interface ExamPayload {
   updatedAt: number;
 }
 
+export function examEtag(updatedAt: unknown): string {
+  const value = Number(updatedAt);
+  return `"exam-${Number.isFinite(value) ? value : 0}"`;
+}
+
 /** The complete exam fields that admin save hooks compose before a version is assigned. */
 export type ExamSavePayload = Omit<ExamPayload, 'updatedAt' | 'ok' | 'binding' | 'metadata' | 'lifecycle'>;
 

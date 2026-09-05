@@ -1,5 +1,9 @@
 import { asFiniteNumber, asRecord } from './typeGuards.js';
 
+export const DEVICE_ONLINE_WINDOW_MS = 180_000;
+export const DEVICE_HEARTBEAT_ACTIVE_INTERVAL_MS = 30_000;
+export const DEVICE_HEARTBEAT_IDLE_INTERVAL_MS = 60_000;
+
 export type DeviceCommandAction = 'pause' | 'resume' | 'extend' | 'end';
 
 export interface DeviceBinding {
@@ -7,6 +11,16 @@ export interface DeviceBinding {
   classId: string;
   revoked: boolean;
   isManagement?: boolean;
+}
+
+export function deviceHeartbeatIntervalMs(input: {
+  temporaryActive?: boolean;
+  hasCurrentExam?: boolean;
+  hasNextExam?: boolean;
+}): number {
+  return input.temporaryActive || input.hasCurrentExam || input.hasNextExam
+    ? DEVICE_HEARTBEAT_ACTIVE_INTERVAL_MS
+    : DEVICE_HEARTBEAT_IDLE_INTERVAL_MS;
 }
 
 export interface DeviceCommand {

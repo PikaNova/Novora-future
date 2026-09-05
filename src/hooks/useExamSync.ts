@@ -14,6 +14,7 @@ import { getResolvedExamItems } from '../utils/appSchedule';
 import type { DeviceBinding } from '../services/classBinding';
 import { ApiError, formatApiError, getSyncNotifyTitle } from '../services/apiError';
 import { notify } from '../services/notify';
+import { jitteredIntervalMs } from '../shared/polling';
 
 interface Options {
   onUpdate?: (data: { items: ExamItem[]; title: string; alerts: AlertsSettings }) => void;
@@ -223,13 +224,19 @@ export function useExamSync({
 
   useEffect(() => {
     let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
     const pull = () => {
       if (!cancelled) void refresh();
     };
     pull();
-    const id = setInterval(() => {
-      if (document.visibilityState === 'visible') pull();
-    }, intervalMs);
+    const schedule = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        if (document.visibilityState === 'visible') pull();
+        schedule();
+      }, jitteredIntervalMs(intervalMs));
+    };
+    schedule();
     const onOnline = () => {
       void pull();
     };
@@ -256,7 +263,7 @@ export function useExamSync({
     window.addEventListener('storage', onStorage);
     return () => {
       cancelled = true;
-      clearInterval(id);
+      if (timer) clearTimeout(timer);
       window.removeEventListener('online', onOnline);
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('focus', onFocus);

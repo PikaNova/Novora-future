@@ -8,11 +8,12 @@ import { parseZonedTime } from '../../src/utils/zonedTime.js';
 import type { AdminActor } from '../_auth.js';
 import type { ExamPayload } from './payload.js';
 import { asRecord } from '../../src/shared/typeGuards.js';
+import { DEVICE_ONLINE_WINDOW_MS } from '../../src/shared/deviceContracts.js';
 import type { MajorExam } from '../../src/types/index.js';
 import type { ScheduleMode, WeeklyConflictPolicy, WeeklyPlan } from '../../src/types/exam.js';
 
 export const PLUGIN_PAIR_TTL_MS = 5 * 60 * 1000;
-export const PLUGIN_VIEWER_ONLINE_MS = 90 * 1000;
+export const PLUGIN_VIEWER_ONLINE_MS = DEVICE_ONLINE_WINDOW_MS;
 export const CLASSISLAND_API_VERSION = 2;
 export const CLASSISLAND_API_CAPABILITIES = [
   'pairing',

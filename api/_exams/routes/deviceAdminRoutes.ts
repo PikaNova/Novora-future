@@ -6,7 +6,11 @@ import { examPayload } from '../payload.js';
 import { allScope } from '../permissions.js';
 import { actorScopeLabel } from '../plugin.js';
 import type { ExamRow } from '../types.js';
-import type { DeviceInstanceRow, PluginInstanceRow } from '../../../src/shared/deviceContracts.js';
+import {
+  DEVICE_ONLINE_WINDOW_MS,
+  type DeviceInstanceRow,
+  type PluginInstanceRow,
+} from '../../../src/shared/deviceContracts.js';
 import { type AdminActor, canAccessClass, isPasswordRequired, requireActor, writeAudit } from '../../_auth.js';
 
 export async function handleDeviceBindings(req: VercelRequest, res: VercelResponse): Promise<void> {
@@ -170,7 +174,7 @@ export async function handleManagedDeviceSetup(req: VercelRequest, res: VercelRe
           instanceId: existing[0].instance_id,
           status: existing[0].status,
           lastSeenAt,
-          online: Date.now() - lastSeenAt <= 90_000,
+          online: Date.now() - lastSeenAt <= DEVICE_ONLINE_WINDOW_MS,
         },
       });
       return;
@@ -326,7 +330,7 @@ export async function handleDeviceRoleUpdate(req: VercelRequest, res: VercelResp
         instanceId: occupied[0].instance_id,
         status: occupied[0].status,
         lastSeenAt,
-        online: Date.now() - lastSeenAt <= 90_000,
+        online: Date.now() - lastSeenAt <= DEVICE_ONLINE_WINDOW_MS,
       },
     });
     return;

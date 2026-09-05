@@ -22,8 +22,9 @@ import DesignPolicyManager from './DesignPolicyManager';
 import { getAdminUser, logoutAdmin } from '../services/examService';
 import DeviceDetailDialog from './DeviceDetailDialog';
 import { deviceIsInScope, resolveDeviceScope } from '../utils/deviceScope';
+import { DEVICE_ONLINE_WINDOW_MS } from '../shared/deviceContracts';
 
-const ONLINE_MS = 90_000;
+const ONLINE_MS = DEVICE_ONLINE_WINDOW_MS;
 const formatTime = (value: number) =>
   value > 0 ? new Date(value).toLocaleString('zh-CN', { hour12: false }) : '从未上线';
 const statusLabel = (item?: DeviceBindingInfo) =>

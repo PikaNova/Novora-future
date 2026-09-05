@@ -10,6 +10,7 @@ import {
   updatedAtIntegerOverflow,
 } from '../db.js';
 import { examPayload } from '../payload.js';
+import { examEtag } from '../../../src/shared/examContracts.js';
 import { isolateQuickMajorCreate, sanitizeStaleSnapshot, validateMutation } from '../permissions.js';
 import { computeRemovedScopeIds } from '../scopeCleanup.js';
 import type { ExamRow, UpdatedRow } from '../types.js';
@@ -81,13 +82,31 @@ export async function handleExamDataGet(req: VercelRequest, res: VercelResponse,
   // 这正是“刚建好班级、第一次进后台却提示未创建，刷新一次才出现”的根本原因。
   // 现在每次 GET 都直接查库，只用 ETag 做协商缓存（304），保证任何时刻返回的
   // 都是当次真实查询到的最新数据。
+  const selectUpdatedAt = async (): Promise<Array<{ updated_at?: unknown }>> =>
+    (await sql`SELECT updated_at FROM exam_data WHERE id = 1`) as unknown as Array<{ updated_at?: unknown }>;
   const selectRow = async (): Promise<ExamRow[]> =>
     (await sql`SELECT items, title, majors, active_major_id, alerts, weekly_plans, schedule_mode, active_weekly_plan_id, active_weekly_plan_by_class, weekly_conflict_policy, grades, classes, initialization, design_policy, major_batch_presets, exam_metadata, lifecycle, updated_at FROM exam_data WHERE id = 1`) as unknown as ExamRow[];
+
+  let versionRows: Array<{ updated_at?: unknown }>;
+  try {
+    versionRows = await selectUpdatedAt();
+  } catch (error) {
+    if (!missingRelation(error)) throw error;
+    await ensureTableOnce();
+    versionRows = await selectUpdatedAt();
+  }
+  const etag = examEtag(versionRows[0]?.updated_at);
+  res.setHeader('ETag', etag);
+  if (req.headers['if-none-match'] === etag) {
+    res.status(304).end();
+    return;
+  }
+
   let rows: ExamRow[];
   try {
     rows = await selectRow();
-  } catch (e) {
-    if (!missingRelation(e)) throw e;
+  } catch (error) {
+    if (!missingRelation(error)) throw error;
     await ensureTableOnce();
     rows = await selectRow();
   }
@@ -106,12 +125,6 @@ export async function handleExamDataGet(req: VercelRequest, res: VercelResponse,
   };
   const payload = examPayload(row);
   const body = JSON.stringify(payload);
-  const etag = `"exam-${payload.updatedAt}"`;
-  res.setHeader('ETag', etag);
-  if (req.headers['if-none-match'] === etag) {
-    res.status(304).end();
-    return;
-  }
   res.setHeader('Server-Timing', `app;dur=${Date.now() - startedAt}`);
   res.setHeader('Content-Type', 'application/json');
   res.status(200).send(body);

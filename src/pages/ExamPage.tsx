@@ -3,6 +3,7 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import type { ExamItem, AlertsSettings } from '../types';
 import { getAppSettings } from '../utils/appSettings';
 import { getResolvedExamItems } from '../utils/appSchedule';
+import { examSyncIntervalMs } from '../utils/examPolling';
 import {
   nowMs,
   formatClockInZone,
@@ -206,6 +207,7 @@ function BoundExamPage() {
   const [temporaryOpen, setTemporaryOpen] = useState(false);
   const examLiveRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const examSyncInterval = useMemo(() => examSyncIntervalMs(items, nowMs()), [items]);
 
   // 数据链接：考试前端保持快速同步，后台切换分科模式后无需手动刷新。
   const {
@@ -215,8 +217,8 @@ function BoundExamPage() {
     hasPendingSync,
     syncError,
   } = useExamSync({
-    intervalMs: 5000,
-    minRefreshMs: 3000,
+    intervalMs: examSyncInterval,
+    minRefreshMs: 10_000,
     onUpdate: ({ title: newTitle, alerts: newAlerts }) => {
       setItems(getResolvedExamItems());
       if (newTitle) setTitle(newTitle);

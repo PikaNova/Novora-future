@@ -9,6 +9,7 @@ import {
 } from '../../src/shared/permissionRules.js';
 import { getShanghaiDateKey, weekIndexOfDateKey } from '../../src/utils/weeklySchedule.js';
 import { parseZonedTime } from '../../src/utils/zonedTime.js';
+import { DEVICE_ONLINE_WINDOW_MS } from '../../src/shared/deviceContracts.js';
 
 export type DashboardGrade = { id: string; name: string; enabled?: boolean };
 export type DashboardClass = { id: string; gradeId: string; name: string; enabled?: boolean };
@@ -321,7 +322,7 @@ export function buildOnlineDevices(
   devices: DashboardDevice[],
   classes: DashboardClass[],
   now: number,
-  onlineWindowMs = 90_000,
+  onlineWindowMs = DEVICE_ONLINE_WINDOW_MS,
   limit = 50,
 ): OnlineDevice[] {
   const classById = new Map(classes.map((item) => [item.id, item]));
@@ -350,7 +351,7 @@ export function buildOnlineDevices(
 export function classifyDevices(
   devices: DashboardDevice[],
   now: number,
-  onlineWindowMs = 90_000,
+  onlineWindowMs = DEVICE_ONLINE_WINDOW_MS,
 ): { onlineDevices: number; inExamDevices: number } {
   let onlineDevices = 0;
   let inExamDevices = 0;

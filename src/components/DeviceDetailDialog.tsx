@@ -14,8 +14,9 @@ import {
 } from '../services/classBinding';
 import { notify } from '../services/notify';
 import ClassMultiPicker from './ClassMultiPicker';
+import { DEVICE_ONLINE_WINDOW_MS } from '../shared/deviceContracts';
 
-const ONLINE_MS = 90_000;
+const ONLINE_MS = DEVICE_ONLINE_WINDOW_MS;
 
 export type DeviceDetailTarget = {
   key: string;

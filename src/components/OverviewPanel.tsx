@@ -20,9 +20,10 @@ import { fetchExamsFromServer, type AdminUserContext, type ExamPayload } from '.
 import { fetchDeviceBindings, type DeviceBindingInfo } from '../services/classBinding';
 import { fetchAuditOverview, type AuditLog, type LoginFailureAlert } from '../services/adminUsers';
 import { getQuickMajorDisplayStatus } from '../utils/majorDisplayStatus';
+import { DEVICE_ONLINE_WINDOW_MS } from '../shared/deviceContracts';
 import '../styles/admin-design.css';
 
-const ONLINE_MS = 90_000;
+const ONLINE_MS = DEVICE_ONLINE_WINDOW_MS;
 type OverviewDetail = 'online' | 'majors' | 'database' | 'attention';
 const HIGH_RISK_ACTIONS = new Set([
   'database.reset',

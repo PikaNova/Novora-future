@@ -2,7 +2,7 @@
 // 从 api/exams.ts 拆分而来，逻辑与对外行为保持不变。
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { acquireWriteSlotOrReject, database, ensureTableOnce, missingRelation } from '../db.js';
-import { parseDeviceCommand } from '../../../src/shared/deviceContracts.js';
+import { DEVICE_ONLINE_WINDOW_MS, parseDeviceCommand } from '../../../src/shared/deviceContracts.js';
 
 export async function handleDeviceBinding(req: VercelRequest, res: VercelResponse): Promise<void> {
   const sql = database();
@@ -61,7 +61,7 @@ export async function handleDeviceBinding(req: VercelRequest, res: VercelRespons
           existing: {
             instanceId: occupied[0].instance_id,
             lastSeenAt,
-            online: Date.now() - lastSeenAt <= 90_000,
+            online: Date.now() - lastSeenAt <= DEVICE_ONLINE_WINDOW_MS,
           },
         });
         return;

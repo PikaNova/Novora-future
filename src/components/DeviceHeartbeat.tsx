@@ -16,6 +16,8 @@ import { pluginInstanceFromSearch, sendPluginViewerHeartbeat } from '../services
 import { updateExamSettings } from '../utils/appSettings';
 import { logoutAdmin } from '../services/examService';
 import { resolveDeviceCommandReceipt } from '../utils/deviceCommandReceipt';
+import { deviceHeartbeatIntervalMs } from '../shared/deviceContracts';
+import { jitteredIntervalMs } from '../shared/polling';
 
 export default function DeviceHeartbeat() {
   const { pathname, search } = useLocation();
@@ -23,6 +25,24 @@ export default function DeviceHeartbeat() {
 
   useEffect(() => {
     let acknowledgedCommandId = '';
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const schedule = () => {
+      if (timer) clearTimeout(timer);
+      const now = nowMs();
+      const items = getResolvedExamItems(now);
+      const current = items.find(
+        (item) => item.enabled && parseZonedTime(item.startTime) <= now && parseZonedTime(item.endTime) > now,
+      );
+      const temporary = getTemporaryExam();
+      const temporaryActive = temporary && temporary.status !== 'ended' && new Date(temporary.endTime).getTime() > now;
+      const delay = jitteredIntervalMs(
+        deviceHeartbeatIntervalMs({
+          temporaryActive,
+          hasCurrentExam: Boolean(current),
+        }),
+      );
+      timer = setTimeout(send, delay);
+    };
     const send = () => {
       void sendPluginViewerHeartbeat(pluginInstanceFromSearch(search), getClassBindingInstanceId());
       const now = nowMs();
@@ -95,16 +115,16 @@ export default function DeviceHeartbeat() {
         notify(receipt.tone, receipt.message);
         window.setTimeout(send, 250);
       });
+      schedule();
     };
     send();
-    const timer = window.setInterval(send, 25_000);
     const onVisible = () => {
       if (document.visibilityState === 'visible') send();
     };
     document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('exam-board:settings-changed', send);
     return () => {
-      window.clearInterval(timer);
+      if (timer) clearTimeout(timer);
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('exam-board:settings-changed', send);
     };

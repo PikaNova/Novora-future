@@ -83,7 +83,6 @@ export default function InitializationWizard({ open, onClose, onComplete, onFina
     reader.readAsDataURL(file);
   };
   const validDocuments = useMemo(() => documents.filter((item) => safeDocumentUrl(item.url)), [documents]);
-  const embedUrl = validDocuments[0] ? safeDocumentUrl(validDocuments[0].url) : '';
   const canDismiss = false;
 
   useEffect(() => {
@@ -201,10 +200,7 @@ export default function InitializationWizard({ open, onClose, onComplete, onFina
     }
     opened.opener = null;
     setDocumentsError('');
-    if (!readingStartedAt) {
-      setReadingStartedAt(Date.now());
-      setReadingRemaining(10);
-    }
+    startReading();
   };
   const copyRecoveryKey = async () => {
     try {
@@ -504,9 +500,6 @@ export default function InitializationWizard({ open, onClose, onComplete, onFina
                   <div className="init-documents__state">正在加载文档…</div>
                 ) : validDocuments.length ? (
                   <>
-                    {embedUrl && (
-                      <iframe className="init-documents__frame" src={embedUrl} title="使用文档" onLoad={startReading} />
-                    )}
                     <div className="init-documents__list">
                       {validDocuments.map((document) => (
                         <article key={document.id}>

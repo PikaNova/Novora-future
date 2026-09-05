@@ -525,3 +525,19 @@ git push origin main
 - `npm run lint`：0 errors / 82 warnings。
 - `npm run format:check`：通过。
 - `git diff --check`：通过。
+
+## 2026-09-05 会话间合并记录
+
+### 开发2 剩余提交合入
+
+| 项目 | 结果 |
+|---|---|
+| 合入提交 | `9789bc3 fix: preserve unnamed legacy grades and classes` → cherry-pick 为 `dcd8b98` |
+| 合入方式 | 从 `novora-remote-audit` fetch 后 cherry-pick，保持线性历史 |
+| 自动合并 | `src/shared/examContracts.ts`（改动区域不同）与 `workspace/nas-sync-tracker.md` 均无冲突 |
+| 验证 | `npm test` 460/460（含开发3 新增 4 项）、typecheck:api、lint 0/0、format:check 通过 |
+
+### 时序说明
+
+- 开发2 的数据库门禁主体（`9cd5570`/`341a29f`/`ba2169c`）已在之前 rebase 时进入本仓库历史；`9789bc3` 是最后剩余提交。
+- 开发3 的免费版 P0 批次（`8fbf345` ETag/轮询/心跳降频）先提交，再执行本次 cherry-pick，未卷入任何未提交状态。

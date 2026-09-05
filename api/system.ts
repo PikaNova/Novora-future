@@ -6,10 +6,12 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { readFileSync } from 'node:fs';
 import { cpus, freemem, hostname, loadavg, totalmem } from 'node:os';
 import { authSql, ensureAuthTables, isAdminRecoveryConfigured, requireActor } from './_auth.js';
+import { ensureTableOnce } from './_exams/db.js';
 import { assertRows, rowShape, isString, isNumberLike, isDatabaseInt8, type DatabaseInt8 } from './_validation.js';
 import { requestId, sendDatabaseError } from './_apiError.js';
 import { loadSmtpConfig } from './emailAuth.js';
 import { drainOutbox } from './_emailQueue.js';
+import { readSchemaMigrationState, type SchemaMigrationState } from './_schemaMigration.js';
 
 let cachedVersion: string | null = null;
 function readVersionFrom(url: URL): string | null {
@@ -65,7 +67,15 @@ const isEventRow = rowShape<{
   created_at: isDatabaseInt8,
 });
 
-const CORE_TABLES = ['app_auth', 'app_users', 'app_roles', 'email_config', 'email_outbox', 'write_throttle'];
+const CORE_TABLES = [
+  'app_auth',
+  'app_users',
+  'app_roles',
+  'email_config',
+  'email_outbox',
+  'write_throttle',
+  'app_schema_versions',
+];
 const REQUIRED_TABLES = [
   'app_auth',
   'app_roles',
@@ -79,6 +89,9 @@ const REQUIRED_TABLES = [
   'write_throttle',
   'device_instances',
   'classisland_plugin_instances',
+  'device_commands',
+  'app_schema_versions',
+  'app_schema_migration_logs',
 ];
 
 function smtpPresetOf(host: string): 'qq' | '163' | 'custom' {
@@ -96,6 +109,7 @@ async function handleHealth(req: VercelRequest, res: VercelResponse): Promise<vo
   }
   try {
     const started = Date.now();
+    await ensureTableOnce();
     await ensureAuthTables();
     await authSql()`SELECT 1`;
     const latencyMs = Date.now() - started;
@@ -111,7 +125,8 @@ async function handleHealth(req: VercelRequest, res: VercelResponse): Promise<vo
       isCountRow,
       'email_outbox',
     );
-    const schemaOk = missingTables.length === 0;
+    const schemaState = await readSchemaMigrationState(authSql());
+    const schemaOk = missingTables.length === 0 && schemaState.matches;
     const backedUp = Number(pendingRows[0]?.count ?? 0) > 20;
     res.status(schemaOk ? 200 : 503).json({
       ok: schemaOk,
@@ -119,6 +134,9 @@ async function handleHealth(req: VercelRequest, res: VercelResponse): Promise<vo
       version: appVersion(),
       serverTime: new Date().toISOString(),
       latencyMs,
+      schemaVersion: schemaState.version,
+      schemaVersions: schemaState.versions,
+      schemaMigrations: schemaState.migrations,
       checks: { db: 'ok', schema: schemaOk ? 'ok' : 'mismatch', mailQueue: backedUp ? 'backed_up' : 'ok' },
     });
   } catch (error) {
@@ -142,10 +160,14 @@ async function collectDatabase(): Promise<{
   cacheHitRate: number | null;
   xactCommit: number | null;
   xactRollback: number | null;
+  schemaVersion: number | null;
+  schemaVersions: SchemaMigrationState['versions'];
+  schemaMigrations: SchemaMigrationState['migrations'];
   error?: string;
 }> {
   try {
     const started = Date.now();
+    await ensureTableOnce();
     await ensureAuthTables();
     await authSql()`SELECT 1`;
     const latencyMs = Date.now() - started;
@@ -156,6 +178,7 @@ async function collectDatabase(): Promise<{
     );
     const present = new Set(tables.map((row) => row.table_name));
     const missingTables = REQUIRED_TABLES.filter((name) => !present.has(name));
+    const schemaState = await readSchemaMigrationState(authSql());
     const throttle = assertRows(
       await authSql()`SELECT next_allowed_at FROM write_throttle WHERE id=1`,
       rowShape<{ next_allowed_at: number | string }>({
@@ -208,7 +231,7 @@ async function collectDatabase(): Promise<{
     return {
       reachable: true,
       latencyMs,
-      schemaOk: missingTables.length === 0,
+      schemaOk: missingTables.length === 0 && schemaState.matches,
       missingTables,
       writeThrottleNextAllowedAt: throttle[0] ? Number(throttle[0].next_allowed_at) : null,
       version: versionRow?.server_version ?? null,
@@ -220,6 +243,9 @@ async function collectDatabase(): Promise<{
       cacheHitRate,
       xactCommit: xactRow ? Number(xactRow.commit) : null,
       xactRollback: xactRow ? Number(xactRow.rollback) : null,
+      schemaVersion: schemaState.version,
+      schemaVersions: schemaState.versions,
+      schemaMigrations: schemaState.migrations,
     };
   } catch (error) {
     return {
@@ -237,6 +263,9 @@ async function collectDatabase(): Promise<{
       cacheHitRate: null,
       xactCommit: null,
       xactRollback: null,
+      schemaVersion: null,
+      schemaVersions: { auth: null, exams: null },
+      schemaMigrations: [],
       error: String(error instanceof Error ? error.message : error).slice(0, 200),
     };
   }

@@ -35,6 +35,19 @@ export type SystemStatusPayload = {
     latencyMs: number | null;
     schemaOk: boolean;
     missingTables: string[];
+    schemaVersion?: number | null;
+    schemaVersions?: { auth: number | null; exams: number | null };
+    schemaMigrations?: Array<{
+      component: 'auth' | 'exams';
+      version: number;
+      description: string;
+      requestId: string;
+      status: 'success' | 'failed';
+      startedAt: number;
+      completedAt: number | null;
+      durationMs: number | null;
+      error: string;
+    }>;
     writeThrottleNextAllowedAt: number | null;
     version: string | null;
     sizeBytes: number | null;

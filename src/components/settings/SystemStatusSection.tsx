@@ -213,6 +213,16 @@ function SystemStatusBody() {
               <b>{data.database.reachable ? '正常' : '异常'}</b>
             </li>
             <li>
+              <span>Schema 版本</span>
+              <b>
+                {data.database.schemaVersion != null
+                  ? `v${data.database.schemaVersion}（auth ${data.database.schemaVersions?.auth ?? '—'} / exams ${
+                      data.database.schemaVersions?.exams ?? '—'
+                    }）`
+                  : '—'}
+              </b>
+            </li>
+            <li>
               <span>往返延迟</span>
               <b className={'system-status__latency ' + latencyTone(data.database.latencyMs)}>
                 {data.database.latencyMs != null ? data.database.latencyMs + ' ms' : '—'}

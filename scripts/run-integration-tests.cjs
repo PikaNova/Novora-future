@@ -7,6 +7,9 @@ const integrationUrl = process.env.INTEGRATION_DATABASE_URL;
 if (!integrationUrl) {
   throw new Error('INTEGRATION_DATABASE_URL is required. Refusing to use DATABASE_URL for integration tests.');
 }
+if (integrationUrl === process.env.DATABASE_URL) {
+  throw new Error('INTEGRATION_DATABASE_URL must differ from DATABASE_URL. Integration tests truncate their target.');
+}
 if (process.env.INTEGRATION_TEST_CONFIRM !== 'novora-disposable') {
   throw new Error('Set INTEGRATION_TEST_CONFIRM=novora-disposable to confirm this database may be cleared.');
 }

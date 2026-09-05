@@ -14,6 +14,24 @@
       timeout: 3s
       retries: 20
 
+  db-integration:
+    image: postgres:16-alpine
+    profiles:
+      - test
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-novora}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-novora}
+      POSTGRES_DB: novora_integration
+    ports:
+      - '${INTEGRATION_DB_PORT:-15432}:5432'
+    volumes:
+      - novora_integration_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-novora} -d novora_integration']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
   app:
     build:
       context: .
@@ -32,3 +50,4 @@
 
 volumes:
   novora_pgdata:
+  novora_integration_pgdata:

@@ -177,6 +177,28 @@ Vite 默认运行在 `http://localhost:5173`。本地调试 Vercel Functions 时
 npm run build
 ```
 
+## 数据库集成测试
+
+集成测试需要一个独立的一次性 PostgreSQL 数据库，测试会清空其中业务数据。不要把生产 `DATABASE_URL` 填入 `INTEGRATION_DATABASE_URL`。
+
+使用 Docker Compose 的独立测试库：
+
+```bash
+docker compose --profile test up -d db-integration
+export INTEGRATION_DATABASE_URL='postgres://novora:novora@localhost:15432/novora_integration'
+export INTEGRATION_TEST_CONFIRM=novora-disposable
+npm run test:integration
+```
+
+PowerShell 使用 `$env:INTEGRATION_DATABASE_URL=...` 和 `$env:INTEGRATION_TEST_CONFIRM=...` 设置变量。测试完成后停止容器并删除专用卷：
+
+```bash
+docker compose --profile test down
+docker volume rm novora_integration_pgdata
+```
+
+如果 Docker Compose 项目名不同，请先执行 `docker volume ls --filter name=novora_integration_pgdata` 找到实际卷名。
+
 ## 遥测说明
 
 遥测启用后会上报实例版本、运行环境、匿名实例标识、省份和完整校名，用于作者了解部署运行情况；不上传考试安排正文、管理员密码、恢复密钥或用户会话。可在系统设置中关闭并查看当前同意状态。

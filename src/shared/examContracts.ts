@@ -127,15 +127,16 @@ function parsePlanMap(raw: unknown): Record<string, string | null> | undefined {
 }
 
 function parseGrades(raw: unknown): SchoolGrade[] {
-  return normalizeGrades(raw)
-    .map((grade) => ({ ...grade, name: grade.name === 'undefined' ? '' : grade.name }))
-    .filter((grade) => grade.name);
+  return normalizeGrades(raw).map((grade) => ({
+    ...grade,
+    name: grade.name === 'undefined' ? '未命名年级' : grade.name,
+  }));
 }
 
 function parseClasses(raw: unknown, grades: SchoolGrade[]): SchoolClass[] {
   return normalizeClasses(raw, grades).map(({ track, ...schoolClass }) => ({
     ...schoolClass,
-    name: schoolClass.name === 'undefined' ? '' : schoolClass.name,
+    name: schoolClass.name === 'undefined' ? '未命名班级' : schoolClass.name,
     ...(Array.isArray(track) ? { track } : {}),
   }));
 }

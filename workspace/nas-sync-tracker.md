@@ -497,3 +497,31 @@ git pull origin main
 cd 'C:\Users\Administrator\Documents\Codex\2026-07-23\nihao-2\novora-remote-audit'
 git push origin main
 ```
+
+## 2026-09-05 18:35 独立 PostgreSQL 集成测试通过
+
+### 环境
+
+| 项目 | 值 |
+|---|---|
+| PostgreSQL | 本机 PostgreSQL 17.11 |
+| 集群 | 工作区外一次性 `pg-integration-data` |
+| 监听地址 | `127.0.0.1:15432` |
+| 数据库 | `novora_integration` |
+| 连接 | `postgres://novora@127.0.0.1:15432/novora_integration` |
+
+### 结果
+
+- 首次集成测试 17/19 通过，发现 `parseExamPayload` 会过滤缺少 `name` 的旧年级/班级。
+- 该回归会让保存请求误判为删除全部结构，并清空用户 scope。
+- 已修复为保留缺名记录，并用 `未命名年级` / `未命名班级` 兜底。
+- 修复后集成测试 19/19 通过，覆盖并发写入、全局写槽、事务回滚、BIGINT、schema 版本、迁移日志和设备替换。
+
+### 其他验证
+
+- `npm test`：453/453 通过。
+- `npm run typecheck:api`：通过。
+- `npm run serve:build`：通过。
+- `npm run lint`：0 errors / 82 warnings。
+- `npm run format:check`：通过。
+- `git diff --check`：通过。

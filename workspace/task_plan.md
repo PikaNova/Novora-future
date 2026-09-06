@@ -10,7 +10,7 @@
 
 ### 双端状态
 - 学校端：`nas-upload-worktree/upload/main`，`1fea6b8 feat: add manual diagnostic log upload`，已同步至 `Novora-future/future/upload/main`。
-- 作者端：`exam-board-telemetry-author/main`，`aae5e5c` + `326de61`，已同步至 `exam-board-telemetry/main`。
+- 作者端：`exam-board-telemetry-author/main`，`aae5e5c` + `326de61` + `c5c4734`，已同步至 `exam-board-telemetry/main`。
 - 作者端验证：9/9 测试、TypeScript、Vite 构建通过；工作树干净。
 
 ### 对话归档

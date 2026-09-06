@@ -11,6 +11,7 @@
 
 - `exam-board-telemetry-author` 已完成诊断日志包接收 API、短期 token `diagnostic:write` 能力、后台查询/状态接口、设备与错误事件关联。
 - `aae5e5c` 完成诊断包 intake 与作者后台错误/诊断界面；`326de61` 补充 `device_id` 持久化。
+- `c5c4734` 补充诊断包访问审计与后台关联展示。
 - `npm test` 9/9、`npm run typecheck`、`npm run build` 通过，两个提交均已推送至 `exam-board-telemetry/main`。
 
 ### 对话归档

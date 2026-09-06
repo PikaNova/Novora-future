@@ -5,6 +5,7 @@
 - 已核对学校端 `nas-upload-worktree/upload/main`：提交 `1fea6b8`（手动诊断日志上传），远端 `Novora-future/future/upload/main` 已存在，工作树干净。
 - 已完成作者端 `exam-board-telemetry-author` 诊断日志包接收、查询、状态管理和设备/错误事件关联；提交 `aae5e5c`、`326de61` 已推送到 `exam-board-telemetry/main`。
 - 作者端验证：`npm test` 9/9、`npm run typecheck`、`npm run build` 全部通过；推送后工作树干净。
+- 作者端后续提交 `c5c4734 feat: audit diagnostic bundle access` 已推送，补充诊断包访问审计与后台展示关联；作者端当前远端与本地一致。
 - 已整理四组对话导出：版本规划整合、未来项目规划、考试功能规划、WebSocket 稳定性评估；原始 HTML/JSON/router 文件将纳入 future workspace。
 - 双端实现进度已写入同步追踪、任务计划、发现记录和会话汇总；未把未授权的旧仓库或运行时目录上传。
 

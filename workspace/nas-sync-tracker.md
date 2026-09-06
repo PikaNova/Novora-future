@@ -644,6 +644,7 @@ git push origin main
 
 - 学校端 `nas-upload-worktree/upload/main`：`1fea6b8 feat: add manual diagnostic log upload`，远端 `Novora-future/future/upload/main` 已同步。
 - 作者端 `exam-board-telemetry-author/main`：`aae5e5c feat: add diagnostic bundle intake and error sections`、`326de61 fix: persist diagnostic device and event ids`，均已推送到 `exam-board-telemetry/main`。
+- 作者端随后提交 `c5c4734 feat: audit diagnostic bundle access` 也已推送，补充访问审计与后台关联展示。
 - 作者端验证：`npm test` 9/9、`npm run typecheck`、`npm run build` 通过，工作树干净。
 
 ### 对话归档

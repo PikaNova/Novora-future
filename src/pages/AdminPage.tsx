@@ -659,6 +659,7 @@ export default function AdminPage() {
                   classes={visibleClasses}
                   majors={visibleMajors}
                   weeklyPlans={visibleWeeklyPlans}
+                  syncState={sync}
                   syncLabel={SYNC_META[sync].label}
                   online={online}
                   onQuickPublish={canQuickPublish ? () => setQuickMajorOpen(true) : undefined}

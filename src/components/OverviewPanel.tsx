@@ -19,10 +19,16 @@ import type { MajorExam } from '../types';
 import { findMajorConflicts } from '../utils/examConflicts';
 import type { WeeklyPlan } from '../types/exam';
 import type { SchoolClass, SchoolGrade } from '../types/school';
-import { fetchExamsFromServer, type AdminUserContext, type ExamPayload } from '../services/examService';
+import {
+  fetchExamsFromServer,
+  getLastExamApiError,
+  type AdminUserContext,
+  type ExamPayload,
+} from '../services/examService';
 import { fetchDeviceBindings, type DeviceBindingInfo } from '../services/classBinding';
 import { fetchAuditOverview, type AuditLog } from '../services/adminUsers';
 import type { LoginFailureAlert } from '../shared/authContracts';
+import type { SyncState } from '../hooks/admin/adminPageUtils';
 import { getQuickMajorDisplayStatus } from '../utils/majorDisplayStatus';
 import { DEVICE_ONLINE_WINDOW_MS } from '../shared/deviceContracts';
 import '../styles/admin-design.css';
@@ -110,6 +116,7 @@ interface Props {
   classes: SchoolClass[];
   majors: MajorExam[];
   weeklyPlans: WeeklyPlan[];
+  syncState: SyncState;
   syncLabel: string;
   online: boolean;
   onQuickPublish?: () => void;
@@ -121,6 +128,7 @@ export default function OverviewPanel({
   classes,
   majors,
   weeklyPlans,
+  syncState,
   syncLabel,
   online,
   onQuickPublish,
@@ -128,12 +136,15 @@ export default function OverviewPanel({
   const [devices, setDevices] = useState<DeviceBindingInfo[]>([]);
   const [deviceError, setDeviceError] = useState('');
   const [now, setNow] = useState(Date.now());
+  const [lastSuccessfulRefreshAt, setLastSuccessfulRefreshAt] = useState<number | null>(null);
   const [detailOpen, setDetailOpen] = useState<OverviewDetail | null>(null);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [loginFailureAlerts, setLoginFailureAlerts] = useState<LoginFailureAlert[]>([]);
   const [auditLoading, setAuditLoading] = useState(false);
   const [auditError, setAuditError] = useState('');
   const [cloudSnapshot, setCloudSnapshot] = useState<ExamPayload | null>(null);
+  const [cloudOverviewError, setCloudOverviewError] = useState('');
+  const [cloudOverviewLoaded, setCloudOverviewLoaded] = useState(false);
 
   const liveGrades = cloudSnapshot?.grades ?? grades;
   const liveClasses = cloudSnapshot?.classes ?? classes;
@@ -153,19 +164,30 @@ export default function OverviewPanel({
     return { gradeIds, classIds };
   }, [liveClasses, liveGrades, user.permissions, user.scopes]);
 
-  const loadDevices = useCallback(async () => {
+  const loadDevices = useCallback(async (): Promise<boolean> => {
     try {
       const result = await fetchDeviceBindings();
       setDevices(result.bindings.filter((item) => scope.classIds.has(item.classId)));
       setDeviceError('');
+      return true;
     } catch (error) {
       setDeviceError(error instanceof Error ? error.message : '设备状态读取失败');
+      return false;
     }
   }, [scope]);
 
-  const loadCloudOverview = useCallback(async () => {
+  const loadCloudOverview = useCallback(async (): Promise<boolean> => {
     const remote = await fetchExamsFromServer();
-    if (remote) setCloudSnapshot(remote);
+    if (!remote) {
+      const apiError = getLastExamApiError();
+      setCloudOverviewError(apiError?.message || '云端考试数据读取失败');
+      setCloudOverviewLoaded(true);
+      return false;
+    }
+    setCloudSnapshot(remote);
+    setCloudOverviewError('');
+    setCloudOverviewLoaded(true);
+    return true;
   }, []);
 
   useEffect(() => {
@@ -173,7 +195,8 @@ export default function OverviewPanel({
     const refresh = async () => {
       if (alive) {
         setNow(Date.now());
-        await Promise.all([loadDevices(), loadCloudOverview()]);
+        const [devicesLoaded, cloudLoaded] = await Promise.all([loadDevices(), loadCloudOverview()]);
+        if (alive && devicesLoaded && cloudLoaded) setLastSuccessfulRefreshAt(Date.now());
       }
     };
     void refresh();
@@ -197,6 +220,30 @@ export default function OverviewPanel({
   const onlineDevices = devices.filter((item) => !item.revoked && now - item.lastSeenAt <= ONLINE_MS);
   const runningDevices = onlineDevices.filter((item) => item.status === 'exam-running');
   const majorConflicts = findMajorConflicts(activeMajors);
+  const syncHealthLabel =
+    !online || syncState === 'offline'
+      ? '等待联网'
+      : syncState === 'error'
+        ? '同步异常'
+        : syncState === 'saving'
+          ? '同步中'
+          : syncState === 'loading'
+            ? '连接中'
+            : cloudOverviewError
+              ? '读取异常'
+              : '运行正常';
+  const syncHealthTone = syncState === 'saved' && online && !cloudOverviewError ? 'is-ok' : 'is-warn';
+  const cloudDataLabel = cloudOverviewError ? '读取异常' : cloudOverviewLoaded ? '连接正常' : '连接中';
+  const deviceHealthIssue = !!deviceError || (devices.length > 0 && onlineDevices.length === 0);
+  const deviceHealthLabel = deviceError
+    ? '读取异常'
+    : devices.length === 0
+      ? '暂无设备'
+      : onlineDevices.length === devices.length
+        ? '全部在线'
+        : onlineDevices.length > 0
+          ? '部分在线'
+          : '全部离线';
   const quickMajorDisplayStatuses: Array<{
     major: MajorExam;
     status: NonNullable<ReturnType<typeof getQuickMajorDisplayStatus>>;
@@ -214,6 +261,7 @@ export default function OverviewPanel({
   const highRiskLogs = auditLogs.filter((item) => HIGH_RISK_ACTIONS.has(item.action)).slice(0, 12);
   const activeErrorCount =
     (deviceError ? 1 : 0) +
+    (cloudOverviewError ? 1 : 0) +
     (auditError ? 1 : 0) +
     devices.filter((item) => item.revoked).length +
     majorConflicts.length;
@@ -224,7 +272,7 @@ export default function OverviewPanel({
       : detailOpen === 'majors'
         ? '待执行大型考试'
         : detailOpen === 'database'
-          ? '数据库状态'
+          ? '云端数据状态'
           : '最近高风险操作';
 
   const loadAuditLogs = useCallback(async () => {
@@ -272,9 +320,14 @@ export default function OverviewPanel({
         <div className="ovd__actions">
           <span className="ovd-refresh">
             <RefreshCw size={13} aria-hidden="true" />
-            更新于 {new Date(now).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
+            {lastSuccessfulRefreshAt
+              ? `更新于 ${new Date(lastSuccessfulRefreshAt).toLocaleTimeString('zh-CN', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}`
+              : '等待首次成功刷新'}
           </span>
-          <strong className={`ovd-sync${online ? ' is-ok' : ' is-warn'}`}>
+          <strong className={`ovd-sync ${syncHealthTone}`}>
             <i aria-hidden="true" />
             {syncLabel}
           </strong>
@@ -309,8 +362,8 @@ export default function OverviewPanel({
             <Database size={18} />
           </span>
           <span className="ovd-capsule__body">
-            <small>数据库状态</small>
-            <strong>{deviceError ? '连接异常' : '连接正常'}</strong>
+            <small>云端数据状态</small>
+            <strong>{cloudDataLabel}</strong>
             <em>
               {displayGrades} 个年级 · {displayClasses} 个班级
             </em>
@@ -341,26 +394,30 @@ export default function OverviewPanel({
       </section>
 
       <section className="ovd-health" aria-label="运行健康">
-        <div className={`ovd-health__item${online ? ' is-ok' : ' is-warn'}`}>
+        <div className={`ovd-health__item ${syncHealthTone}`}>
           <span className="ovd-health__icon">
             <ShieldCheck size={16} />
           </span>
           <span>
             <small>数据同步</small>
-            <strong>{online ? '运行正常' : '等待联网'}</strong>
+            <strong>{syncHealthLabel}</strong>
           </span>
           <em>{syncLabel}</em>
         </div>
-        <div className={`ovd-health__item${deviceError ? ' is-warn' : ' is-ok'}`}>
+        <div className={`ovd-health__item${deviceHealthIssue ? ' is-warn' : devices.length ? ' is-ok' : ''}`}>
           <span className="ovd-health__icon">
             <MonitorCheck size={16} />
           </span>
           <span>
             <small>设备心跳</small>
-            <strong>{deviceError ? '读取异常' : '连接正常'}</strong>
+            <strong>{deviceHealthLabel}</strong>
           </span>
           <em>
-            {onlineDevices.length}/{devices.length || 0} 在线
+            {deviceError
+              ? '状态暂不可用'
+              : devices.length
+                ? `${onlineDevices.length}/${devices.length} 在线`
+                : '暂无已绑定设备'}
           </em>
         </div>
         <div className={`ovd-health__item${majorConflicts.length ? ' is-danger' : ' is-ok'}`}>
@@ -574,13 +631,15 @@ export default function OverviewPanel({
               {detailOpen === 'database' && (
                 <>
                   <article>
-                    <strong>{deviceError ? '连接异常' : '连接正常'}</strong>
+                    <strong>{cloudDataLabel}</strong>
                     <span>{syncLabel}</span>
                     <small>
                       {scope.gradeIds.size} 个年级 · {scope.classIds.size} 个班级
                     </small>
                   </article>
-                  {canReadAudit ? (
+                  {cloudOverviewError ? (
+                    <p>{cloudOverviewError}</p>
+                  ) : canReadAudit ? (
                     auditLoading ? (
                       <p>正在读取最近同步到云端的改动…</p>
                     ) : auditError ? (
@@ -607,6 +666,7 @@ export default function OverviewPanel({
                 (riskCount || auditLoading ? (
                   <>
                     {(deviceError ||
+                      cloudOverviewError ||
                       auditError ||
                       devices.some((item) => item.revoked) ||
                       majorConflicts.length > 0) && (
@@ -614,8 +674,14 @@ export default function OverviewPanel({
                         <strong>错误提醒</strong>
                         {deviceError && (
                           <article>
-                            <strong>同步或设备状态读取异常</strong>
+                            <strong>设备状态读取异常</strong>
                             <span>{deviceError}</span>
+                          </article>
+                        )}
+                        {cloudOverviewError && (
+                          <article>
+                            <strong>云端考试数据读取异常</strong>
+                            <span>{cloudOverviewError}</span>
                           </article>
                         )}
                         {auditError && (

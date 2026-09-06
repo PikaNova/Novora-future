@@ -115,6 +115,10 @@ export const PERMISSION_META: Record<string, { label: string; description: strin
   'user.delete': { label: '删除管理员', description: '删除管理范围内的账号并立即撤销其所有会话。' },
   'role.manage': { label: '管理角色', description: '创建、修改和删除自定义角色。' },
   'audit.read': { label: '查看操作日志', description: '查看最近的登录与数据修改记录。' },
+  'diagnostics.read': { label: '查看诊断日志', description: '查看错误关联的本地诊断日志包。' },
+  'diagnostics.upload': { label: '发送诊断日志', description: '按日期或错误选择诊断日志并发送给作者端。' },
+  'diagnostics.download': { label: '下载诊断日志', description: '下载学校端保留的诊断日志包。' },
+  'diagnostics.settings': { label: '诊断日志设置', description: '配置错误前后日志保留时长和本地保留策略。' },
   'deployment.trigger': { label: '触发重新部署', description: '通过已配置的部署钩子更新应用。' },
 };
 

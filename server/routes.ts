@@ -9,6 +9,7 @@ const MODULE_FOR_NAME: Record<string, string> = {
   'email-worker': 'system',
   emailAuth: 'emailAuth',
   'error-report': 'error-report',
+  'diagnostic-logs': 'diagnostic-logs',
   exams: 'exams',
   health: 'system',
   login: 'login',

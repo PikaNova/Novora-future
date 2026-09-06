@@ -27,6 +27,7 @@ import DataMaintenanceSection from '../components/settings/DataMaintenanceSectio
 import SettingsGroupNav from '../components/settings/SettingsGroupNav';
 import SettingsCollapsibleCard from '../components/settings/SettingsCollapsibleCard';
 import SystemStatusSection from '../components/settings/SystemStatusSection';
+import DiagnosticLogsSection from '../components/settings/DiagnosticLogsSection';
 import { ArrowLeft, DatabaseZap, ListChecks, RadioTower, Rocket } from 'lucide-react';
 
 export default function SettingsPage() {
@@ -77,6 +78,9 @@ export default function SettingsPage() {
   const canEditAlerts = adminUser ? adminCan('alerts.edit', adminUser) : !hasValidLocalToken();
   const canEditSchool = adminUser ? adminCan('initialization.run', adminUser) : !hasValidLocalToken();
   const canResetDatabase = adminUser ? adminUser.permissions.includes('*') : !hasValidLocalToken();
+  const canReadDiagnostics = adminUser ? adminCan('diagnostics.read', adminUser) : !hasValidLocalToken();
+  const canUploadDiagnostics = adminUser ? adminCan('diagnostics.upload', adminUser) : !hasValidLocalToken();
+  const canEditDiagnostics = adminUser ? adminCan('diagnostics.settings', adminUser) : !hasValidLocalToken();
   const hasAnyEditable =
     canEditSettings || canEditPresets || canEditWeekly || canEditAlerts || canEditSchool || canResetDatabase;
 
@@ -146,6 +150,11 @@ export default function SettingsPage() {
             {(canEditSettings || canResetDatabase) && (
               <EmailServiceSection canEditSettings={canEditSettings} canEditPolicy={canResetDatabase} />
             )}
+            <DiagnosticLogsSection
+              canRead={canReadDiagnostics}
+              canUpload={canUploadDiagnostics}
+              canEdit={canEditDiagnostics}
+            />
           </div>
         </section>
 

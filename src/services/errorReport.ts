@@ -12,6 +12,7 @@ import {
 import { APP_VERSION, getInstanceId, isEnabled } from './telemetry';
 import type { ErrorReportLevel, ErrorReportType } from '../shared/errorReportContracts';
 import { getAppSettings } from '../utils/appSettings';
+import { captureErrorWindow } from '../utils/logger';
 
 export type { ErrorReportLevel, ErrorReportType } from '../shared/errorReportContracts';
 
@@ -205,6 +206,11 @@ export async function reportError(input: ErrorReportInput): Promise<void> {
   if (shouldSkipDuplicate(fingerprint)) return;
   const payload = buildPayload(input);
   if (!payload) return;
+  captureErrorWindow({
+    errorEventId: typeof payload.fingerprint === 'string' ? `err_${payload.fingerprint}_${Date.now()}` : undefined,
+    fingerprint: typeof payload.fingerprint === 'string' ? payload.fingerprint : undefined,
+    errorCode: typeof payload.errorName === 'string' ? payload.errorName : undefined,
+  });
   await flushQueuedReports();
   if ((await sendPayload(payload)) === 'retry') enqueue(payload);
 }

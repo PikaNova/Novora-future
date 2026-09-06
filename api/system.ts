@@ -96,6 +96,8 @@ const REQUIRED_TABLES = [
   'exam_record_operations',
   'app_schema_versions',
   'app_schema_migration_logs',
+  'app_diagnostic_settings',
+  'app_diagnostic_bundles',
 ];
 
 function smtpPresetOf(host: string): 'qq' | '163' | 'custom' {

@@ -637,3 +637,18 @@ git push origin main
 - 当前任务计划：`workspace/task_plan.md`
 - 当前发现与证据：`workspace/findings.md`
 - 数据库集成门禁已通过；临时 PostgreSQL 已停止，`.tmp-pg-integration` 尚待手动清理。
+
+## 2026-09-06 双端进度整理、对话归档与远端同步
+
+### 双端更新
+
+- 学校端 `nas-upload-worktree/upload/main`：`1fea6b8 feat: add manual diagnostic log upload`，远端 `Novora-future/future/upload/main` 已同步。
+- 作者端 `exam-board-telemetry-author/main`：`aae5e5c feat: add diagnostic bundle intake and error sections`、`326de61 fix: persist diagnostic device and event ids`，均已推送到 `exam-board-telemetry/main`。
+- 作者端验证：`npm test` 9/9、`npm run typecheck`、`npm run build` 通过，工作树干净。
+
+### 对话归档
+
+- 索引：`workspace/conversation-index.md`。
+- 原始导出：`share_6a92fda6.*`、`share_6a9bda6b.*`、`share_6a9bdada.*`、`share_6a9bdc53.*`。
+- 主题覆盖版本规划、未来路线、考试功能和 WebSocket 稳定性评估。
+- 不上传旧仓库、依赖目录、临时运行目录或数据库内容。

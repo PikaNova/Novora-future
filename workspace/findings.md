@@ -1,5 +1,23 @@
 # 发现与决策
 
+## 双端进度与远端同步（2026-09-06）
+
+### 学校端
+
+- `nas-upload-worktree/upload/main` 当前为 `1fea6b8`，已包含手动诊断日志上传、学校端日志契约、迁移和设置入口。
+- 对应远端分支为 `Novora-future/future/upload/main`；本次不改写或强推学校端历史。
+
+### 作者端
+
+- `exam-board-telemetry-author` 已完成诊断日志包接收 API、短期 token `diagnostic:write` 能力、后台查询/状态接口、设备与错误事件关联。
+- `aae5e5c` 完成诊断包 intake 与作者后台错误/诊断界面；`326de61` 补充 `device_id` 持久化。
+- `npm test` 9/9、`npm run typecheck`、`npm run build` 通过，两个提交均已推送至 `exam-board-telemetry/main`。
+
+### 对话归档
+
+- 四组 `share_6*` 导出与对应 router/html/json 文件作为规划依据纳入 future workspace；会话汇总单独记录端点范围、提交和验证证据。
+- 原始导出中可能含历史会话文本，仅作为项目档案保存，不作为运行时输入或业务数据。
+
 ## P1 API/客户端契约批次（2026-08-30）
 
 ### 共享契约

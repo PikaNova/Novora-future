@@ -1,5 +1,24 @@
 # 任务计划：代码优化
 
+## 当前会话：双端进度整理、对话归档与远端同步（2026-09-06）
+
+### 目标
+- [x] 汇总学校端与作者端最新提交、验证结果和远端分支状态。
+- [x] 更新 `progress.md`、`task_plan.md`、`findings.md`、`nas-sync-tracker.md`。
+- [x] 归档四组共享对话导出及可复用解析脚本到 future workspace。
+- [x] 推送作者端可提交改动；学校端已有提交保持在 `future/upload/main`。
+
+### 双端状态
+- 学校端：`nas-upload-worktree/upload/main`，`1fea6b8 feat: add manual diagnostic log upload`，已同步至 `Novora-future/future/upload/main`。
+- 作者端：`exam-board-telemetry-author/main`，`aae5e5c` + `326de61`，已同步至 `exam-board-telemetry/main`。
+- 作者端验证：9/9 测试、TypeScript、Vite 构建通过；工作树干净。
+
+### 对话归档
+- `share_6a92fda6.*`：版本规划整合。
+- `share_6a9bda6b.*`：贴合实际的未来项目规划。
+- `share_6a9bdada.*`：考试功能规划。
+- `share_6a9bdc53.*`：WebSocket 稳定性评估。
+
 ## 当前会话：Novora P1 数据库集成门禁（2026-09-06）
 
 ### 目标

@@ -6692,6 +6692,10 @@
     overflow-wrap: anywhere;
     word-break: normal;
   }
+  /* 班级管理的标题说明需要完整宽度，操作区在窄屏下单独换行。 */
+  .class-management .device-status__heading {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .account-email-binding__head span {
   color: rgba(240, 240, 240, 0.55);

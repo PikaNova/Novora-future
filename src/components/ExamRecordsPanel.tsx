@@ -154,7 +154,11 @@ function weeklyDateLabel(dateKey: string, now: number): string {
   return dateKey.slice(5);
 }
 
-function displayStatusOf(record: ExamRecordListEntry, major: MajorExam | undefined, now: number): ExamRecordDisplayStatus {
+function displayStatusOf(
+  record: ExamRecordListEntry,
+  major: MajorExam | undefined,
+  now: number,
+): ExamRecordDisplayStatus {
   if (record.displayStatus === 'draft' || record.displayStatus === 'ended' || record.displayStatus === 'archived') {
     return record.displayStatus;
   }
@@ -192,6 +196,7 @@ export default function ExamRecordsPanel({
   const [rememberedFilters] = useState(() => readExamListFilters(preset));
   const [records, setRecords] = useState<ExamRecordListEntry[]>([]);
   const [query, setQuery] = useState(rememberedFilters?.query ?? '');
+  const [queryInput, setQueryInput] = useState(rememberedFilters?.query ?? '');
   const [gradeId, setGradeId] = useState(rememberedFilters?.gradeId ?? '');
   const [source, setSource] = useState<'' | RecordSource>(rememberedFilters?.source ?? '');
   const [createdBy, setCreatedBy] = useState(rememberedFilters?.createdBy ?? '');
@@ -225,6 +230,16 @@ export default function ExamRecordsPanel({
     return () => globalThis.clearInterval(timer);
   }, []);
 
+  // 连续输入时等待片刻再请求，避免日程和草稿查询同时形成请求洪峰。
+  useEffect(() => {
+    if (queryInput === query) return;
+    const timer = globalThis.setTimeout(() => {
+      setQuery(queryInput);
+      setPage(1);
+    }, 300);
+    return () => globalThis.clearTimeout(timer);
+  }, [query, queryInput]);
+
   /**
    * 父级（AdminPage）每 10 秒重渲染一次，`visibleClasses` 这类派生数组每次都是新引用；
    * 直接把它们放进 useCallback/useEffect 依赖，会让列表与草稿每 10 秒重新请求一次——
@@ -254,10 +269,7 @@ export default function ExamRecordsPanel({
   }, [classes, classSignature]);
 
   // 「考试安排」的时间窗：今天 / 明天 / 本周 / 未来两周 / 全部。
-  const window = useMemo(
-    () => resolveScheduleWindow(scheduleWindow, now),
-    [scheduleWindow, now],
-  );
+  const window = useMemo(() => resolveScheduleWindow(scheduleWindow, now), [scheduleWindow, now]);
   // 日程轴与班级网格共用同一套取数与行模型（时间窗、草稿、冲突），只有呈现方式不同。
   const boardActive = preset === 'schedule' && viewMode !== 'exam';
   const boardTimeline = preset === 'schedule' && viewMode === 'timeline';
@@ -284,7 +296,7 @@ export default function ExamRecordsPanel({
           ? { from: window.from, to: window.to, includeUnscheduled: true }
           : {}),
       });
-    if (seq !== requestSeqRef.current) return;
+      if (seq !== requestSeqRef.current) return;
       setRecords(result.data);
       setTotal(result.total);
       setTotalPages(result.totalPages);
@@ -695,9 +707,7 @@ export default function ExamRecordsPanel({
                       ...(can('major.quick_create')
                         ? [['quick', '快速发布', '立刻统一下发到班级，保存即生效'] as const]
                         : []),
-                      ...(can('weekly.create')
-                        ? [['weekly', '周测计划', '周期性的课表安排'] as const]
-                        : []),
+                      ...(can('weekly.create') ? [['weekly', '周测计划', '周期性的课表安排'] as const] : []),
                     ] as const
                   ).map(([kind, label, hint]) => (
                     <button
@@ -744,7 +754,12 @@ export default function ExamRecordsPanel({
         <label className="exam-records-search">
           <Search size={16} aria-hidden="true" />
           <span className="sr-only">搜索考试</span>
-          <input value={query} onChange={filterHandler(setQuery)} placeholder="搜索名称或编号" type="search" />
+          <input
+            value={queryInput}
+            onChange={(event) => setQueryInput(event.target.value)}
+            placeholder="搜索名称或编号"
+            type="search"
+          />
         </label>
         <label>
           <span>年级</span>

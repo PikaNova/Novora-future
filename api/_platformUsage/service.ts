@@ -230,6 +230,9 @@ function decorateMetrics(
 
   // 手工录入的指标没有序列，只算占比，不编造趋势。
   for (const item of config?.custom ?? []) {
+    // 手工指标的序列来自我们自己记的历史：每次保存都会落一个采样点，
+    // 于是「每隔几天更新一次数字」也能积累出速度，进而算出还剩几天。
+    const series = cumulativeToDailyRates(history[item.key] ?? []);
     decorated.push({
       key: item.key,
       label: item.label,
@@ -238,6 +241,14 @@ function decorateMetrics(
       unit: item.unit,
       percent: percentOf(item.used, item.limit),
       note: '手工录入',
+      forecast: forecastUsage({
+        used: item.used,
+        limit: item.limit,
+        series,
+        periodStart: snapshot?.periodStart ?? null,
+        periodEnd: snapshot?.periodEnd ?? null,
+        now,
+      }),
     });
   }
   return decorated;
@@ -479,7 +490,8 @@ export async function handlePlatformUsageConfig(req: VercelRequest, res: VercelR
           return;
         }
         custom.push({
-          key: `custom_${custom.length + 1}`,
+          // 稳定的 key 由前端生成，跨多次保存保持不变，历史采样才能连成一条线。
+          key: (String(record.key ?? '').trim() || `custom_${custom.length + 1}`).slice(0, 64),
           label: label.slice(0, 80),
           used,
           unit: String(record.unit ?? '')
@@ -491,10 +503,19 @@ export async function handlePlatformUsageConfig(req: VercelRequest, res: VercelR
     }
 
     const secretPlain = decryptSecret(fields[SECRET_FIELD[provider]] ?? '', secret) ?? '';
+    const finalCustom = hasCustom ? custom : (existing?.custom ?? []);
     await writePlatformConfig(provider, fields, secretHint(secretPlain), actor.id, {
       limits,
-      custom: hasCustom ? custom : (existing?.custom ?? []),
+      custom: finalCustom,
     });
+    // 手工指标没有外部来源，每保存一次就落一个采样点，攒够几天就能算趋势。
+    if (hasCustom && finalCustom.length) {
+      await recordUsageHistory(
+        provider,
+        finalCustom.map((item) => ({ metricKey: item.key, used: item.used })),
+        Date.now(),
+      );
+    }
     res.json(await buildPlatformUsagePayload());
   } catch (error) {
     sendDatabaseError(req, res, error, 'write');

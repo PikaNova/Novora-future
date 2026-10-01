@@ -130,7 +130,7 @@ export function savePlatformConfig(
   values: Record<string, string>,
   extra?: {
     limits?: Record<string, string>;
-    custom?: Array<{ label: string; used: string; unit: string; limit: string }>;
+    custom?: Array<{ key: string; label: string; used: string; unit: string; limit: string }>;
   },
 ): Promise<PlatformUsagePayload> {
   return request<PlatformUsagePayload>('/api/platform-usage-config', {

@@ -119,7 +119,12 @@ type ProviderCardProps = {
   onPayload: (payload: PlatformUsagePayload) => void;
 };
 
-type CustomDraft = { label: string; used: string; unit: string; limit: string };
+type CustomDraft = { key: string; label: string; used: string; unit: string; limit: string };
+
+/** 给手工指标生成一个稳定 id：多次保存保持不变，历史采样才能连成一条线。 */
+function newCustomKey(): string {
+  return `custom_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+}
 
 function ProviderCard({ view, onPayload }: ProviderCardProps) {
   const [draft, setDraft] = useState<Record<string, string>>({});
@@ -150,6 +155,7 @@ function ProviderCard({ view, onPayload }: ProviderCardProps) {
     setLimitDraft(next);
     setCustomDraft(
       view.custom.map((item) => ({
+        key: item.key,
         label: item.label,
         used: String(item.used),
         unit: item.unit,
@@ -197,6 +203,7 @@ function ProviderCard({ view, onPayload }: ProviderCardProps) {
     const custom = customDraft
       .filter((item) => item.label.trim())
       .map((item) => ({
+        key: item.key,
         label: item.label.trim(),
         used: item.used.trim() || '0',
         unit: item.unit.trim(),
@@ -380,7 +387,12 @@ function ProviderCard({ view, onPayload }: ProviderCardProps) {
                   className="set-btn"
                   type="button"
                   disabled={busy}
-                  onClick={() => setCustomDraft((prev) => [...prev, { label: '', used: '', unit: '', limit: '' }])}
+                  onClick={() =>
+                    setCustomDraft((prev) => [
+                      ...prev,
+                      { key: newCustomKey(), label: '', used: '', unit: '', limit: '' },
+                    ])
+                  }
                 >
                   添加自定义指标
                 </button>

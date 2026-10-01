@@ -3,16 +3,17 @@ import test from 'node:test';
 import { decryptSecret, encryptSecret, secretHint } from '../api/_platformUsage/crypto.js';
 import { detectPlatformEnvironment, isNeonConnectionString } from '../api/_platformUsage/environment.js';
 import { NEON_FREE_LIMITS } from '../api/_platformUsage/neon.js';
-import { statusFromMetrics, type PlatformMetric } from '../api/_platformUsage/types.js';
+import { remainingCooldownSeconds, statusFromMetrics, type PlatformMetric } from '../api/_platformUsage/types.js';
 import {
+  buildVercelMetrics,
   collectVercelUsage,
-  collectNamedUsage,
-  collectKeyedUsage,
   describeShape,
-  normalizeUsage,
+  sumBuckets,
   vercelDeclarativeMetrics,
+  VERCEL_BYTE_FIELDS,
+  VERCEL_GB_HOUR_FIELDS,
   VERCEL_HOBBY_LIMITS,
-  VERCEL_USAGE_TYPES,
+  VERCEL_USAGE_TYPE,
 } from '../api/_platformUsage/vercel.js';
 
 const NEON_URL = 'postgresql://u:p@ep-cool-1234.ap-southeast-1.aws.neon.tech/neondb?sslmode=require';
@@ -79,56 +80,110 @@ test('凭据提示只保留尾 4 位', () => {
   assert.ok(!secretHint('napi_1234567890abcd').includes('123456'));
 });
 
-test('Vercel 解析: 只在指标名与单位都可识别时给出数字', () => {
-  const payload = {
-    usage: [
-      { name: 'Fast Data Transfer', value: 42, unit: 'GB' },
-      { name: 'Active CPU', value: 1.5, unit: 'hours' },
-      { name: 'Provisioned Memory', value: 30, unit: 'GB-hours' },
-      { name: 'Mystery Metric', value: 7, unit: 'quux' },
-    ],
-  };
-  const entries: Array<{ name: string; value: number; unit: string | null }> = [];
-  collectNamedUsage(payload, entries);
-  assert.equal(entries.length, 4);
+test('Neon 免费额度常量与官方文档一致', () => {
+  assert.equal(NEON_FREE_LIMITS.computeCuHours, 100);
+  assert.equal(NEON_FREE_LIMITS.storageBytes, 500_000_000);
+  assert.equal(NEON_FREE_LIMITS.transferBytes, 5_000_000_000);
+});
 
-  const transfer = entries.find((entry) => entry.name === 'Fast Data Transfer');
-  assert.ok(transfer);
-  assert.equal(normalizeUsage(transfer, 'bytes')! / 1_000_000_000, 42);
+test('读数状态阈值: 80% 警告、95% 严重、100% 超限', () => {
+  const metric = (percent: number | null): PlatformMetric => ({
+    key: 'k',
+    label: 'l',
+    used: percent ?? 0,
+    limit: 100,
+    unit: 'u',
+    percent,
+  });
+  assert.equal(statusFromMetrics([metric(0)]), 'ok');
+  assert.equal(statusFromMetrics([metric(79.9)]), 'ok');
+  assert.equal(statusFromMetrics([metric(80)]), 'warning');
+  assert.equal(statusFromMetrics([metric(94.9)]), 'warning');
+  assert.equal(statusFromMetrics([metric(95)]), 'critical');
+  assert.equal(statusFromMetrics([metric(120)]), 'critical');
+  // 没有上限的指标不参与判定。
+  assert.equal(statusFromMetrics([metric(null)]), 'ok');
+  // 取最差的一条。
+  assert.equal(statusFromMetrics([metric(10), metric(96)]), 'critical');
+});
 
-  const cpu = entries.find((entry) => entry.name === 'Active CPU');
-  assert.ok(cpu);
-  assert.equal(normalizeUsage(cpu, 'seconds'), 1.5 * 3600);
+test('刷新冷却: 由上次刷新时间推算剩余秒数，向上取整', () => {
+  const now = 1_000_000;
+  assert.equal(remainingCooldownSeconds(null, now), 0);
+  assert.equal(remainingCooldownSeconds(undefined, now), 0);
+  assert.equal(remainingCooldownSeconds(0, now), 0);
+  // 刚刷新过：整整一分钟。
+  assert.equal(remainingCooldownSeconds(now, now), 60);
+  assert.equal(remainingCooldownSeconds(now - 30_000, now), 30);
+  // 不足一秒也要算 1 秒，避免按钮提前可用、点了又吃一个 429。
+  assert.equal(remainingCooldownSeconds(now - 59_001, now), 1);
+  assert.equal(remainingCooldownSeconds(now - 60_000, now), 0);
+  assert.equal(remainingCooldownSeconds(now - 120_000, now), 0);
+});
 
-  const mystery = entries.find((entry) => entry.name === 'Mystery Metric');
-  assert.ok(mystery);
-  // 单位无法识别时必须返回 null，宁可回落 unsupported 也不猜。
-  assert.equal(normalizeUsage(mystery, 'bytes'), null);
-  assert.equal(normalizeUsage({ name: 'x', value: 1, unit: null }, 'seconds'), null);
-  assert.equal(normalizeUsage({ name: 'x', value: 1, unit: 'GiB' }, 'bytes'), 1024 ** 3);
+// 2026-10-01 真实账号返回的字段名与量级（已脱敏为同一数量级）。
+const REAL_BUCKETS = [
+  { bandwidth_outgoing_bytes: 50_000_000, function_execution_successful_gb_hours: 0.2 },
+  { bandwidth_outgoing_bytes: '2181634', function_execution_error_gb_hours: 0.096626631111111 },
+];
+
+test('Vercel 分桶求和: 逐桶累加，数值字符串也认，缺失与非数值按 0', () => {
+  assert.equal(sumBuckets(REAL_BUCKETS, VERCEL_BYTE_FIELDS), 52_181_634);
+  assert.ok(Math.abs(sumBuckets(REAL_BUCKETS, VERCEL_GB_HOUR_FIELDS) - 0.296626631111111) < 1e-9);
+
+  assert.equal(sumBuckets([{ a: 1 }, { a: 2 }, { a: 3 }], ['a']), 6);
+  assert.equal(sumBuckets([{ a: null }, {}, 'junk', { a: 'nope' }], ['a']), 0);
+  assert.equal(sumBuckets(undefined, ['a']), 0);
+  assert.equal(sumBuckets({ a: 1 }, ['a']), 0);
+});
+
+test('Vercel 读数: 用真实字段名换算出已用量与百分比', () => {
+  assert.deepEqual(buildVercelMetrics(REAL_BUCKETS), [
+    {
+      key: 'fast_data_transfer',
+      label: 'Fast Data Transfer',
+      used: 0.052,
+      limit: 100,
+      unit: 'GB',
+      percent: 0.05,
+    },
+    {
+      key: 'provisioned_memory',
+      label: 'Provisioned Memory',
+      used: 0.297,
+      limit: 360,
+      unit: 'GB-hrs',
+      percent: 0.08,
+    },
+  ]);
+  // Active CPU 不在读数里——该接口不返回它，显示 0 会让人误以为没用量。
+  assert.equal(
+    buildVercelMetrics(REAL_BUCKETS).some((metric) => metric.key === 'active_cpu'),
+    false,
+  );
 });
 
 test('Vercel 兜底读数: 只列官方 Hobby 额度，不给百分比', () => {
-  const metrics = vercelDeclarativeMetrics();
   assert.deepEqual(
-    metrics.map((metric) => [metric.key, metric.limit, metric.unit, metric.percent]),
+    vercelDeclarativeMetrics().map((metric) => [metric.key, metric.limit, metric.unit, metric.percent]),
     [
       ['fast_data_transfer', 100, 'GB', null],
       ['active_cpu', 4, 'CPU-hrs', null],
       ['provisioned_memory', 360, 'GB-hrs', null],
     ],
   );
-  // 文档里已移除 Edge Requests，这里不应再作为额度出现。
-  assert.equal(
-    VERCEL_HOBBY_LIMITS.some((spec) => /edge/i.test(spec.namePattern.source)),
-    false,
-  );
+  assert.equal(VERCEL_HOBBY_LIMITS.fastDataTransferGb, 100);
+  assert.equal(VERCEL_HOBBY_LIMITS.activeCpuHours, 4);
+  assert.equal(VERCEL_HOBBY_LIMITS.provisionedMemoryGbHours, 360);
 });
 
-test('Neon 免费额度常量与官方文档一致', () => {
-  assert.equal(NEON_FREE_LIMITS.computeCuHours, 100);
-  assert.equal(NEON_FREE_LIMITS.storageBytes, 500_000_000);
-  assert.equal(NEON_FREE_LIMITS.transferBytes, 5_000_000_000);
+test('Vercel 解析失败时回显结构骨架，只含键名不含数值', () => {
+  assert.equal(
+    describeShape({ data: { activeCpu: 2, note: 'x' }, list: [1, 2] }),
+    '{ data: { activeCpu: number, note: string }, list: [number] }',
+  );
+  assert.equal(describeShape(null), 'null');
+  assert.equal(describeShape([]), '[]');
 });
 
 /** 用一次性的 fetch 替身驱动适配器；每次调用都返回全新的 Response（响应体只能读一次）。 */
@@ -151,99 +206,71 @@ async function withStubbedFetch<T>(
   }
 }
 
-test('Vercel 请求必须带 type 与 from：缺 type 时接口直接 400', async () => {
-  const { result, calls } = await withStubbedFetch(
-    () => ({ status: 200, body: { usage: [{ name: 'Fast Data Transfer', value: 12, unit: 'GB' }] } }),
-    () => collectVercelUsage({ token: 't', now: Date.parse('2026-10-01T00:00:00Z') }),
-  );
+const okBody = { granularity: 'day', lastUpdate: '2026-10-01T00:00:00Z', data: REAL_BUCKETS };
 
+test('Vercel 请求: 必须带 type/from/to；team_ 走 teamId，其它走 slug', async () => {
+  const plain = await withStubbedFetch(
+    () => ({ status: 200, body: okBody }),
+    () => collectVercelUsage({ token: 't', now: Date.parse('2026-10-01T12:00:00Z') }),
+  );
+  assert.equal(plain.calls.length, 1);
+  assert.match(plain.calls[0], new RegExp(`[?&]type=${VERCEL_USAGE_TYPE}`));
+  assert.match(plain.calls[0], /[?&]from=/);
+  assert.match(plain.calls[0], /[?&]to=/);
+  assert.equal(/[?&](teamId|slug)=/.test(plain.calls[0]), false);
+
+  const byId = await withStubbedFetch(
+    () => ({ status: 200, body: okBody }),
+    () => collectVercelUsage({ token: 't', teamId: 'team_abc123' }),
+  );
+  assert.match(byId.calls[0], /[?&]teamId=team_abc123/);
+  assert.equal(/[?&]slug=/.test(byId.calls[0]), false);
+
+  const bySlug = await withStubbedFetch(
+    () => ({ status: 200, body: okBody }),
+    () => collectVercelUsage({ token: 't', teamId: 'jinzhiyuan0327s-projects' }),
+  );
+  assert.match(bySlug.calls[0], /[?&]slug=jinzhiyuan0327s-projects/);
+  assert.equal(/[?&]teamId=/.test(bySlug.calls[0]), false);
+});
+
+test('Vercel 端到端: 正常响应换算成读数与状态', async () => {
+  const { result } = await withStubbedFetch(
+    () => ({ status: 200, body: okBody }),
+    () => collectVercelUsage({ token: 't', now: Date.parse('2026-10-01T12:00:00Z') }),
+  );
   assert.equal(result.status, 'ok');
-  assert.equal(result.metrics.length, 1);
-  assert.equal(result.metrics[0].used, 12);
-  assert.equal(result.metrics[0].percent, 12);
-  assert.equal(calls.length, VERCEL_USAGE_TYPES.length);
-  for (const url of calls) {
-    assert.match(url, /[?&]type=/);
-    assert.match(url, /[?&]from=/);
-    assert.match(url, /[?&]to=/);
-  }
+  assert.equal(result.observedAt, Date.parse('2026-10-01T12:00:00Z'));
+  assert.equal(result.metrics.length, 2);
+  assert.match(result.message, /未返回 Active CPU/);
+  assert.equal(result.metrics[0].used, 0.052);
 });
 
-test('Vercel 报错时带出平台原话，而不是只说 HTTP 400', async () => {
-  const { result } = await withStubbedFetch(
-    () => ({ status: 400, body: { error: { message: 'Invalid request: missing required property `type`.' } } }),
-    () => collectVercelUsage({ token: 't' }),
-  );
-  assert.equal(result.status, 'error');
-  assert.match(result.message, /missing required property/);
-});
-
-test('Vercel 401/403 归类为凭据问题', async () => {
-  const { result } = await withStubbedFetch(
+test('Vercel 失败态: 403 凭据问题、400 带出平台原话、空列表与未知结构各有提示', async () => {
+  const forbidden = await withStubbedFetch(
     () => ({ status: 403, body: { error: { message: 'forbidden' } } }),
     () => collectVercelUsage({ token: 'bad' }),
   );
-  assert.equal(result.status, 'credential_error');
-});
+  assert.equal(forbidden.result.status, 'credential_error');
 
-test('Vercel 键名即指标名时也能识别，但仍要求单位可辨认', () => {
-  const entries: Array<{ name: string; value: number; unit: string | null }> = [];
-  collectKeyedUsage({ data: { activeCpu: { value: 2, unit: 'hours' } } }, entries);
-  assert.deepEqual(entries, [{ name: 'activeCpu', value: 2, unit: 'hours' }]);
-  assert.equal(normalizeUsage(entries[0], 'seconds'), 7200);
-
-  // 没有单位时依然拒绝换算，避免把毫秒、秒、小时混为一谈。
-  const unitless: Array<{ name: string; value: number; unit: string | null }> = [];
-  collectKeyedUsage({ activeCpu: 2 }, unitless);
-  assert.equal(normalizeUsage(unitless[0], 'seconds'), null);
-});
-
-test('解析失败时回显结构骨架，只含键名不含数值', async () => {
-  assert.equal(
-    describeShape({ data: { activeCpu: 2, note: 'x' }, list: [1, 2] }),
-    '{ data: { activeCpu: number, note: string }, list: [number] }',
-  );
-  assert.equal(describeShape(null), 'null');
-  assert.equal(describeShape([]), '[]');
-
-  const { result } = await withStubbedFetch(
-    () => ({ status: 200, body: { data: { somethingElse: 7 } } }),
+  const badRequest = await withStubbedFetch(
+    () => ({ status: 400, body: { error: { message: 'Invalid request: missing required property `type`.' } } }),
     () => collectVercelUsage({ token: 't' }),
   );
-  assert.equal(result.status, 'unsupported');
-  assert.match(result.message, /somethingElse/);
-  // 只报结构，不把读到的数值带进提示。
-  assert.equal(result.message.includes('7'), false);
-});
+  assert.equal(badRequest.result.status, 'error');
+  assert.match(badRequest.result.message, /missing required property/);
 
-test('Vercel 指标藏在键名里时也能算出百分比', async () => {
-  const { result } = await withStubbedFetch(
-    () => ({ status: 200, body: { metrics: { activeCpu: { value: 2, unit: 'hours' } } } }),
+  const empty = await withStubbedFetch(
+    () => ({ status: 200, body: { granularity: 'day', lastUpdate: '2026-10-01T00:00:00Z', data: [] } }),
     () => collectVercelUsage({ token: 't' }),
   );
-  assert.equal(result.status, 'ok');
-  assert.deepEqual(result.metrics, [
-    { key: 'active_cpu', label: 'Active CPU', used: 2, limit: 4, unit: 'CPU-hrs', percent: 50 },
-  ]);
-});
+  assert.equal(empty.result.status, 'unsupported');
+  assert.match(empty.result.message, /用量列表为空/);
 
-test('读数状态阈值: 80% 警告、95% 严重、100% 超限', () => {
-  const metric = (percent: number | null): PlatformMetric => ({
-    key: 'k',
-    label: 'l',
-    used: percent ?? 0,
-    limit: 100,
-    unit: 'u',
-    percent,
-  });
-  assert.equal(statusFromMetrics([metric(0)]), 'ok');
-  assert.equal(statusFromMetrics([metric(79.9)]), 'ok');
-  assert.equal(statusFromMetrics([metric(80)]), 'warning');
-  assert.equal(statusFromMetrics([metric(94.9)]), 'warning');
-  assert.equal(statusFromMetrics([metric(95)]), 'critical');
-  assert.equal(statusFromMetrics([metric(120)]), 'critical');
-  // 没有上限的指标不参与判定。
-  assert.equal(statusFromMetrics([metric(null)]), 'ok');
-  // 取最差的一条。
-  assert.equal(statusFromMetrics([metric(10), metric(96)]), 'critical');
+  const unknown = await withStubbedFetch(
+    () => ({ status: 200, body: { granularity: 'day', rows: [] } }),
+    () => collectVercelUsage({ token: 't' }),
+  );
+  assert.equal(unknown.result.status, 'unsupported');
+  assert.match(unknown.result.message, /rows/);
 });

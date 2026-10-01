@@ -3,6 +3,7 @@ import { ExternalLink, Gauge } from 'lucide-react';
 import {
   clearPlatformConfig,
   fetchPlatformUsage,
+  PlatformUsageError,
   refreshPlatformUsage,
   savePlatformConfig,
   type PlatformMetric,
@@ -88,6 +89,20 @@ function ProviderCard({ view, onPayload }: ProviderCardProps) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [cooldown, setCooldown] = useState(view.nextRefreshInSeconds);
+  const cooling = cooldown > 0;
+
+  // 服务端返回的剩余秒数是权威值：每次拿到新载荷都同步一次。
+  useEffect(() => {
+    setCooldown(view.nextRefreshInSeconds);
+  }, [view.nextRefreshInSeconds]);
+
+  // 本地每秒递减，让「N 秒后可刷新」自己走动，而不是等下一次请求才知道。
+  useEffect(() => {
+    if (!cooling) return;
+    const timer = window.setInterval(() => setCooldown((value) => (value <= 1 ? 0 : value - 1)), 1000);
+    return () => window.clearInterval(timer);
+  }, [cooling]);
 
   const run = async (task: () => Promise<PlatformUsagePayload>, success: string) => {
     setBusy(true);
@@ -98,6 +113,8 @@ function ProviderCard({ view, onPayload }: ProviderCardProps) {
       setDraft({});
       setMessage(success);
     } catch (cause) {
+      // 刷新冷却时把剩余秒数接住，按钮直接进入倒计时，用户不用再试探。
+      if (cause instanceof PlatformUsageError && cause.retryAfterSeconds) setCooldown(cause.retryAfterSeconds);
       setError(cause instanceof Error ? cause.message : '操作失败');
     } finally {
       setBusy(false);
@@ -189,12 +206,15 @@ function ProviderCard({ view, onPayload }: ProviderCardProps) {
             {snapshot?.stale ? ' · 本次未取到新数据，显示的是上一次成功读数' : ''}
           </p>
           {snapshot?.message ? <p className="set-note">{snapshot.message}</p> : null}
+          {cooling ? <p className="set-note">为避免频繁调用外部接口，请等待 {cooldown} 秒后再刷新。</p> : null}
           <div className="set-inline-actions">
             <RefreshButton
               className="set-btn"
               busy={busy}
+              disabled={cooling}
+              label={cooling ? `${cooldown} 秒后可刷新` : '刷新'}
               onRefresh={() => void run(() => refreshPlatformUsage(view.provider), '已读取最新用量。')}
-              title="立即读取用量"
+              title={cooling ? `冷却中：${cooldown} 秒后可再次读取` : '立即读取用量'}
             />
             <button
               className="set-btn set-btn--ghost"

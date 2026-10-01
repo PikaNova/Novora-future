@@ -22,6 +22,7 @@ import {
 } from './store.js';
 import {
   isPlatformProviderId,
+  remainingCooldownSeconds,
   type PlatformConfigFieldSpec,
   type PlatformMetric,
   type PlatformProviderId,
@@ -54,9 +55,9 @@ export const FIELD_SPECS: Record<PlatformProviderId, PlatformConfigFieldSpec[]> 
     },
     {
       key: 'teamId',
-      label: 'Team ID（可选）',
-      placeholder: 'team_xxxxxxxx',
-      hint: '个人账户留空；团队账户填写后可读取该团队的用量。',
+      label: 'Team ID / 团队 slug（团队账户必填）',
+      placeholder: 'team_xxxxxxxx 或 my-team-projects',
+      hint: '个人账户留空。团队账户填 Team Settings → General 的 Team ID（team_ 开头），或部署地址里的团队 slug。',
       required: false,
       secret: false,
     },
@@ -88,12 +89,6 @@ export const FIELD_SPECS: Record<PlatformProviderId, PlatformConfigFieldSpec[]> 
     },
   ],
 };
-
-/**
- * 刷新冷却：60 秒。比系统状态面板的 10 秒轮询长得多，避免误触把免费额度耗光；
- * 足够短，管理员配置完能立刻验证一次。
- */
-export const REFRESH_COOLDOWN_MS = 60_000;
 
 export function providerEnabled(environment: PlatformEnvironment, provider: PlatformProviderId): boolean {
   return provider === 'vercel' ? environment.vercel : environment.neon;
@@ -183,6 +178,7 @@ async function buildProviderView(provider: PlatformProviderId, enabled: boolean)
       configured: false,
       hint: null,
       updatedAt: null,
+      nextRefreshInSeconds: 0,
       fields: FIELD_SPECS[provider],
       consoleUrl: CONSOLE_URLS[provider],
       snapshot: null,
@@ -196,6 +192,7 @@ async function buildProviderView(provider: PlatformProviderId, enabled: boolean)
     configured,
     hint: configured ? stored?.hint || null : null,
     updatedAt: stored?.updatedAt ?? null,
+    nextRefreshInSeconds: remainingCooldownSeconds(snapshot?.updatedAt, Date.now()),
     fields: FIELD_SPECS[provider],
     consoleUrl: snapshot?.consoleUrl || CONSOLE_URLS[provider],
     // 未配置时不回放历史快照，避免清除凭据后仍显示旧数字。
@@ -390,8 +387,8 @@ export async function handlePlatformUsageRefresh(req: VercelRequest, res: Vercel
 
     const previous = await readPlatformSnapshot(provider);
     const now = Date.now();
-    if (previous && previous.updatedAt > 0 && now - previous.updatedAt < REFRESH_COOLDOWN_MS) {
-      const retryAfterSeconds = Math.max(1, Math.ceil((REFRESH_COOLDOWN_MS - (now - previous.updatedAt)) / 1000));
+    if (previous && remainingCooldownSeconds(previous.updatedAt, now) > 0) {
+      const retryAfterSeconds = remainingCooldownSeconds(previous.updatedAt, now);
       res.setHeader('Retry-After', String(retryAfterSeconds));
       res
         .status(429)

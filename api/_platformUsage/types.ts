@@ -60,10 +60,26 @@ export type PlatformProviderView = {
   /** 已保存凭据的尾号提示，例如 `••••ab12`；未配置或非密钥字段为 null。 */
   hint: string | null;
   updatedAt: number | null;
+  /** 距离下次可刷新还剩的秒数；0 表示现在就能刷新。 */
+  nextRefreshInSeconds: number;
   fields: PlatformConfigFieldSpec[];
   consoleUrl: string;
   snapshot: PlatformProviderSnapshot | null;
 };
+
+/** 两次手动刷新之间的最短间隔。与「10 秒系统状态轮询」解耦，避免误触耗光免费额度。 */
+export const PLATFORM_REFRESH_COOLDOWN_MS = 60_000;
+
+/** 由上次刷新时间推算剩余冷却秒数（向上取整，0 表示可刷新）。 */
+export function remainingCooldownSeconds(
+  lastRefreshAt: number | null | undefined,
+  now: number,
+  cooldownMs: number = PLATFORM_REFRESH_COOLDOWN_MS,
+): number {
+  if (!lastRefreshAt || lastRefreshAt <= 0) return 0;
+  const remaining = cooldownMs - (now - lastRefreshAt);
+  return remaining > 0 ? Math.ceil(remaining / 1000) : 0;
+}
 
 export type PlatformUsagePayload = {
   ok: true;

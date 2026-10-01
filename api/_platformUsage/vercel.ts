@@ -1,9 +1,15 @@
 // Vercel 免费（Hobby）额度适配器。
 //
-// 重要事实：Vercel 官方 OpenAPI 规范里没有用量端点，`/v2/usage` 是未公开路由
-// （无凭据返回 400，而需要鉴权的已知端点返回 403）。因此这里采取「保守解析」：
-// 只有在响应里同时拿到可识别的指标名和可识别的单位时才给出数字，否则一律回落为
-// unsupported，只展示官方额度与控制台入口，不猜、不换算不明单位。
+// `/v2/usage` 是未公开端点，参数与响应形状由 2026-10-01 用真实账号逐项实测确定：
+//
+//   GET /v2/usage?type=<type>&from=<ISO>&to=<ISO>[&teamId=|&slug=]
+//
+//   - `type` 与 `from` 必填；缺 `type` 时返回 400，错误信息里带完整枚举。
+//   - 只有 `type=requests` 会返回我们要的字段（monitoring / edge / builds 等对大多数
+//     账户是空数组），响应形如 `{ granularity, lastUpdate, data: [ {…按天分桶…} ] }`。
+//   - 每个桶里有 `bandwidth_outgoing_bytes`、`function_execution_*_gb_hours` 等累加值，
+//     必须对窗口内所有桶求和，取第一条会严重低估。
+//   - 该端点不返回 Active CPU，因此那一条只显示官方额度、不给百分比。
 import { statusFromMetrics, type PlatformMetric, type PlatformProviderSnapshot } from './types.js';
 
 const API_BASE = 'https://api.vercel.com';
@@ -11,246 +17,138 @@ const CONSOLE_URL = 'https://vercel.com/dashboard/usage';
 const WINDOW_DAYS = 30;
 const GB = 1_000_000_000;
 
-/**
- * `/v2/usage` 是未公开端点，但它的参数约束可以从报错里读出来：
- * `type` 必填，允许值为 requests / monitoring / builds / edge / edge_group_by_project /
- * artifacts / edge_config / log_drains / storage_postgres / storage_redis / storage_blob /
- * cron_jobs / data_cache（2026-10-01 实测）；`from` 必填。
- *
- * 与 Hobby 那三项额度最相关的两类是 monitoring（函数：Active CPU / Provisioned Memory）
- * 和 edge（CDN：Fast Data Transfer）。按此顺序查询，同名指标取先命中的那个，不做累加，
- * 避免同一份用量被两类响应重复计数。
- */
-export const VERCEL_USAGE_TYPES = ['monitoring', 'edge'] as const;
+/** 唯一会返回用量字段的 type（已逐一实测其余取值）。 */
+export const VERCEL_USAGE_TYPE = 'requests';
 
-type LimitSpec = {
-  key: string;
-  label: string;
-  namePattern: RegExp;
-  limit: number;
-  unit: string;
-  /** 目标单位：字节或秒。 */
-  dimension: 'bytes' | 'seconds';
+/** Hobby 免费额度，取自官方 Hobby 文档（2026-10 核对）。 */
+export const VERCEL_HOBBY_LIMITS = {
+  fastDataTransferGb: 100,
+  activeCpuHours: 4,
+  provisionedMemoryGbHours: 360,
 };
 
-/** 额度来自官方 Hobby 文档（2026-10 核对：Fast Data Transfer 100 GB、Active CPU 4 CPU-hrs、
- *  Provisioned Memory 360 GB-hrs）。文档里已不再列 Edge Requests 这一项。 */
-const HOBBY_LIMITS: LimitSpec[] = [
-  {
-    key: 'fast_data_transfer',
-    label: 'Fast Data Transfer',
-    namePattern: /fast[\s_-]?data[\s_-]?transfer|datatransfer/i,
-    limit: 100 * GB,
-    unit: 'GB',
-    dimension: 'bytes',
-  },
-  {
-    key: 'active_cpu',
-    label: 'Active CPU',
-    namePattern: /active[\s_-]?cpu/i,
-    limit: 4 * 3600,
-    unit: 'CPU-hrs',
-    dimension: 'seconds',
-  },
-  {
-    key: 'provisioned_memory',
-    label: 'Provisioned Memory',
-    namePattern: /provisioned[\s_-]?memory/i,
-    limit: 360 * 3600,
-    unit: 'GB-hrs',
-    dimension: 'seconds',
-  },
-];
+/** 需要按窗口求和的字节字段：CDN 传出去的量就是 Fast Data Transfer。 */
+export const VERCEL_BYTE_FIELDS = ['bandwidth_outgoing_bytes'] as const;
 
-const BYTE_UNITS: Record<string, number> = {
-  b: 1,
-  byte: 1,
-  bytes: 1,
-  kb: 1_000,
-  mb: 1_000_000,
-  gb: GB,
-  tb: GB * 1_000,
-  kib: 1024,
-  mib: 1024 ** 2,
-  gib: 1024 ** 3,
-  tib: 1024 ** 4,
-};
+/** 需要按窗口求和的 GB-小时字段：函数实例占用内存的总时长。 */
+export const VERCEL_GB_HOUR_FIELDS = [
+  'function_execution_successful_gb_hours',
+  'function_execution_error_gb_hours',
+  'function_execution_timeout_gb_hours',
+] as const;
 
-const SECOND_UNITS: Record<string, number> = {
-  s: 1,
-  sec: 1,
-  secs: 1,
-  second: 1,
-  seconds: 1,
-  m: 60,
-  min: 60,
-  mins: 60,
-  minute: 60,
-  minutes: 60,
-  h: 3600,
-  hr: 3600,
-  hrs: 3600,
-  hour: 3600,
-  hours: 3600,
-};
-
-type NamedUsage = { name: string; value: number; unit: string | null };
-
-/** 内层承载数值的常见字段名。 */
-const NUMERIC_FIELDS = ['value', 'total', 'usage', 'count', 'amount', 'used', 'current', 'quantity'] as const;
-
-/**
- * 按「对象键名」识别指标。
- *
- * 未公开端点不一定把指标名放在 `name` 字段里——也可能直接是键名，例如
- * `{ activeCpu: { value: 2, unit: "hours" } }`。这里把数值型键名也收集进来，
- * 复用它最近的 `unit` 字段；单位仍然必须在 normalizeUsage 里被认出来才算数，
- * 所以不会因为键名像就凭空造数字。
- */
-export function collectKeyedUsage(node: unknown, out: NamedUsage[], depth = 0, unitHint: string | null = null): void {
-  if (depth > 8 || node == null) return;
-  if (Array.isArray(node)) {
-    for (const item of node) collectKeyedUsage(item, out, depth + 1, unitHint);
-    return;
-  }
-  if (typeof node !== 'object') return;
-  const record = node as Record<string, unknown>;
-  const localUnit = typeof record.unit === 'string' && record.unit.trim() ? record.unit.trim() : unitHint;
-  for (const [key, value] of Object.entries(record)) {
-    if (typeof value === 'number' && Number.isFinite(value)) {
-      out.push({ name: key, value, unit: localUnit });
-      continue;
-    }
-    if (typeof value === 'string' && value.trim() !== '' && Number.isFinite(Number(value))) {
-      out.push({ name: key, value: Number(value), unit: localUnit });
-      continue;
-    }
-    // `{ activeCpu: { value: 2, unit: "hours" } }`：指标名是父级键，数值取内层字段。
-    if (value && typeof value === 'object' && !Array.isArray(value)) {
-      const inner = value as Record<string, unknown>;
-      const innerUnit = typeof inner.unit === 'string' && inner.unit.trim() ? inner.unit.trim() : localUnit;
-      const hit = NUMERIC_FIELDS.find((field) => typeof inner[field] === 'number' && Number.isFinite(inner[field]));
-      if (hit) {
-        out.push({ name: key, value: Number(inner[hit]), unit: innerUnit });
-        continue;
-      }
-    }
-    collectKeyedUsage(value, out, depth + 1, localUnit);
-  }
+function toNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim() !== '' && Number.isFinite(Number(value))) return Number(value);
+  return null;
 }
 
-/**
- * 只描述「结构骨架」——键名和类型，不含任何数值——用于解析失败时把响应形状
- * 直接回显到面板上，省掉一轮「加日志 → 重新部署 → 导出日志」的来回。
- */
+/** 对分桶数组里指定字段求和；非数值与缺失字段按 0 处理，不抛错。 */
+export function sumBuckets(data: unknown, fields: readonly string[]): number {
+  if (!Array.isArray(data)) return 0;
+  let total = 0;
+  for (const bucket of data) {
+    if (!bucket || typeof bucket !== 'object') continue;
+    const record = bucket as Record<string, unknown>;
+    for (const field of fields) {
+      const value = toNumber(record[field]);
+      if (value != null) total += value;
+    }
+  }
+  return total;
+}
+
+/** 只描述结构骨架（键名与类型，不含数值），用于遇到未知响应时把形状回显到面板上。 */
 export function describeShape(node: unknown, depth = 0): string {
   if (depth > 3) return '…';
   if (node === null) return 'null';
   if (Array.isArray(node)) return node.length ? `[${describeShape(node[0], depth + 1)}]` : '[]';
   if (typeof node === 'object') {
-    const keys = Object.keys(node as Record<string, unknown>);
-    if (!keys.length) return '{}';
-    const shown = keys
-      .slice(0, 12)
-      .map((key) => `${key}: ${describeShape((node as Record<string, unknown>)[key], depth + 1)}`);
-    return `{ ${shown.join(', ')}${keys.length > 12 ? ', …' : ''} }`;
+    const entries = Object.entries(node as Record<string, unknown>);
+    if (!entries.length) return '{}';
+    const shown = entries.slice(0, 12).map(([key, value]) => `${key}: ${describeShape(value, depth + 1)}`);
+    return `{ ${shown.join(', ')}${entries.length > 12 ? ', …' : ''} }`;
   }
   return typeof node;
 }
 
-export function collectNamedUsage(node: unknown, out: NamedUsage[], depth = 0): void {
-  if (depth > 8 || node == null) return;
-  if (Array.isArray(node)) {
-    for (const item of node) collectNamedUsage(item, out, depth + 1);
-    return;
-  }
-  if (typeof node !== 'object') return;
-  const record = node as Record<string, unknown>;
-
-  let name: string | null = null;
-  for (const key of ['name', 'type', 'metric', 'key', 'slug', 'resource']) {
-    const value = record[key];
-    if (typeof value === 'string' && value.trim()) {
-      name = value.trim();
-      break;
-    }
-  }
-  let value: number | null = null;
-  for (const key of ['value', 'total', 'usage', 'count', 'amount', 'used', 'current', 'quantity']) {
-    const raw = record[key];
-    if (typeof raw === 'number' && Number.isFinite(raw)) {
-      value = raw;
-      break;
-    }
-    if (typeof raw === 'string' && raw.trim() !== '' && Number.isFinite(Number(raw))) {
-      value = Number(raw);
-      break;
-    }
-  }
-  let unit: string | null = null;
-  for (const key of ['unit', 'units', 'unitType', 'measure']) {
-    const raw = record[key];
-    if (typeof raw === 'string' && raw.trim()) {
-      unit = raw.trim();
-      break;
-    }
-  }
-  if (name && value != null) out.push({ name, value, unit });
-
-  for (const child of Object.values(record)) collectNamedUsage(child, out, depth + 1);
+function round(value: number, digits: number): number {
+  return Number(value.toFixed(digits));
 }
 
-/** 把带单位的读数换算到目标维度；单位无法识别时返回 null（宁可不显示，也不猜）。 */
-export function normalizeUsage(entry: NamedUsage, dimension: 'bytes' | 'seconds'): number | null {
-  const rawUnit = (entry.unit ?? '').toLowerCase().replace(/[^a-z]/g, '');
-  if (dimension === 'bytes') {
-    const factor = BYTE_UNITS[rawUnit];
-    if (factor == null) return null;
-    return entry.value * factor;
-  }
-  const factor = SECOND_UNITS[rawUnit];
-  if (factor == null) return null;
-  return entry.value * factor;
+function percentOf(used: number, limit: number): number | null {
+  if (!Number.isFinite(limit) || limit <= 0) return null;
+  return round((used / limit) * 100, 2);
 }
 
-function pickMetric(spec: LimitSpec, entries: NamedUsage[]): PlatformMetric | null {
-  const matches = entries.filter((entry) => spec.namePattern.test(entry.name));
-  if (!matches.length) return null;
-  for (const entry of matches) {
-    const normalized = normalizeUsage(entry, spec.dimension);
-    if (normalized == null) continue;
-    const used = spec.dimension === 'bytes' ? normalized / GB : normalized / 3600;
-    const limit = spec.dimension === 'bytes' ? spec.limit / GB : spec.limit / 3600;
-    return {
-      key: spec.key,
-      label: spec.label,
-      used: Number(used.toFixed(3)),
-      limit: Number(limit.toFixed(3)),
-      unit: spec.unit,
-      percent: limit > 0 ? Number(((used / limit) * 100).toFixed(1)) : null,
-    };
-  }
-  return null;
+/** 没有读数时展示官方额度，但不给百分比。 */
+export function vercelDeclarativeMetrics(): PlatformMetric[] {
+  return [
+    {
+      key: 'fast_data_transfer',
+      label: 'Fast Data Transfer',
+      used: 0,
+      limit: VERCEL_HOBBY_LIMITS.fastDataTransferGb,
+      unit: 'GB',
+      percent: null,
+    },
+    {
+      key: 'active_cpu',
+      label: 'Active CPU',
+      used: 0,
+      limit: VERCEL_HOBBY_LIMITS.activeCpuHours,
+      unit: 'CPU-hrs',
+      percent: null,
+    },
+    {
+      key: 'provisioned_memory',
+      label: 'Provisioned Memory',
+      used: 0,
+      limit: VERCEL_HOBBY_LIMITS.provisionedMemoryGbHours,
+      unit: 'GB-hrs',
+      percent: null,
+    },
+  ];
 }
 
-function declarativeMetrics(): PlatformMetric[] {
-  return HOBBY_LIMITS.map((spec) => ({
-    key: spec.key,
-    label: spec.label,
-    used: 0,
-    limit: spec.dimension === 'bytes' ? spec.limit / GB : spec.limit / 3600,
-    unit: spec.unit,
-    percent: null,
-  }));
+/**
+ * 把 `type=requests` 的分桶数组换算成额度读数。
+ *
+ * Active CPU 不在这里出现：该端点不返回它，与其显示一个「0 / 4」让人误以为没用量，
+ * 不如把它交给提示文案说明。
+ */
+export function buildVercelMetrics(data: unknown): PlatformMetric[] {
+  const outgoingBytes = sumBuckets(data, VERCEL_BYTE_FIELDS);
+  const gbHours = sumBuckets(data, VERCEL_GB_HOUR_FIELDS);
+  const usedGb = outgoingBytes / GB;
+  return [
+    {
+      key: 'fast_data_transfer',
+      label: 'Fast Data Transfer',
+      used: round(usedGb, 3),
+      limit: VERCEL_HOBBY_LIMITS.fastDataTransferGb,
+      unit: 'GB',
+      percent: percentOf(usedGb, VERCEL_HOBBY_LIMITS.fastDataTransferGb),
+    },
+    {
+      key: 'provisioned_memory',
+      label: 'Provisioned Memory',
+      used: round(gbHours, 3),
+      limit: VERCEL_HOBBY_LIMITS.provisionedMemoryGbHours,
+      unit: 'GB-hrs',
+      percent: percentOf(gbHours, VERCEL_HOBBY_LIMITS.provisionedMemoryGbHours),
+    },
+  ];
 }
 
 export type VercelCollectInput = {
   token: string;
+  /** 团队作用域：Team ID（`team_…`）或团队 slug。个人账户可留空。 */
   teamId?: string;
   now?: number;
 };
 
-/** 把 `{ error: { message } }` 读出来，让 400 之类的报错带上平台原话。 */
+/** 把 `{ error: { message } }` 读出来，让报错带上平台原话。 */
 async function readApiError(response: Response): Promise<string> {
   try {
     const body = (await response.json()) as { error?: { message?: unknown }; message?: unknown };
@@ -262,10 +160,13 @@ async function readApiError(response: Response): Promise<string> {
   return `HTTP ${response.status}`;
 }
 
+const NO_ACTIVE_CPU_NOTE = '该接口未返回 Active CPU，请到 Vercel 用量页查看。';
+
 export async function collectVercelUsage(input: VercelCollectInput): Promise<PlatformProviderSnapshot> {
   const now = input.now ?? Date.now();
   const from = new Date(now - WINDOW_DAYS * 86_400_000).toISOString();
   const to = new Date(now).toISOString();
+  const scope = input.teamId?.trim() ?? '';
 
   const base: PlatformProviderSnapshot = {
     provider: 'vercel',
@@ -275,94 +176,74 @@ export async function collectVercelUsage(input: VercelCollectInput): Promise<Pla
     observedAt: null,
     periodStart: from,
     periodEnd: to,
-    metrics: declarativeMetrics(),
+    metrics: vercelDeclarativeMetrics(),
     consoleUrl: CONSOLE_URL,
     source: 'vercel-api',
-    accountLabel: input.teamId ? `team ${input.teamId}` : null,
+    accountLabel: scope || null,
     stale: false,
   };
 
-  const entries: NamedUsage[] = [];
-  const payloads: unknown[] = [];
-  const problems: string[] = [];
-  let rateLimited = false;
+  const params = new URLSearchParams({ type: VERCEL_USAGE_TYPE, from, to });
+  // `team_` 开头按 Team ID 传，否则按 slug 传——两者在 Vercel 是分开的参数。
+  if (scope) params.set(scope.startsWith('team_') ? 'teamId' : 'slug', scope);
 
-  for (const type of VERCEL_USAGE_TYPES) {
-    const params = new URLSearchParams({ type, from, to });
-    if (input.teamId) params.set('teamId', input.teamId);
-
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 8000);
-    let response: Response;
-    try {
-      response = await fetch(`${API_BASE}/v2/usage?${params.toString()}`, {
-        headers: { Authorization: `Bearer ${input.token}`, Accept: 'application/json' },
-        signal: controller.signal,
-      });
-    } catch (error) {
-      problems.push(`${type}: ${error instanceof Error ? error.message : String(error)}`);
-      continue;
-    } finally {
-      clearTimeout(timer);
-    }
-
-    if (response.status === 401 || response.status === 403) {
-      return { ...base, status: 'credential_error', message: 'Vercel Token 无效或权限不足，请重新填写。' };
-    }
-    if (response.status === 429) {
-      rateLimited = true;
-      continue;
-    }
-    if (!response.ok) {
-      problems.push(`${type}: ${await readApiError(response)}`);
-      continue;
-    }
-
-    try {
-      payloads.push(await response.json());
-    } catch {
-      problems.push(`${type}: 响应无法解析`);
-    }
-  }
-
-  for (const payload of payloads) {
-    collectNamedUsage(payload, entries);
-    collectKeyedUsage(payload, entries);
-  }
-
-  const metrics: PlatformMetric[] = [];
-  for (const spec of HOBBY_LIMITS) {
-    const metric = pickMetric(spec, entries);
-    if (metric) metrics.push(metric);
-  }
-
-  if (!metrics.length) {
-    if (rateLimited && !problems.length) {
-      return { ...base, status: 'rate_limited', message: 'Vercel 接口触发限流，请稍后再试。' };
-    }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE}/v2/usage?${params.toString()}`, {
+      headers: { Authorization: `Bearer ${input.token}`, Accept: 'application/json' },
+      signal: controller.signal,
+    });
+  } catch (error) {
     return {
       ...base,
-      status: problems.length ? 'error' : 'unsupported',
-      message: problems.length
-        ? `Vercel 用量接口未返回可识别数据（${problems.join('；')}）。`
-        : `Vercel 返回的数据里没有可识别的用量字段。响应结构：${payloads
-            .map((payload) => describeShape(payload))
-            .join(' ')
-            .slice(0, 400)}`,
+      status: 'error',
+      message: `Vercel 用量接口请求失败：${error instanceof Error ? error.message : String(error)}`,
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+
+  if (response.status === 401 || response.status === 403) {
+    return { ...base, status: 'credential_error', message: 'Vercel Token 无效或权限不足，请重新填写。' };
+  }
+  if (response.status === 429) {
+    return { ...base, status: 'rate_limited', message: 'Vercel 接口触发限流，请稍后再试。' };
+  }
+  if (!response.ok) {
+    return { ...base, status: 'error', message: `Vercel 用量接口报错：${await readApiError(response)}` };
+  }
+
+  let payload: unknown;
+  try {
+    payload = await response.json();
+  } catch {
+    return { ...base, status: 'unsupported', message: 'Vercel 用量接口返回的内容无法解析。' };
+  }
+
+  const data = (payload as { data?: unknown } | null)?.data;
+  if (!Array.isArray(data)) {
+    return {
+      ...base,
+      status: 'unsupported',
+      message: `Vercel 返回了未知结构：${describeShape(payload).slice(0, 300)}`,
+    };
+  }
+  if (!data.length) {
+    return {
+      ...base,
+      status: 'unsupported',
+      message: 'Vercel 返回的用量列表为空：近 30 天没有可用记录，请到 Vercel 用量页核对团队与计费周期。',
     };
   }
 
-  const partial = metrics.length < HOBBY_LIMITS.length;
+  const metrics = buildVercelMetrics(data);
   return {
     ...base,
     status: statusFromMetrics(metrics),
-    message: partial
-      ? '只识别到部分指标，其余请到 Vercel 用量页核对。'
-      : '数据来自 Vercel 用量接口，可能有一小时左右延迟。',
+    message: `数据来自 Vercel 用量接口（${data.length} 个日桶累加），可能有一小时左右延迟。${NO_ACTIVE_CPU_NOTE}`,
     observedAt: now,
     metrics,
   };
 }
-
-export const VERCEL_HOBBY_LIMITS = HOBBY_LIMITS;
-export { declarativeMetrics as vercelDeclarativeMetrics };

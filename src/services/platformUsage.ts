@@ -45,6 +45,8 @@ export type PlatformProviderView = {
   configured: boolean;
   hint: string | null;
   updatedAt: number | null;
+  /** 距离下次可刷新还剩的秒数；0 表示现在就能刷新。 */
+  nextRefreshInSeconds: number;
   fields: PlatformConfigFieldSpec[];
   consoleUrl: string;
   snapshot: PlatformProviderSnapshot | null;
@@ -56,15 +58,34 @@ export type PlatformUsagePayload = {
   providers: PlatformProviderView[];
 };
 
+/** 带业务码的请求错误。刷新冷却时携带剩余秒数，前端据此倒计时。 */
+export class PlatformUsageError extends Error {
+  readonly code: string;
+  readonly retryAfterSeconds: number | null;
+
+  constructor(message: string, code: string, retryAfterSeconds: number | null) {
+    super(message);
+    this.name = 'PlatformUsageError';
+    this.code = code;
+    this.retryAfterSeconds = retryAfterSeconds;
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
     ...init,
     headers: { 'Content-Type': 'application/json', ...authHeaders(), ...(init?.headers ?? {}) },
     cache: 'no-store',
   });
-  const data = (await response.json().catch(() => null)) as (T & { error?: string; code?: string }) | null;
+  const data = (await response.json().catch(() => null)) as
+    (T & { error?: string; code?: string; retryAfterSeconds?: number }) | null;
   if (!response.ok || !data) {
-    throw new Error(data?.error || `HTTP ${response.status}`);
+    const retry = Number(data?.retryAfterSeconds);
+    throw new PlatformUsageError(
+      data?.error || `HTTP ${response.status}`,
+      data?.code || 'REQUEST_FAILED',
+      Number.isFinite(retry) && retry > 0 ? retry : null,
+    );
   }
   return data;
 }

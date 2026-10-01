@@ -96,6 +96,68 @@ const SECOND_UNITS: Record<string, number> = {
 
 type NamedUsage = { name: string; value: number; unit: string | null };
 
+/** 内层承载数值的常见字段名。 */
+const NUMERIC_FIELDS = ['value', 'total', 'usage', 'count', 'amount', 'used', 'current', 'quantity'] as const;
+
+/**
+ * 按「对象键名」识别指标。
+ *
+ * 未公开端点不一定把指标名放在 `name` 字段里——也可能直接是键名，例如
+ * `{ activeCpu: { value: 2, unit: "hours" } }`。这里把数值型键名也收集进来，
+ * 复用它最近的 `unit` 字段；单位仍然必须在 normalizeUsage 里被认出来才算数，
+ * 所以不会因为键名像就凭空造数字。
+ */
+export function collectKeyedUsage(node: unknown, out: NamedUsage[], depth = 0, unitHint: string | null = null): void {
+  if (depth > 8 || node == null) return;
+  if (Array.isArray(node)) {
+    for (const item of node) collectKeyedUsage(item, out, depth + 1, unitHint);
+    return;
+  }
+  if (typeof node !== 'object') return;
+  const record = node as Record<string, unknown>;
+  const localUnit = typeof record.unit === 'string' && record.unit.trim() ? record.unit.trim() : unitHint;
+  for (const [key, value] of Object.entries(record)) {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      out.push({ name: key, value, unit: localUnit });
+      continue;
+    }
+    if (typeof value === 'string' && value.trim() !== '' && Number.isFinite(Number(value))) {
+      out.push({ name: key, value: Number(value), unit: localUnit });
+      continue;
+    }
+    // `{ activeCpu: { value: 2, unit: "hours" } }`：指标名是父级键，数值取内层字段。
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      const inner = value as Record<string, unknown>;
+      const innerUnit = typeof inner.unit === 'string' && inner.unit.trim() ? inner.unit.trim() : localUnit;
+      const hit = NUMERIC_FIELDS.find((field) => typeof inner[field] === 'number' && Number.isFinite(inner[field]));
+      if (hit) {
+        out.push({ name: key, value: Number(inner[hit]), unit: innerUnit });
+        continue;
+      }
+    }
+    collectKeyedUsage(value, out, depth + 1, localUnit);
+  }
+}
+
+/**
+ * 只描述「结构骨架」——键名和类型，不含任何数值——用于解析失败时把响应形状
+ * 直接回显到面板上，省掉一轮「加日志 → 重新部署 → 导出日志」的来回。
+ */
+export function describeShape(node: unknown, depth = 0): string {
+  if (depth > 3) return '…';
+  if (node === null) return 'null';
+  if (Array.isArray(node)) return node.length ? `[${describeShape(node[0], depth + 1)}]` : '[]';
+  if (typeof node === 'object') {
+    const keys = Object.keys(node as Record<string, unknown>);
+    if (!keys.length) return '{}';
+    const shown = keys
+      .slice(0, 12)
+      .map((key) => `${key}: ${describeShape((node as Record<string, unknown>)[key], depth + 1)}`);
+    return `{ ${shown.join(', ')}${keys.length > 12 ? ', …' : ''} }`;
+  }
+  return typeof node;
+}
+
 export function collectNamedUsage(node: unknown, out: NamedUsage[], depth = 0): void {
   if (depth > 8 || node == null) return;
   if (Array.isArray(node)) {
@@ -221,6 +283,7 @@ export async function collectVercelUsage(input: VercelCollectInput): Promise<Pla
   };
 
   const entries: NamedUsage[] = [];
+  const payloads: unknown[] = [];
   const problems: string[] = [];
   let rateLimited = false;
 
@@ -256,10 +319,15 @@ export async function collectVercelUsage(input: VercelCollectInput): Promise<Pla
     }
 
     try {
-      collectNamedUsage(await response.json(), entries);
+      payloads.push(await response.json());
     } catch {
       problems.push(`${type}: 响应无法解析`);
     }
+  }
+
+  for (const payload of payloads) {
+    collectNamedUsage(payload, entries);
+    collectKeyedUsage(payload, entries);
   }
 
   const metrics: PlatformMetric[] = [];
@@ -277,7 +345,10 @@ export async function collectVercelUsage(input: VercelCollectInput): Promise<Pla
       status: problems.length ? 'error' : 'unsupported',
       message: problems.length
         ? `Vercel 用量接口未返回可识别数据（${problems.join('；')}）。`
-        : 'Vercel 返回的数据里没有可识别的用量字段，请到 Vercel 用量页核对。',
+        : `Vercel 返回的数据里没有可识别的用量字段。响应结构：${payloads
+            .map((payload) => describeShape(payload))
+            .join(' ')
+            .slice(0, 400)}`,
     };
   }
 

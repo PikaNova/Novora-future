@@ -7,6 +7,8 @@ import { statusFromMetrics, type PlatformMetric } from '../api/_platformUsage/ty
 import {
   collectVercelUsage,
   collectNamedUsage,
+  collectKeyedUsage,
+  describeShape,
   normalizeUsage,
   vercelDeclarativeMetrics,
   VERCEL_HOBBY_LIMITS,
@@ -182,6 +184,47 @@ test('Vercel 401/403 归类为凭据问题', async () => {
     () => collectVercelUsage({ token: 'bad' }),
   );
   assert.equal(result.status, 'credential_error');
+});
+
+test('Vercel 键名即指标名时也能识别，但仍要求单位可辨认', () => {
+  const entries: Array<{ name: string; value: number; unit: string | null }> = [];
+  collectKeyedUsage({ data: { activeCpu: { value: 2, unit: 'hours' } } }, entries);
+  assert.deepEqual(entries, [{ name: 'activeCpu', value: 2, unit: 'hours' }]);
+  assert.equal(normalizeUsage(entries[0], 'seconds'), 7200);
+
+  // 没有单位时依然拒绝换算，避免把毫秒、秒、小时混为一谈。
+  const unitless: Array<{ name: string; value: number; unit: string | null }> = [];
+  collectKeyedUsage({ activeCpu: 2 }, unitless);
+  assert.equal(normalizeUsage(unitless[0], 'seconds'), null);
+});
+
+test('解析失败时回显结构骨架，只含键名不含数值', async () => {
+  assert.equal(
+    describeShape({ data: { activeCpu: 2, note: 'x' }, list: [1, 2] }),
+    '{ data: { activeCpu: number, note: string }, list: [number] }',
+  );
+  assert.equal(describeShape(null), 'null');
+  assert.equal(describeShape([]), '[]');
+
+  const { result } = await withStubbedFetch(
+    () => ({ status: 200, body: { data: { somethingElse: 7 } } }),
+    () => collectVercelUsage({ token: 't' }),
+  );
+  assert.equal(result.status, 'unsupported');
+  assert.match(result.message, /somethingElse/);
+  // 只报结构，不把读到的数值带进提示。
+  assert.equal(result.message.includes('7'), false);
+});
+
+test('Vercel 指标藏在键名里时也能算出百分比', async () => {
+  const { result } = await withStubbedFetch(
+    () => ({ status: 200, body: { metrics: { activeCpu: { value: 2, unit: 'hours' } } } }),
+    () => collectVercelUsage({ token: 't' }),
+  );
+  assert.equal(result.status, 'ok');
+  assert.deepEqual(result.metrics, [
+    { key: 'active_cpu', label: 'Active CPU', used: 2, limit: 4, unit: 'CPU-hrs', percent: 50 },
+  ]);
 });
 
 test('读数状态阈值: 80% 警告、95% 严重、100% 超限', () => {

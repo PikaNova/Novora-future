@@ -5,10 +5,12 @@ import { detectPlatformEnvironment, isNeonConnectionString } from '../api/_platf
 import { NEON_FREE_LIMITS } from '../api/_platformUsage/neon.js';
 import { statusFromMetrics, type PlatformMetric } from '../api/_platformUsage/types.js';
 import {
+  collectVercelUsage,
   collectNamedUsage,
   normalizeUsage,
   vercelDeclarativeMetrics,
   VERCEL_HOBBY_LIMITS,
+  VERCEL_USAGE_TYPES,
 } from '../api/_platformUsage/vercel.js';
 
 const NEON_URL = 'postgresql://u:p@ep-cool-1234.ap-southeast-1.aws.neon.tech/neondb?sslmode=require';
@@ -125,6 +127,61 @@ test('Neon 免费额度常量与官方文档一致', () => {
   assert.equal(NEON_FREE_LIMITS.computeCuHours, 100);
   assert.equal(NEON_FREE_LIMITS.storageBytes, 500_000_000);
   assert.equal(NEON_FREE_LIMITS.transferBytes, 5_000_000_000);
+});
+
+/** 用一次性的 fetch 替身驱动适配器；每次调用都返回全新的 Response（响应体只能读一次）。 */
+async function withStubbedFetch<T>(
+  handler: (url: string) => { status: number; body: unknown },
+  run: () => Promise<T>,
+): Promise<{ result: T; calls: string[] }> {
+  const calls: string[] = [];
+  const original = globalThis.fetch;
+  globalThis.fetch = (async (input: unknown) => {
+    const url = String(input);
+    calls.push(url);
+    const { status, body } = handler(url);
+    return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+  }) as typeof fetch;
+  try {
+    return { result: await run(), calls };
+  } finally {
+    globalThis.fetch = original;
+  }
+}
+
+test('Vercel 请求必须带 type 与 from：缺 type 时接口直接 400', async () => {
+  const { result, calls } = await withStubbedFetch(
+    () => ({ status: 200, body: { usage: [{ name: 'Fast Data Transfer', value: 12, unit: 'GB' }] } }),
+    () => collectVercelUsage({ token: 't', now: Date.parse('2026-10-01T00:00:00Z') }),
+  );
+
+  assert.equal(result.status, 'ok');
+  assert.equal(result.metrics.length, 1);
+  assert.equal(result.metrics[0].used, 12);
+  assert.equal(result.metrics[0].percent, 12);
+  assert.equal(calls.length, VERCEL_USAGE_TYPES.length);
+  for (const url of calls) {
+    assert.match(url, /[?&]type=/);
+    assert.match(url, /[?&]from=/);
+    assert.match(url, /[?&]to=/);
+  }
+});
+
+test('Vercel 报错时带出平台原话，而不是只说 HTTP 400', async () => {
+  const { result } = await withStubbedFetch(
+    () => ({ status: 400, body: { error: { message: 'Invalid request: missing required property `type`.' } } }),
+    () => collectVercelUsage({ token: 't' }),
+  );
+  assert.equal(result.status, 'error');
+  assert.match(result.message, /missing required property/);
+});
+
+test('Vercel 401/403 归类为凭据问题', async () => {
+  const { result } = await withStubbedFetch(
+    () => ({ status: 403, body: { error: { message: 'forbidden' } } }),
+    () => collectVercelUsage({ token: 'bad' }),
+  );
+  assert.equal(result.status, 'credential_error');
 });
 
 test('读数状态阈值: 80% 警告、95% 严重、100% 超限', () => {

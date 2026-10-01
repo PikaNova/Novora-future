@@ -11,6 +11,18 @@ const CONSOLE_URL = 'https://vercel.com/dashboard/usage';
 const WINDOW_DAYS = 30;
 const GB = 1_000_000_000;
 
+/**
+ * `/v2/usage` 是未公开端点，但它的参数约束可以从报错里读出来：
+ * `type` 必填，允许值为 requests / monitoring / builds / edge / edge_group_by_project /
+ * artifacts / edge_config / log_drains / storage_postgres / storage_redis / storage_blob /
+ * cron_jobs / data_cache（2026-10-01 实测）；`from` 必填。
+ *
+ * 与 Hobby 那三项额度最相关的两类是 monitoring（函数：Active CPU / Provisioned Memory）
+ * 和 edge（CDN：Fast Data Transfer）。按此顺序查询，同名指标取先命中的那个，不做累加，
+ * 避免同一份用量被两类响应重复计数。
+ */
+export const VERCEL_USAGE_TYPES = ['monitoring', 'edge'] as const;
+
 type LimitSpec = {
   key: string;
   label: string;
@@ -176,12 +188,22 @@ export type VercelCollectInput = {
   now?: number;
 };
 
+/** 把 `{ error: { message } }` 读出来，让 400 之类的报错带上平台原话。 */
+async function readApiError(response: Response): Promise<string> {
+  try {
+    const body = (await response.json()) as { error?: { message?: unknown }; message?: unknown };
+    const message = body?.error?.message ?? body?.message;
+    if (typeof message === 'string' && message) return message.slice(0, 200);
+  } catch {
+    /* 无 JSON 响应体 */
+  }
+  return `HTTP ${response.status}`;
+}
+
 export async function collectVercelUsage(input: VercelCollectInput): Promise<PlatformProviderSnapshot> {
   const now = input.now ?? Date.now();
   const from = new Date(now - WINDOW_DAYS * 86_400_000).toISOString();
   const to = new Date(now).toISOString();
-  const params = new URLSearchParams({ from, to });
-  if (input.teamId) params.set('teamId', input.teamId);
 
   const base: PlatformProviderSnapshot = {
     provider: 'vercel',
@@ -198,50 +220,48 @@ export async function collectVercelUsage(input: VercelCollectInput): Promise<Pla
     stale: false,
   };
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 8000);
-  let response: Response;
-  try {
-    response = await fetch(`${API_BASE}/v2/usage?${params.toString()}`, {
-      headers: { Authorization: `Bearer ${input.token}`, Accept: 'application/json' },
-      signal: controller.signal,
-    });
-  } catch (error) {
-    return {
-      ...base,
-      status: 'error',
-      message: `Vercel 用量接口请求失败：${error instanceof Error ? error.message : String(error)}`,
-    };
-  } finally {
-    clearTimeout(timer);
-  }
-
-  if (response.status === 401 || response.status === 403) {
-    return { ...base, status: 'credential_error', message: 'Vercel Token 无效或权限不足，请重新填写。' };
-  }
-  if (response.status === 429) {
-    return { ...base, status: 'rate_limited', message: 'Vercel 接口触发限流，请稍后再试。' };
-  }
-  if (response.status === 404 || response.status === 405 || response.status === 501) {
-    return {
-      ...base,
-      status: 'unsupported',
-      message: '当前账户未开放 Vercel 用量接口，请到 Vercel 用量页核对。',
-    };
-  }
-  if (!response.ok) {
-    return { ...base, status: 'error', message: `Vercel 用量接口返回 HTTP ${response.status}。` };
-  }
-
-  let payload: unknown;
-  try {
-    payload = await response.json();
-  } catch {
-    return { ...base, status: 'unsupported', message: 'Vercel 用量接口返回的内容无法解析。' };
-  }
-
   const entries: NamedUsage[] = [];
-  collectNamedUsage(payload, entries);
+  const problems: string[] = [];
+  let rateLimited = false;
+
+  for (const type of VERCEL_USAGE_TYPES) {
+    const params = new URLSearchParams({ type, from, to });
+    if (input.teamId) params.set('teamId', input.teamId);
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    let response: Response;
+    try {
+      response = await fetch(`${API_BASE}/v2/usage?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${input.token}`, Accept: 'application/json' },
+        signal: controller.signal,
+      });
+    } catch (error) {
+      problems.push(`${type}: ${error instanceof Error ? error.message : String(error)}`);
+      continue;
+    } finally {
+      clearTimeout(timer);
+    }
+
+    if (response.status === 401 || response.status === 403) {
+      return { ...base, status: 'credential_error', message: 'Vercel Token 无效或权限不足，请重新填写。' };
+    }
+    if (response.status === 429) {
+      rateLimited = true;
+      continue;
+    }
+    if (!response.ok) {
+      problems.push(`${type}: ${await readApiError(response)}`);
+      continue;
+    }
+
+    try {
+      collectNamedUsage(await response.json(), entries);
+    } catch {
+      problems.push(`${type}: 响应无法解析`);
+    }
+  }
+
   const metrics: PlatformMetric[] = [];
   for (const spec of HOBBY_LIMITS) {
     const metric = pickMetric(spec, entries);
@@ -249,10 +269,15 @@ export async function collectVercelUsage(input: VercelCollectInput): Promise<Pla
   }
 
   if (!metrics.length) {
+    if (rateLimited && !problems.length) {
+      return { ...base, status: 'rate_limited', message: 'Vercel 接口触发限流，请稍后再试。' };
+    }
     return {
       ...base,
-      status: 'unsupported',
-      message: 'Vercel 返回的数据里没有可识别的用量字段，请到 Vercel 用量页核对。',
+      status: problems.length ? 'error' : 'unsupported',
+      message: problems.length
+        ? `Vercel 用量接口未返回可识别数据（${problems.join('；')}）。`
+        : 'Vercel 返回的数据里没有可识别的用量字段，请到 Vercel 用量页核对。',
     };
   }
 

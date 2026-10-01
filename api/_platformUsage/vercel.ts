@@ -1,41 +1,130 @@
-// Vercel 免费（Hobby）额度适配器。
+// Vercel 用量适配器（未公开端点 `/v2/usage`）。
 //
-// `/v2/usage` 是未公开端点，参数与响应形状由 2026-10-01 用真实账号逐项实测确定：
+// 参数与响应形状由 2026-10-01 用真实账号逐项实测确定：
 //
 //   GET /v2/usage?type=<type>&from=<ISO>&to=<ISO>[&teamId=|&slug=]
 //
-//   - `type` 与 `from` 必填；缺 `type` 时返回 400，错误信息里带完整枚举。
-//   - 只有 `type=requests` 会返回我们要的字段（monitoring / edge / builds 等对大多数
-//     账户是空数组），响应形如 `{ granularity, lastUpdate, data: [ {…按天分桶…} ] }`。
-//   - 每个桶里有 `bandwidth_outgoing_bytes`、`function_execution_*_gb_hours` 等累加值，
-//     必须对窗口内所有桶求和，取第一条会严重低估。
-//   - 该端点不返回 Active CPU，因此那一条只显示官方额度、不给百分比。
-import { statusFromMetrics, type PlatformMetric, type PlatformProviderSnapshot } from './types.js';
+//   - `type` 与 `from` 必填；缺 `type` 会返回 400，错误信息里带完整枚举。
+//   - 13 个取值里只有 `requests` 与 `builds` 会返回数据，其余对这个账号恒为空数组。
+//   - 窗口越长接口会自动把分桶粒度切成月（30 天=天桶，120 天=月桶），因此必须
+//     按返回的桶求和，不能只取第一条——那样会低估十几倍。
+//
+// 两件必须说清楚的事（都写进了返回值而不是悄悄处理）：
+//
+//   1. 该端点不提供任何额度上限。团队信息里只有 `billing.plan = "hobby"`，
+//      没有配额字段，所以这里只报「已用量」，不计算百分比，避免用错误的
+//      上限误导判断。
+//   2. 面板上的 Functions Storage、Deployment Storage、ISR、Blob、Queue、
+//      Sandbox、Image Optimization 等指标在这个端点里完全没有，无法读取。
+//   3. 出站/入站带宽的口径与面板的 Fast Data Transfer / Fast Origin Transfer
+//      并不一致（实测同一窗口 3.44 GB vs 面板 5.6 GB），因此按接口自身的
+//      语义命名，不冒用面板的名字。
+import type { PlatformMetric, PlatformProviderSnapshot } from './types.js';
 
 const API_BASE = 'https://api.vercel.com';
 const CONSOLE_URL = 'https://vercel.com/dashboard/usage';
 const WINDOW_DAYS = 30;
 const GB = 1_000_000_000;
 
-/** 唯一会返回用量字段的 type（已逐一实测其余取值）。 */
-export const VERCEL_USAGE_TYPE = 'requests';
+/** 会返回数据的两个 type（其余取值已逐一实测为空）。 */
+export const VERCEL_USAGE_TYPES = ['requests', 'builds'] as const;
+export type VercelUsageType = (typeof VERCEL_USAGE_TYPES)[number];
 
-/** Hobby 免费额度，取自官方 Hobby 文档（2026-10 核对）。 */
-export const VERCEL_HOBBY_LIMITS = {
-  fastDataTransferGb: 100,
-  activeCpuHours: 4,
-  provisionedMemoryGbHours: 360,
+export type VercelMetricDef = {
+  source: VercelUsageType;
+  key: string;
+  label: string;
+  unit: string;
+  /** 需要按窗口求和的字段；同一指标可能由多个字段组成。 */
+  fields: readonly string[];
+  /** 求和后除以该系数（例如字节转 GB、秒转分钟）。 */
+  scale?: number;
+  /** 展示时保留的小数位。 */
+  digits: number;
 };
 
-/** 需要按窗口求和的字节字段：CDN 传出去的量就是 Fast Data Transfer。 */
-export const VERCEL_BYTE_FIELDS = ['bandwidth_outgoing_bytes'] as const;
-
-/** 需要按窗口求和的 GB-小时字段：函数实例占用内存的总时长。 */
-export const VERCEL_GB_HOUR_FIELDS = [
-  'function_execution_successful_gb_hours',
-  'function_execution_error_gb_hours',
-  'function_execution_timeout_gb_hours',
-] as const;
+/**
+ * 端点能提供的全部指标。没有 `limit` 字段是有意为之：该端点不返回上限，
+ * 写死一个数字只会让人误判离限额还有多远。
+ */
+export const VERCEL_METRICS: readonly VercelMetricDef[] = [
+  {
+    source: 'requests',
+    key: 'cdn_requests',
+    label: 'CDN 请求（缓存命中 + 回源）',
+    unit: '次',
+    fields: ['request_hit_count', 'request_miss_count'],
+    digits: 0,
+  },
+  {
+    source: 'requests',
+    key: 'bandwidth_outgoing',
+    label: '出站带宽（CDN → 用户）',
+    unit: 'GB',
+    fields: ['bandwidth_outgoing_bytes'],
+    scale: GB,
+    digits: 3,
+  },
+  {
+    source: 'requests',
+    key: 'bandwidth_incoming',
+    label: '入站带宽（源站 → CDN）',
+    unit: 'GB',
+    fields: ['bandwidth_incoming_bytes'],
+    scale: GB,
+    digits: 3,
+  },
+  {
+    source: 'requests',
+    key: 'function_invocations',
+    label: '函数调用次数',
+    unit: '次',
+    fields: [
+      'function_invocation_successful_count',
+      'function_invocation_error_count',
+      'function_invocation_throttle_count',
+      'function_invocation_timeout_count',
+    ],
+    digits: 0,
+  },
+  {
+    source: 'requests',
+    key: 'function_gb_hours',
+    label: '函数内存时长',
+    unit: 'GB-hrs',
+    fields: [
+      'function_execution_successful_gb_hours',
+      'function_execution_error_gb_hours',
+      'function_execution_timeout_gb_hours',
+    ],
+    digits: 3,
+  },
+  {
+    source: 'requests',
+    key: 'monitoring_metrics',
+    label: '监控指标',
+    unit: '次',
+    fields: ['monitoring_metric_count'],
+    digits: 0,
+  },
+  {
+    source: 'builds',
+    key: 'builds',
+    label: '构建次数',
+    unit: '次',
+    fields: ['build_completed_count', 'build_failed_count'],
+    digits: 0,
+  },
+  {
+    source: 'builds',
+    key: 'build_minutes',
+    label: '构建耗时',
+    unit: '分钟',
+    fields: ['build_build_seconds', 'build_queued_seconds'],
+    scale: 60,
+    digits: 1,
+  },
+];
 
 function toNumber(value: unknown): number | null {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
@@ -72,73 +161,34 @@ export function describeShape(node: unknown, depth = 0): string {
   return typeof node;
 }
 
-function round(value: number, digits: number): number {
-  return Number(value.toFixed(digits));
+/** 按指标定义把某一类响应的分桶数组换算成读数；没有上限，因此不给百分比。 */
+export function buildVercelMetrics(dataByType: Partial<Record<VercelUsageType, unknown>>): PlatformMetric[] {
+  const metrics: PlatformMetric[] = [];
+  for (const def of VERCEL_METRICS) {
+    const raw = sumBuckets(dataByType[def.source], def.fields);
+    const used = def.scale ? raw / def.scale : raw;
+    metrics.push({
+      key: def.key,
+      label: def.label,
+      used: Number(used.toFixed(def.digits)),
+      limit: null,
+      unit: def.unit,
+      percent: null,
+    });
+  }
+  return metrics;
 }
 
-function percentOf(used: number, limit: number): number | null {
-  if (!Number.isFinite(limit) || limit <= 0) return null;
-  return round((used / limit) * 100, 2);
-}
-
-/** 没有读数时展示官方额度，但不给百分比。 */
+/** 没有读数时的占位：同样的指标清单，全部按 0 显示。 */
 export function vercelDeclarativeMetrics(): PlatformMetric[] {
-  return [
-    {
-      key: 'fast_data_transfer',
-      label: 'Fast Data Transfer',
-      used: 0,
-      limit: VERCEL_HOBBY_LIMITS.fastDataTransferGb,
-      unit: 'GB',
-      percent: null,
-    },
-    {
-      key: 'active_cpu',
-      label: 'Active CPU',
-      used: 0,
-      limit: VERCEL_HOBBY_LIMITS.activeCpuHours,
-      unit: 'CPU-hrs',
-      percent: null,
-    },
-    {
-      key: 'provisioned_memory',
-      label: 'Provisioned Memory',
-      used: 0,
-      limit: VERCEL_HOBBY_LIMITS.provisionedMemoryGbHours,
-      unit: 'GB-hrs',
-      percent: null,
-    },
-  ];
-}
-
-/**
- * 把 `type=requests` 的分桶数组换算成额度读数。
- *
- * Active CPU 不在这里出现：该端点不返回它，与其显示一个「0 / 4」让人误以为没用量，
- * 不如把它交给提示文案说明。
- */
-export function buildVercelMetrics(data: unknown): PlatformMetric[] {
-  const outgoingBytes = sumBuckets(data, VERCEL_BYTE_FIELDS);
-  const gbHours = sumBuckets(data, VERCEL_GB_HOUR_FIELDS);
-  const usedGb = outgoingBytes / GB;
-  return [
-    {
-      key: 'fast_data_transfer',
-      label: 'Fast Data Transfer',
-      used: round(usedGb, 3),
-      limit: VERCEL_HOBBY_LIMITS.fastDataTransferGb,
-      unit: 'GB',
-      percent: percentOf(usedGb, VERCEL_HOBBY_LIMITS.fastDataTransferGb),
-    },
-    {
-      key: 'provisioned_memory',
-      label: 'Provisioned Memory',
-      used: round(gbHours, 3),
-      limit: VERCEL_HOBBY_LIMITS.provisionedMemoryGbHours,
-      unit: 'GB-hrs',
-      percent: percentOf(gbHours, VERCEL_HOBBY_LIMITS.provisionedMemoryGbHours),
-    },
-  ];
+  return VERCEL_METRICS.map((def) => ({
+    key: def.key,
+    label: def.label,
+    used: 0,
+    limit: null,
+    unit: def.unit,
+    percent: null,
+  }));
 }
 
 export type VercelCollectInput = {
@@ -160,7 +210,8 @@ async function readApiError(response: Response): Promise<string> {
   return `HTTP ${response.status}`;
 }
 
-const NO_ACTIVE_CPU_NOTE = '该接口未返回 Active CPU，请到 Vercel 用量页查看。';
+const MISSING_NOTE =
+  'Vercel 公开接口不提供额度上限，也不返回 Functions Storage、Deployment Storage 等指标，这些请到用量页查看。';
 
 export async function collectVercelUsage(input: VercelCollectInput): Promise<PlatformProviderSnapshot> {
   const now = input.now ?? Date.now();
@@ -177,73 +228,80 @@ export async function collectVercelUsage(input: VercelCollectInput): Promise<Pla
     periodStart: from,
     periodEnd: to,
     metrics: vercelDeclarativeMetrics(),
-    consoleUrl: CONSOLE_URL,
+    consoleUrl: scope && !scope.startsWith('team_') ? `https://vercel.com/${scope}/~/usage` : CONSOLE_URL,
     source: 'vercel-api',
     accountLabel: scope || null,
     stale: false,
   };
 
-  const params = new URLSearchParams({ type: VERCEL_USAGE_TYPE, from, to });
-  // `team_` 开头按 Team ID 传，否则按 slug 传——两者在 Vercel 是分开的参数。
-  if (scope) params.set(scope.startsWith('team_') ? 'teamId' : 'slug', scope);
+  const dataByType: Partial<Record<VercelUsageType, unknown>> = {};
+  const problems: string[] = [];
+  let rateLimited = false;
+  let sawBucket = false;
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 8000);
-  let response: Response;
-  try {
-    response = await fetch(`${API_BASE}/v2/usage?${params.toString()}`, {
-      headers: { Authorization: `Bearer ${input.token}`, Accept: 'application/json' },
-      signal: controller.signal,
-    });
-  } catch (error) {
+  for (const type of VERCEL_USAGE_TYPES) {
+    const params = new URLSearchParams({ type, from, to });
+    // `team_` 开头按 Team ID 传，否则按 slug 传——两者在 Vercel 是分开的参数。
+    if (scope) params.set(scope.startsWith('team_') ? 'teamId' : 'slug', scope);
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    let response: Response;
+    try {
+      response = await fetch(`${API_BASE}/v2/usage?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${input.token}`, Accept: 'application/json' },
+        signal: controller.signal,
+      });
+    } catch (error) {
+      problems.push(`${type}: ${error instanceof Error ? error.message : String(error)}`);
+      continue;
+    } finally {
+      clearTimeout(timer);
+    }
+
+    if (response.status === 401 || response.status === 403) {
+      return { ...base, status: 'credential_error', message: 'Vercel Token 无效或权限不足，请重新填写。' };
+    }
+    if (response.status === 429) {
+      rateLimited = true;
+      continue;
+    }
+    if (!response.ok) {
+      problems.push(`${type}: ${await readApiError(response)}`);
+      continue;
+    }
+
+    try {
+      const payload = (await response.json()) as { data?: unknown };
+      if (!Array.isArray(payload?.data)) {
+        problems.push(`${type}: 未知结构 ${describeShape(payload).slice(0, 200)}`);
+        continue;
+      }
+      dataByType[type] = payload.data;
+      if (payload.data.length) sawBucket = true;
+    } catch {
+      problems.push(`${type}: 响应无法解析`);
+    }
+  }
+
+  if (!sawBucket) {
+    if (rateLimited && !problems.length) {
+      return { ...base, status: 'rate_limited', message: 'Vercel 接口触发限流，请稍后再试。' };
+    }
     return {
       ...base,
-      status: 'error',
-      message: `Vercel 用量接口请求失败：${error instanceof Error ? error.message : String(error)}`,
-    };
-  } finally {
-    clearTimeout(timer);
-  }
-
-  if (response.status === 401 || response.status === 403) {
-    return { ...base, status: 'credential_error', message: 'Vercel Token 无效或权限不足，请重新填写。' };
-  }
-  if (response.status === 429) {
-    return { ...base, status: 'rate_limited', message: 'Vercel 接口触发限流，请稍后再试。' };
-  }
-  if (!response.ok) {
-    return { ...base, status: 'error', message: `Vercel 用量接口报错：${await readApiError(response)}` };
-  }
-
-  let payload: unknown;
-  try {
-    payload = await response.json();
-  } catch {
-    return { ...base, status: 'unsupported', message: 'Vercel 用量接口返回的内容无法解析。' };
-  }
-
-  const data = (payload as { data?: unknown } | null)?.data;
-  if (!Array.isArray(data)) {
-    return {
-      ...base,
-      status: 'unsupported',
-      message: `Vercel 返回了未知结构：${describeShape(payload).slice(0, 300)}`,
-    };
-  }
-  if (!data.length) {
-    return {
-      ...base,
-      status: 'unsupported',
-      message: 'Vercel 返回的用量列表为空：近 30 天没有可用记录，请到 Vercel 用量页核对团队与计费周期。',
+      status: problems.length ? 'error' : 'unsupported',
+      message: problems.length
+        ? `Vercel 用量接口未返回可用数据（${problems.join('；')}）。`
+        : 'Vercel 返回的用量列表为空：近 30 天没有可用记录，请到 Vercel 用量页核对团队与计费周期。',
     };
   }
 
-  const metrics = buildVercelMetrics(data);
   return {
     ...base,
-    status: statusFromMetrics(metrics),
-    message: `数据来自 Vercel 用量接口（${data.length} 个日桶累加），可能有一小时左右延迟。${NO_ACTIVE_CPU_NOTE}`,
+    status: 'ok',
+    message: `数据来自 Vercel 用量接口，统计窗口为近 ${WINDOW_DAYS} 天并按返回的桶累加。${MISSING_NOTE}`,
     observedAt: now,
-    metrics,
+    metrics: buildVercelMetrics(dataByType),
   };
 }

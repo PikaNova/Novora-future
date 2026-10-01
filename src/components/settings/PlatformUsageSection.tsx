@@ -191,7 +191,8 @@ function ProviderCard({ view, onPayload }: ProviderCardProps) {
                     {formatMetric(metric)}
                     {metric.percent != null ? <em className="platform-usage__percent">{metric.percent}%</em> : null}
                   </b>
-                  <UsageBar value={metric.percent} />
+                  {/* 没有上限的指标只报用量：画一条空进度条会让人误以为「用量为 0」或「没超限」。 */}
+                  {metric.percent != null ? <UsageBar value={metric.percent} /> : null}
                 </li>
               ))}
             </ul>

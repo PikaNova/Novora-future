@@ -10,10 +10,8 @@ import {
   describeShape,
   sumBuckets,
   vercelDeclarativeMetrics,
-  VERCEL_BYTE_FIELDS,
-  VERCEL_GB_HOUR_FIELDS,
-  VERCEL_HOBBY_LIMITS,
-  VERCEL_USAGE_TYPE,
+  VERCEL_METRICS,
+  VERCEL_USAGE_TYPES,
 } from '../api/_platformUsage/vercel.js';
 
 const NEON_URL = 'postgresql://u:p@ep-cool-1234.ap-southeast-1.aws.neon.tech/neondb?sslmode=require';
@@ -121,60 +119,69 @@ test('刷新冷却: 由上次刷新时间推算剩余秒数，向上取整', () 
   assert.equal(remainingCooldownSeconds(now - 120_000, now), 0);
 });
 
-// 2026-10-01 真实账号返回的字段名与量级（已脱敏为同一数量级）。
-const REAL_BUCKETS = [
-  { bandwidth_outgoing_bytes: 50_000_000, function_execution_successful_gb_hours: 0.2 },
-  { bandwidth_outgoing_bytes: '2181634', function_execution_error_gb_hours: 0.096626631111111 },
+// 2026-10-01 真实账号返回的字段名与量级（120 天窗口的实际汇总值）。
+const REQUESTS_BUCKETS = [
+  {
+    request_hit_count: 281_708,
+    request_miss_count: 1_120_230,
+    bandwidth_outgoing_bytes: 3_441_000_000,
+    bandwidth_incoming_bytes: 1_792_000_000,
+    function_invocation_successful_count: 1_087_960,
+    function_execution_successful_gb_hours: 29.333,
+    monitoring_metric_count: 5,
+  },
+];
+const BUILDS_BUCKETS = [
+  { build_completed_count: 3, build_failed_count: 1, build_build_seconds: 600, build_queued_seconds: 60 },
 ];
 
 test('Vercel 分桶求和: 逐桶累加，数值字符串也认，缺失与非数值按 0', () => {
-  assert.equal(sumBuckets(REAL_BUCKETS, VERCEL_BYTE_FIELDS), 52_181_634);
-  assert.ok(Math.abs(sumBuckets(REAL_BUCKETS, VERCEL_GB_HOUR_FIELDS) - 0.296626631111111) < 1e-9);
-
   assert.equal(sumBuckets([{ a: 1 }, { a: 2 }, { a: 3 }], ['a']), 6);
+  assert.equal(sumBuckets([{ a: 1 }, { a: '2' }], ['a']), 3);
+  assert.equal(sumBuckets([{ a: 1, b: 2 }], ['a', 'b']), 3);
   assert.equal(sumBuckets([{ a: null }, {}, 'junk', { a: 'nope' }], ['a']), 0);
   assert.equal(sumBuckets(undefined, ['a']), 0);
   assert.equal(sumBuckets({ a: 1 }, ['a']), 0);
 });
 
-test('Vercel 读数: 用真实字段名换算出已用量与百分比', () => {
-  assert.deepEqual(buildVercelMetrics(REAL_BUCKETS), [
+test('Vercel 读数: 列出接口能提供的全部指标', () => {
+  const metrics = buildVercelMetrics({ requests: REQUESTS_BUCKETS, builds: BUILDS_BUCKETS });
+  assert.deepEqual(metrics, [
     {
-      key: 'fast_data_transfer',
-      label: 'Fast Data Transfer',
-      used: 0.052,
-      limit: 100,
-      unit: 'GB',
-      percent: 0.05,
+      key: 'cdn_requests',
+      label: 'CDN 请求（缓存命中 + 回源）',
+      used: 1_401_938,
+      limit: null,
+      unit: '次',
+      percent: null,
     },
-    {
-      key: 'provisioned_memory',
-      label: 'Provisioned Memory',
-      used: 0.297,
-      limit: 360,
-      unit: 'GB-hrs',
-      percent: 0.08,
-    },
+    { key: 'bandwidth_outgoing', label: '出站带宽（CDN → 用户）', used: 3.441, limit: null, unit: 'GB', percent: null },
+    { key: 'bandwidth_incoming', label: '入站带宽（源站 → CDN）', used: 1.792, limit: null, unit: 'GB', percent: null },
+    { key: 'function_invocations', label: '函数调用次数', used: 1_087_960, limit: null, unit: '次', percent: null },
+    { key: 'function_gb_hours', label: '函数内存时长', used: 29.333, limit: null, unit: 'GB-hrs', percent: null },
+    { key: 'monitoring_metrics', label: '监控指标', used: 5, limit: null, unit: '次', percent: null },
+    { key: 'builds', label: '构建次数', used: 4, limit: null, unit: '次', percent: null },
+    { key: 'build_minutes', label: '构建耗时', used: 11, limit: null, unit: '分钟', percent: null },
   ]);
-  // Active CPU 不在读数里——该接口不返回它，显示 0 会让人误以为没用量。
+  // 这个端点不返回额度上限，任何指标都不该凭空出现百分比。
   assert.equal(
-    buildVercelMetrics(REAL_BUCKETS).some((metric) => metric.key === 'active_cpu'),
-    false,
+    metrics.every((metric) => metric.limit === null && metric.percent === null),
+    true,
   );
 });
 
-test('Vercel 兜底读数: 只列官方 Hobby 额度，不给百分比', () => {
+test('Vercel 占位读数: 同样列全指标，但全部按 0 显示且不给百分比', () => {
+  const metrics = vercelDeclarativeMetrics();
+  assert.equal(metrics.length, VERCEL_METRICS.length);
   assert.deepEqual(
-    vercelDeclarativeMetrics().map((metric) => [metric.key, metric.limit, metric.unit, metric.percent]),
-    [
-      ['fast_data_transfer', 100, 'GB', null],
-      ['active_cpu', 4, 'CPU-hrs', null],
-      ['provisioned_memory', 360, 'GB-hrs', null],
-    ],
+    metrics.map((metric) => [metric.key, metric.used, metric.limit, metric.percent]),
+    VERCEL_METRICS.map((def) => [def.key, 0, null, null]),
   );
-  assert.equal(VERCEL_HOBBY_LIMITS.fastDataTransferGb, 100);
-  assert.equal(VERCEL_HOBBY_LIMITS.activeCpuHours, 4);
-  assert.equal(VERCEL_HOBBY_LIMITS.provisionedMemoryGbHours, 360);
+  // 面板上那些拿不到的指标不能出现在这里，否则等于编数据。
+  const labels = metrics.map((metric) => metric.label).join(' ');
+  for (const absent of ['Functions Storage', 'Deployment Storage', 'Active CPU', 'ISR', 'Blob']) {
+    assert.equal(labels.includes(absent), false, `${absent} 不应出现在读数里`);
+  }
 });
 
 test('Vercel 解析失败时回显结构骨架，只含键名不含数值', () => {
@@ -206,44 +213,65 @@ async function withStubbedFetch<T>(
   }
 }
 
-const okBody = { granularity: 'day', lastUpdate: '2026-10-01T00:00:00Z', data: REAL_BUCKETS };
+/** 按 type 返回不同响应体：requests 与 builds 各一次请求。 */
+function typeAware(url: string): { status: number; body: unknown } {
+  const isBuilds = /[?&]type=builds/.test(url);
+  return {
+    status: 200,
+    body: {
+      granularity: 'day',
+      lastUpdate: '2026-10-01T00:00:00Z',
+      data: isBuilds ? BUILDS_BUCKETS : REQUESTS_BUCKETS,
+    },
+  };
+}
 
-test('Vercel 请求: 必须带 type/from/to；team_ 走 teamId，其它走 slug', async () => {
-  const plain = await withStubbedFetch(
-    () => ({ status: 200, body: okBody }),
-    () => collectVercelUsage({ token: 't', now: Date.parse('2026-10-01T12:00:00Z') }),
+test('Vercel 请求: 两类各一次且都带 type/from/to；team_ 走 teamId，其它走 slug', async () => {
+  const plain = await withStubbedFetch(typeAware, () =>
+    collectVercelUsage({ token: 't', now: Date.parse('2026-10-01T12:00:00Z') }),
   );
-  assert.equal(plain.calls.length, 1);
-  assert.match(plain.calls[0], new RegExp(`[?&]type=${VERCEL_USAGE_TYPE}`));
-  assert.match(plain.calls[0], /[?&]from=/);
-  assert.match(plain.calls[0], /[?&]to=/);
-  assert.equal(/[?&](teamId|slug)=/.test(plain.calls[0]), false);
+  assert.equal(plain.calls.length, VERCEL_USAGE_TYPES.length);
+  for (const type of VERCEL_USAGE_TYPES) {
+    assert.ok(
+      plain.calls.some((url) => url.includes(`type=${type}`)),
+      `缺少 type=${type} 的请求`,
+    );
+  }
+  for (const url of plain.calls) {
+    assert.match(url, /[?&]from=/);
+    assert.match(url, /[?&]to=/);
+    assert.equal(/[?&](teamId|slug)=/.test(url), false);
+  }
 
-  const byId = await withStubbedFetch(
-    () => ({ status: 200, body: okBody }),
-    () => collectVercelUsage({ token: 't', teamId: 'team_abc123' }),
-  );
-  assert.match(byId.calls[0], /[?&]teamId=team_abc123/);
-  assert.equal(/[?&]slug=/.test(byId.calls[0]), false);
+  const byId = await withStubbedFetch(typeAware, () => collectVercelUsage({ token: 't', teamId: 'team_abc123' }));
+  for (const url of byId.calls) {
+    assert.match(url, /[?&]teamId=team_abc123/);
+    assert.equal(/[?&]slug=/.test(url), false);
+  }
 
-  const bySlug = await withStubbedFetch(
-    () => ({ status: 200, body: okBody }),
-    () => collectVercelUsage({ token: 't', teamId: 'jinzhiyuan0327s-projects' }),
+  const bySlug = await withStubbedFetch(typeAware, () =>
+    collectVercelUsage({ token: 't', teamId: 'jinzhiyuan0327s-projects' }),
   );
-  assert.match(bySlug.calls[0], /[?&]slug=jinzhiyuan0327s-projects/);
-  assert.equal(/[?&]teamId=/.test(bySlug.calls[0]), false);
+  for (const url of bySlug.calls) {
+    assert.match(url, /[?&]slug=jinzhiyuan0327s-projects/);
+    assert.equal(/[?&]teamId=/.test(url), false);
+  }
+  // slug 形态下给出团队用量页地址，而不是通用的 dashboard 地址。
+  assert.equal(bySlug.result.consoleUrl, 'https://vercel.com/jinzhiyuan0327s-projects/~/usage');
 });
 
-test('Vercel 端到端: 正常响应换算成读数与状态', async () => {
-  const { result } = await withStubbedFetch(
-    () => ({ status: 200, body: okBody }),
-    () => collectVercelUsage({ token: 't', now: Date.parse('2026-10-01T12:00:00Z') }),
+test('Vercel 端到端: 两类响应合并成完整指标清单', async () => {
+  const { result } = await withStubbedFetch(typeAware, () =>
+    collectVercelUsage({ token: 't', now: Date.parse('2026-10-01T12:00:00Z') }),
   );
   assert.equal(result.status, 'ok');
   assert.equal(result.observedAt, Date.parse('2026-10-01T12:00:00Z'));
-  assert.equal(result.metrics.length, 2);
-  assert.match(result.message, /未返回 Active CPU/);
-  assert.equal(result.metrics[0].used, 0.052);
+  assert.equal(result.metrics.length, VERCEL_METRICS.length);
+  const byKey = new Map(result.metrics.map((metric) => [metric.key, metric]));
+  assert.equal(byKey.get('cdn_requests')?.used, 1_401_938);
+  assert.equal(byKey.get('bandwidth_outgoing')?.used, 3.441);
+  assert.equal(byKey.get('build_minutes')?.used, 11);
+  assert.match(result.message, /不提供额度上限/);
 });
 
 test('Vercel 失败态: 403 凭据问题、400 带出平台原话、空列表与未知结构各有提示', async () => {
@@ -271,6 +299,6 @@ test('Vercel 失败态: 403 凭据问题、400 带出平台原话、空列表与
     () => ({ status: 200, body: { granularity: 'day', rows: [] } }),
     () => collectVercelUsage({ token: 't' }),
   );
-  assert.equal(unknown.result.status, 'unsupported');
+  assert.equal(unknown.result.status, 'error');
   assert.match(unknown.result.message, /rows/);
 });

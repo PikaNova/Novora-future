@@ -13,6 +13,33 @@ export type PlatformMetric = {
   unit: string;
   percent: number | null;
   note?: string;
+  /** 服务端按当前上限算出的预测。 */
+  forecast?: PlatformForecast;
+};
+
+export type PlatformForecastStatus = 'ok' | 'insufficient' | 'no-usage' | 'exceeded';
+
+export type PlatformForecast = {
+  status: PlatformForecastStatus;
+  basis: 'period' | 'window' | null;
+  sampleDays: number;
+  dailyRate: number | null;
+  recentDailyRate: number | null;
+  remaining: number | null;
+  daysToPeriodEnd: number | null;
+  daysLeft: number | null;
+  exhaustsWithinPeriod: boolean | null;
+  projectedExhaustDate: string | null;
+  volatile: boolean;
+};
+
+/** 手工录入的指标。 */
+export type PlatformCustomMetric = {
+  key: string;
+  label: string;
+  used: number;
+  unit: string;
+  limit: number | null;
 };
 
 export type PlatformProviderSnapshot = {
@@ -47,6 +74,10 @@ export type PlatformProviderView = {
   updatedAt: number | null;
   /** 距离下次可刷新还剩的秒数；0 表示现在就能刷新。 */
   nextRefreshInSeconds: number;
+  /** 指标 key → 用户设定的上限；留空的指标不会出现在这里，表示用免费版默认值。 */
+  limits: Record<string, number>;
+  /** 手工录入的指标。 */
+  custom: PlatformCustomMetric[];
   fields: PlatformConfigFieldSpec[];
   consoleUrl: string;
   snapshot: PlatformProviderSnapshot | null;
@@ -97,10 +128,14 @@ export function fetchPlatformUsage(): Promise<PlatformUsagePayload> {
 export function savePlatformConfig(
   provider: 'vercel' | 'neon',
   values: Record<string, string>,
+  extra?: {
+    limits?: Record<string, string>;
+    custom?: Array<{ label: string; used: string; unit: string; limit: string }>;
+  },
 ): Promise<PlatformUsagePayload> {
   return request<PlatformUsagePayload>('/api/platform-usage-config', {
     method: 'POST',
-    body: JSON.stringify({ provider, values }),
+    body: JSON.stringify({ provider, values, ...(extra ?? {}) }),
   });
 }
 

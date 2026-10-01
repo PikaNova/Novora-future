@@ -1737,9 +1737,32 @@ select.set-input {
   color: #93a0ad;
   font-size: 12px;
 }
+.platform-usage__forecast {
+  grid-column: 1 / -1;
+  color: #8b95a1;
+  font-size: 11.5px;
+  font-style: normal;
+}
+.platform-usage__settings {
+  margin-top: 8px;
+}
+.platform-usage__settings > summary {
+  cursor: pointer;
+  color: #93a0ad;
+  font-size: 12px;
+}
+.platform-usage__custom-row {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 0.8fr 1fr auto;
+  gap: 6px;
+  align-items: center;
+}
 @media (max-width: 620px) {
   .platform-usage__grid {
     grid-template-columns: 1fr;
+  }
+  .platform-usage__custom-row {
+    grid-template-columns: 1fr 1fr;
   }
 }
 @media (prefers-reduced-motion: reduce) {

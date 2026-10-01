@@ -41,6 +41,32 @@ function tone(value: number | null): 'ok' | 'warn' | 'err' | 'idle' {
   return 'ok';
 }
 
+function formatRate(value: number | null, unit: string): string {
+  if (value == null || !Number.isFinite(value)) return '—';
+  return `${formatNumber(value)}${unit ? ' ' + unit : ''}/天`;
+}
+
+/** 把服务端的预测翻译成一句人话。样本不足或没上限时也要说清楚为什么没有天数。 */
+function forecastText(metric: PlatformMetric): string | null {
+  const forecast = metric.forecast;
+  if (!forecast) return null;
+  if (forecast.status === 'exceeded') return '本周期已超限';
+  if (forecast.status === 'no-usage') return '本周期尚未产生消耗';
+  if (forecast.status === 'insufficient') {
+    return metric.limit == null ? '未设上限，无法预测还能用几天' : `样本只有 ${forecast.sampleDays} 天，暂不外推`;
+  }
+  const rate = formatRate(forecast.dailyRate, metric.unit);
+  const basis = forecast.basis === 'window' ? '（本周期样本不足，按整个窗口估算）' : '';
+  const shake = forecast.volatile ? '，近期波动较大' : '';
+  if (forecast.exhaustsWithinPeriod === true) {
+    return `按 ${rate}${shake}${basis}，预计 ${forecast.daysLeft} 天后用尽（${forecast.projectedExhaustDate}）`;
+  }
+  if (forecast.exhaustsWithinPeriod === false) {
+    return `按 ${rate}${shake}${basis}，本周期不会用尽`;
+  }
+  return `按 ${rate}${shake}${basis}，约还能撑 ${forecast.daysLeft} 天`;
+}
+
 function statusTone(status: PlatformStatus): 'ok' | 'warn' | 'err' | 'idle' {
   if (status === 'ok') return 'ok';
   if (status === 'warning') return 'warn';
@@ -84,6 +110,8 @@ type ProviderCardProps = {
   onPayload: (payload: PlatformUsagePayload) => void;
 };
 
+type CustomDraft = { label: string; used: string; unit: string; limit: string };
+
 function ProviderCard({ view, onPayload }: ProviderCardProps) {
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
@@ -91,6 +119,8 @@ function ProviderCard({ view, onPayload }: ProviderCardProps) {
   const [error, setError] = useState('');
   const [cooldown, setCooldown] = useState(view.nextRefreshInSeconds);
   const cooling = cooldown > 0;
+  const [limitDraft, setLimitDraft] = useState<Record<string, string>>({});
+  const [customDraft, setCustomDraft] = useState<CustomDraft[]>([]);
 
   // 服务端返回的剩余秒数是权威值：每次拿到新载荷都同步一次。
   useEffect(() => {
@@ -103,6 +133,21 @@ function ProviderCard({ view, onPayload }: ProviderCardProps) {
     const timer = window.setInterval(() => setCooldown((value) => (value <= 1 ? 0 : value - 1)), 1000);
     return () => window.clearInterval(timer);
   }, [cooling]);
+
+  // 服务端返回的上限与手工指标是权威值；每次拿到新载荷就同步到草稿。
+  useEffect(() => {
+    const next: Record<string, string> = {};
+    for (const [key, value] of Object.entries(view.limits)) next[key] = String(value);
+    setLimitDraft(next);
+    setCustomDraft(
+      view.custom.map((item) => ({
+        label: item.label,
+        used: String(item.used),
+        unit: item.unit,
+        limit: item.limit == null ? '' : String(item.limit),
+      })),
+    );
+  }, [view.limits, view.custom]);
 
   const run = async (task: () => Promise<PlatformUsagePayload>, success: string) => {
     setBusy(true);
@@ -132,6 +177,27 @@ function ProviderCard({ view, onPayload }: ProviderCardProps) {
       return;
     }
     void run(() => savePlatformConfig(view.provider, values), '凭据已保存。');
+  };
+
+  const saveSettings = () => {
+    const limits: Record<string, string> = {};
+    for (const [key, value] of Object.entries(limitDraft)) {
+      const trimmed = value.trim();
+      if (trimmed) limits[key] = trimmed; // 留空即不提交，服务端回落到免费版默认值
+    }
+    const custom = customDraft
+      .filter((item) => item.label.trim())
+      .map((item) => ({
+        label: item.label.trim(),
+        used: item.used.trim() || '0',
+        unit: item.unit.trim(),
+        limit: item.limit.trim(),
+      }));
+    void run(() => savePlatformConfig(view.provider, {}, { limits, custom }), '上限与自定义指标已保存。');
+  };
+
+  const updateCustom = (index: number, field: keyof CustomDraft, value: string) => {
+    setCustomDraft((prev) => prev.map((item, i) => (i === index ? { ...item, [field]: value } : item)));
   };
 
   const snapshot = view.snapshot;
@@ -181,20 +247,24 @@ function ProviderCard({ view, onPayload }: ProviderCardProps) {
         <>
           {snapshot && snapshot.metrics.length ? (
             <ul className="platform-usage__metrics">
-              {snapshot.metrics.map((metric) => (
-                <li key={metric.key}>
-                  <span>
-                    {metric.label}
-                    {metric.note ? <em className="platform-usage__note">{metric.note}</em> : null}
-                  </span>
-                  <b>
-                    {formatMetric(metric)}
-                    {metric.percent != null ? <em className="platform-usage__percent">{metric.percent}%</em> : null}
-                  </b>
-                  {/* 没有上限的指标只报用量：画一条空进度条会让人误以为「用量为 0」或「没超限」。 */}
-                  {metric.percent != null ? <UsageBar value={metric.percent} /> : null}
-                </li>
-              ))}
+              {snapshot.metrics.map((metric) => {
+                const forecast = forecastText(metric);
+                return (
+                  <li key={metric.key}>
+                    <span>
+                      {metric.label}
+                      {metric.note ? <em className="platform-usage__note">{metric.note}</em> : null}
+                    </span>
+                    <b>
+                      {formatMetric(metric)}
+                      {metric.percent != null ? <em className="platform-usage__percent">{metric.percent}%</em> : null}
+                    </b>
+                    {/* 没有上限的指标只报用量：画一条空进度条会让人误以为「用量为 0」或「没超限」。 */}
+                    {metric.percent != null ? <UsageBar value={metric.percent} /> : null}
+                    {forecast ? <em className="platform-usage__forecast">{forecast}</em> : null}
+                  </li>
+                );
+              })}
             </ul>
           ) : (
             <p className="set-note">尚未读取到用量，点击「立即刷新」尝试一次。</p>
@@ -230,6 +300,87 @@ function ProviderCard({ view, onPayload }: ProviderCardProps) {
               <ExternalLink size={14} aria-hidden="true" />
             </a>
           </div>
+          <details className="platform-usage__settings">
+            <summary>上限与自定义指标</summary>
+            <div className="platform-usage__wizard">
+              <p className="set-note">
+                上限留空表示使用免费版默认值，填了就按你填的算百分比和预测。接口拿不到的指标（例如 Functions
+                Storage）可以在下面手工添加，数值从 Vercel 用量页抄。
+              </p>
+              {(snapshot?.metrics ?? [])
+                .filter((metric) => metric.note !== '手工录入')
+                .map((metric) => (
+                  <label className="set-row platform-usage__field" key={metric.key}>
+                    <span className="set-label">
+                      {metric.label}
+                      {metric.limit != null ? `（当前按 ${formatNumber(metric.limit)} ${metric.unit}）` : ''}
+                    </span>
+                    <input
+                      className="set-input"
+                      type="number"
+                      inputMode="decimal"
+                      min="0"
+                      step="any"
+                      placeholder="留空用免费版默认值"
+                      value={limitDraft[metric.key] ?? ''}
+                      onChange={(event) => setLimitDraft((prev) => ({ ...prev, [metric.key]: event.target.value }))}
+                    />
+                  </label>
+                ))}
+              {customDraft.map((item, index) => (
+                <div className="platform-usage__custom-row" key={index}>
+                  <input
+                    className="set-input"
+                    placeholder="名称"
+                    value={item.label}
+                    onChange={(event) => updateCustom(index, 'label', event.target.value)}
+                  />
+                  <input
+                    className="set-input"
+                    type="number"
+                    inputMode="decimal"
+                    placeholder="已用"
+                    value={item.used}
+                    onChange={(event) => updateCustom(index, 'used', event.target.value)}
+                  />
+                  <input
+                    className="set-input"
+                    placeholder="单位"
+                    value={item.unit}
+                    onChange={(event) => updateCustom(index, 'unit', event.target.value)}
+                  />
+                  <input
+                    className="set-input"
+                    type="number"
+                    inputMode="decimal"
+                    placeholder="上限"
+                    value={item.limit}
+                    onChange={(event) => updateCustom(index, 'limit', event.target.value)}
+                  />
+                  <button
+                    className="set-btn set-btn--ghost"
+                    type="button"
+                    onClick={() => setCustomDraft((prev) => prev.filter((_, i) => i !== index))}
+                  >
+                    删除
+                  </button>
+                </div>
+              ))}
+              <div className="set-inline-actions">
+                <button
+                  className="set-btn"
+                  type="button"
+                  disabled={busy}
+                  onClick={() => setCustomDraft((prev) => [...prev, { label: '', used: '', unit: '', limit: '' }])}
+                >
+                  添加自定义指标
+                </button>
+                <button className="set-btn set-btn--primary" type="button" disabled={busy} onClick={saveSettings}>
+                  保存上限
+                </button>
+              </div>
+            </div>
+          </details>
           <details className="platform-usage__reconfigure">
             <summary>重新填写凭据</summary>
             <div className="platform-usage__wizard">

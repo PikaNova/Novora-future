@@ -167,3 +167,29 @@ export function forecastUsage(input: ForecastInput): ForecastResult {
     projectedExhaustDate: exhaustsWithinPeriod ? isoDate(input.now + daysLeft * DAY_MS) : null,
   };
 }
+
+/**
+ * 把「累计用量」采样点换算成「日均速度」序列。
+ *
+ * 平台自己给的日桶是每天的量，可以直接用；而我们自己记的历史是**累计值**（某个时刻
+ * 本周期已用多少），不能当成每日用量。相邻两次采样求差再除以相隔天数，才得到速度。
+ * 用量回落（周期重置）的点直接丢掉，否则一个巨大的负值会把中位数带偏。
+ */
+export function cumulativeToDailyRates(points: readonly ForecastPoint[]): ForecastPoint[] {
+  const sorted = points
+    .map((point) => ({ at: Date.parse(point.date), value: point.value }))
+    .filter((point) => Number.isFinite(point.at) && Number.isFinite(point.value))
+    .sort((a, b) => a.at - b.at);
+
+  const rates: ForecastPoint[] = [];
+  for (let index = 1; index < sorted.length; index += 1) {
+    const previous = sorted[index - 1];
+    const current = sorted[index];
+    const days = (current.at - previous.at) / DAY_MS;
+    if (!Number.isFinite(days) || days <= 0) continue;
+    const delta = current.value - previous.value;
+    if (delta < 0) continue;
+    rates.push({ date: new Date(current.at).toISOString(), value: delta / days });
+  }
+  return rates;
+}

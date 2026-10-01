@@ -23,6 +23,7 @@ import {
   handlePlatformUsage,
   handlePlatformUsageConfig,
   handlePlatformUsageRefresh,
+  handlePlatformUsageWorker,
 } from './_platformUsage/service.js';
 
 let cachedVersion: string | null = null;
@@ -56,6 +57,7 @@ const SYSTEM_ROUTES = [
   'platform-usage',
   'platform-usage-config',
   'platform-usage-refresh',
+  'platform-usage-worker',
 ] as const;
 
 function sysRoute(req: VercelRequest): string {
@@ -622,6 +624,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return handlePlatformUsageConfig(req, res);
     case 'platform-usage-refresh':
       return handlePlatformUsageRefresh(req, res);
+    case 'platform-usage-worker':
+      return handlePlatformUsageWorker(req, res);
     default:
       res.status(404).json({ ok: false, code: 'NOT_FOUND', error: 'Not found' });
   }

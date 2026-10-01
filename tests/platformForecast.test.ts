@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { forecastUsage, MIN_SAMPLE_DAYS, type ForecastPoint } from '../api/_platformUsage/forecast.js';
+import {
+  cumulativeToDailyRates,
+  forecastUsage,
+  MIN_SAMPLE_DAYS,
+  type ForecastPoint,
+} from '../api/_platformUsage/forecast.js';
 
 const NOW = Date.parse('2026-10-01T12:00:00Z');
 const DAY = 86_400_000;
@@ -141,4 +146,36 @@ test('没有周期信息时只给天数，不给「是否用尽」的结论', ()
   assert.equal(result.daysLeft, 10);
   assert.equal(result.daysToPeriodEnd, null);
   assert.equal(result.exhaustsWithinPeriod, null);
+});
+
+test('累计值换算成日均速度，周期重置造成的负增长被丢弃', () => {
+  const points = [
+    { date: '2026-09-28T00:00:00Z', value: 0 },
+    { date: '2026-09-29T00:00:00Z', value: 10 },
+    { date: '2026-09-30T00:00:00Z', value: 30 },
+    // 周期重置：用量回落，这一步不能当成「负速度」参与中位数。
+    { date: '2026-10-01T00:00:00Z', value: 5 },
+  ];
+  assert.deepEqual(cumulativeToDailyRates(points), [
+    { date: '2026-09-29T00:00:00.000Z', value: 10 },
+    { date: '2026-09-30T00:00:00.000Z', value: 20 },
+  ]);
+});
+
+test('累计值样本不足或乱序时也不出错', () => {
+  assert.deepEqual(cumulativeToDailyRates([]), []);
+  assert.deepEqual(cumulativeToDailyRates([{ date: '2026-09-30T00:00:00Z', value: 5 }]), []);
+  // 乱序输入先按时间排好再求差。
+  assert.deepEqual(
+    cumulativeToDailyRates([
+      { date: '2026-09-30T00:00:00Z', value: 30 },
+      { date: '2026-09-29T00:00:00Z', value: 10 },
+      { date: '2026-09-28T00:00:00Z', value: 0 },
+      { date: 'not-a-date', value: 99 },
+    ]),
+    [
+      { date: '2026-09-29T00:00:00.000Z', value: 10 },
+      { date: '2026-09-30T00:00:00.000Z', value: 20 },
+    ],
+  );
 });

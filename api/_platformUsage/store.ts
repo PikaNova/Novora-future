@@ -10,6 +10,10 @@ import {
   type PlatformProviderId,
   type PlatformStatus,
 } from './types.js';
+import type { ForecastPoint } from './forecast.js';
+
+/** 历史采样保留 90 天：够看趋势，又不至于把表撑大。 */
+export const HISTORY_RETENTION_MS = 90 * 86_400_000;
 
 export type StoredPlatformConfig = {
   /** 字段名 → 密文（`v1.iv.tag.ct`）。 */
@@ -55,6 +59,20 @@ export function ensurePlatformUsageTables(): Promise<void> {
         )
       `;
       await sql`ALTER TABLE platform_usage_config ADD COLUMN IF NOT EXISTS extra JSONB NOT NULL DEFAULT '{}'`;
+      // 我们自己记的采样：平台不给序列的指标（Neon 存储）只能靠它算趋势。
+      await sql`
+        CREATE TABLE IF NOT EXISTS platform_usage_history (
+          provider TEXT NOT NULL,
+          metric_key TEXT NOT NULL,
+          observed_at BIGINT NOT NULL,
+          used DOUBLE PRECISION NOT NULL,
+          PRIMARY KEY (provider, metric_key, observed_at)
+        )
+      `;
+      await sql`
+        CREATE INDEX IF NOT EXISTS idx_platform_usage_history_recent
+        ON platform_usage_history (provider, observed_at DESC)
+      `;
       await sql`
         CREATE TABLE IF NOT EXISTS platform_usage_snapshots (
           provider TEXT PRIMARY KEY,
@@ -194,6 +212,52 @@ export async function writePlatformConfig(
 export async function clearPlatformConfig(provider: PlatformProviderId): Promise<void> {
   await ensurePlatformUsageTables();
   await authSql()`DELETE FROM platform_usage_config WHERE provider=${provider}`;
+}
+
+/** 记录一次读数（累计值）。同一时刻重复写就覆盖，避免重复刷新堆出重复点。 */
+export async function recordUsageHistory(
+  provider: PlatformProviderId,
+  points: Array<{ metricKey: string; used: number }>,
+  now: number,
+): Promise<void> {
+  const valid = points.filter((point) => point.metricKey && Number.isFinite(point.used));
+  if (!valid.length) return;
+  await ensurePlatformUsageTables();
+  const sql = authSql();
+  await sql.transaction((tx) =>
+    valid.map(
+      (point) =>
+        tx`INSERT INTO platform_usage_history (provider, metric_key, observed_at, used)
+           VALUES (${provider}, ${point.metricKey}, ${now}, ${point.used})
+           ON CONFLICT (provider, metric_key, observed_at) DO UPDATE SET used = EXCLUDED.used`,
+    ),
+  );
+  // 顺手清掉过期点：一次删除比定时任务简单，也不会让表无限增长。
+  await sql`DELETE FROM platform_usage_history WHERE provider=${provider} AND observed_at < ${now - HISTORY_RETENTION_MS}`;
+}
+
+/** 读回某个平台的全部历史采样，按指标分组。 */
+export async function readUsageHistory(
+  provider: PlatformProviderId,
+  sinceMs: number,
+): Promise<Record<string, ForecastPoint[]>> {
+  await ensurePlatformUsageTables();
+  const rows = await authSql()`
+    SELECT metric_key, observed_at, used FROM platform_usage_history
+    WHERE provider=${provider} AND observed_at >= ${sinceMs}
+    ORDER BY observed_at ASC
+  `;
+  const grouped: Record<string, ForecastPoint[]> = {};
+  for (const row of rows) {
+    const key = typeof row.metric_key === 'string' ? row.metric_key : '';
+    const at = toNumber(row.observed_at);
+    const used = toNumber(row.used);
+    if (!key || at == null || used == null) continue;
+    const list = grouped[key] ?? [];
+    list.push({ date: new Date(at).toISOString(), value: used });
+    grouped[key] = list;
+  }
+  return grouped;
 }
 
 export async function readPlatformSnapshot(provider: PlatformProviderId): Promise<StoredPlatformSnapshot | null> {

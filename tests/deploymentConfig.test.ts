@@ -35,6 +35,7 @@ test('merged api entries keep their legacy urls working', async () => {
     '/api/platform-usage',
     '/api/platform-usage-config',
     '/api/platform-usage-refresh',
+    '/api/platform-usage-worker',
   ]) {
     assert.ok(rewrites.has(legacy), `缺少 ${legacy} 的 rewrite`);
   }
@@ -52,6 +53,7 @@ test('merged api entries keep their legacy urls working', async () => {
     ['platform-usage', 'system'],
     ['platform-usage-config', 'system'],
     ['platform-usage-refresh', 'system'],
+    ['platform-usage-worker', 'system'],
   ]) {
     assert.match(routes, new RegExp(`['"]?${name}['"]?:\\s*'${module}'`), `${name} 应映射到 ${module}`);
   }
@@ -83,6 +85,16 @@ test('deployment config supplies security and PWA revalidation headers', async (
       'public, max-age=0, must-revalidate',
     );
   }
+});
+
+test('平台用量采样挂在每天一次的 cron 上', async () => {
+  const config = JSON.parse(await readFile('vercel.json', 'utf8')) as {
+    crons?: Array<{ path: string; schedule: string }>;
+  };
+  const cron = config.crons?.find((entry) => entry.path === '/api/platform-usage-worker');
+  assert.ok(cron, '缺少平台用量采样的 cron 条目');
+  // Hobby 只允许每天一次；写成更频繁会在部署阶段被拒。
+  assert.equal(cron?.schedule, '0 1 * * *');
 });
 
 test('service worker uses the current shell cache and removes stale Novora caches', async () => {

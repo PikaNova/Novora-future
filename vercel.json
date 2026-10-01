@@ -113,12 +113,22 @@
       "destination": "/api/system?sys=platform-usage-refresh"
     },
     {
+      "source": "/api/platform-usage-worker",
+      "destination": "/api/system?sys=platform-usage-worker"
+    },
+    {
       "source": "/api/:path*",
       "destination": "/api/:path*"
     },
     {
       "source": "/(.*)",
       "destination": "/index.html"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/platform-usage-worker",
+      "schedule": "0 1 * * *"
     }
   ]
 }

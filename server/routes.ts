@@ -19,6 +19,7 @@ const MODULE_FOR_NAME: Record<string, string> = {
   'platform-usage': 'system',
   'platform-usage-config': 'system',
   'platform-usage-refresh': 'system',
+  'platform-usage-worker': 'system',
   redeploy: 'system',
   status: 'system',
   system: 'system',

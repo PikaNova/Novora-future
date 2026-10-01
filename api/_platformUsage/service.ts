@@ -9,14 +9,17 @@ import { authSql, requireActor } from '../_auth.js';
 import { sendDatabaseError } from '../_apiError.js';
 import { decryptSecret, encryptSecret, secretHint } from './crypto.js';
 import { detectPlatformEnvironment, type PlatformEnvironment } from './environment.js';
-import { forecastUsage, type ForecastPoint } from './forecast.js';
+import { cumulativeToDailyRates, forecastUsage, type ForecastPoint } from './forecast.js';
 import { collectNeonUsage, NEON_FREE_LIMITS } from './neon.js';
 import {
   clearPlatformConfig,
   encryptionSecret,
   ensurePlatformUsageTables,
+  HISTORY_RETENTION_MS,
   readPlatformConfig,
   readPlatformSnapshot,
+  readUsageHistory,
+  recordUsageHistory,
   writePlatformConfig,
   writePlatformSnapshot,
   type StoredPlatformConfig,
@@ -197,11 +200,15 @@ function decorateMetrics(
   config: StoredPlatformConfig | null,
   snapshot: StoredPlatformSnapshot | null,
   now: number,
+  history: Record<string, ForecastPoint[]>,
 ): PlatformMetric[] {
   const defaults = DEFAULT_LIMITS[provider];
   const overrides = config?.limits ?? {};
   const decorated: PlatformMetric[] = metrics.map((metric) => {
     const limit = overrides[metric.key] ?? defaults[metric.key] ?? metric.limit ?? null;
+    // 平台自己给的日桶可以直接用；没有的话退回我们自己记的采样——
+    // 那是累计值，必须先换算成日均速度。
+    const series = metric.series?.length ? metric.series : cumulativeToDailyRates(history[metric.key] ?? []);
     return {
       key: metric.key,
       label: metric.label,
@@ -213,7 +220,7 @@ function decorateMetrics(
       forecast: forecastUsage({
         used: metric.used,
         limit,
-        series: metric.series,
+        series,
         periodStart: snapshot?.periodStart ?? null,
         periodEnd: snapshot?.periodEnd ?? null,
         now,
@@ -288,8 +295,9 @@ async function buildProviderView(provider: PlatformProviderId, enabled: boolean)
   const configured = Boolean(stored && Object.keys(stored.fields).length > 0);
   const now = Date.now();
   const base = configured && snapshot ? toSnapshot(provider, snapshot) : null;
+  const history = configured ? await readUsageHistory(provider, now - HISTORY_RETENTION_MS) : {};
   // 上限与预测都在视图层套用：改上限能立刻反映到天数上，不必等下一次刷新。
-  const decorated = base ? decorateMetrics(provider, base.metrics, stored, snapshot, now) : null;
+  const decorated = base ? decorateMetrics(provider, base.metrics, stored, snapshot, now, history) : null;
   const view =
     base && decorated
       ? {
@@ -567,38 +575,108 @@ export async function handlePlatformUsageRefresh(req: VercelRequest, res: Vercel
       return;
     }
 
-    const secret = await encryptionSecret();
-    const plain = (key: string): string | null => {
-      const encrypted = stored.fields[key];
-      if (!encrypted) return null;
-      return decryptSecret(encrypted, secret);
-    };
-
-    let snapshot: PlatformProviderSnapshot;
-    if (provider === 'vercel') {
-      const token = plain('token');
-      if (!token) {
-        res.status(400).json({ ok: false, code: 'CREDENTIAL_UNREADABLE', error: 'Vercel Token 无法解密，请重新填写' });
-        return;
-      }
-      snapshot = await collectVercelUsage({ token, teamId: plain('teamId') ?? undefined, now });
-    } else {
-      const apiKey = plain('apiKey');
-      if (!apiKey) {
-        res.status(400).json({ ok: false, code: 'CREDENTIAL_UNREADABLE', error: 'Neon API Key 无法解密，请重新填写' });
-        return;
-      }
-      snapshot = await collectNeonUsage({
-        apiKey,
-        organizationId: plain('organizationId') ?? undefined,
-        projectId: plain('projectId') ?? undefined,
-        selfMeasuredStorageBytes: await selfMeasuredDatabaseBytes(),
-        now,
-      });
+    const outcome = await refreshProvider(provider, now);
+    if (isRefreshFailure(outcome)) {
+      res.status(outcome.status).json({ ok: false, code: outcome.code, error: outcome.message });
+      return;
     }
-
-    await writePlatformSnapshot(provider, mergeWithPrevious(snapshot, previous));
     res.json(await buildPlatformUsagePayload());
+  } catch (error) {
+    sendDatabaseError(req, res, error, 'write');
+  }
+}
+
+type RefreshFailure = { ok: false; status: number; code: string; message: string };
+type RefreshOutcome = { ok: true } | RefreshFailure;
+
+/** 本仓库 api 的 tsconfig 未开 strictNullChecks，布尔判别联合要靠显式谓词收窄。 */
+function isRefreshFailure(outcome: RefreshOutcome): outcome is RefreshFailure {
+  return outcome.ok === false;
+}
+
+/**
+ * 真正拉一次外部读数并落库的共用逻辑：手动刷新与定时采样走同一条路径，
+ * 因此定时采样同样受 60 秒冷却约束，不会因为被反复调用而烧掉免费额度。
+ */
+async function refreshProvider(provider: PlatformProviderId, now: number): Promise<RefreshOutcome> {
+  const stored = await readPlatformConfig(provider);
+  if (!stored || !Object.keys(stored.fields).length) {
+    return { ok: false, status: 400, code: 'NOT_CONFIGURED', message: '请先完成平台凭据设置' };
+  }
+
+  const previous = await readPlatformSnapshot(provider);
+  if (previous && remainingCooldownSeconds(previous.updatedAt, now) > 0) {
+    return { ok: false, status: 429, code: 'REFRESH_TOO_SOON', message: '刷新过于频繁，请稍后再试' };
+  }
+
+  const secret = await encryptionSecret();
+  const plain = (key: string): string | null => {
+    const encrypted = stored.fields[key];
+    if (!encrypted) return null;
+    return decryptSecret(encrypted, secret);
+  };
+
+  let snapshot: PlatformProviderSnapshot;
+  if (provider === 'vercel') {
+    const token = plain('token');
+    if (!token) {
+      return { ok: false, status: 400, code: 'CREDENTIAL_UNREADABLE', message: 'Vercel Token 无法解密，请重新填写' };
+    }
+    snapshot = await collectVercelUsage({ token, teamId: plain('teamId') ?? undefined, now });
+  } else {
+    const apiKey = plain('apiKey');
+    if (!apiKey) {
+      return { ok: false, status: 400, code: 'CREDENTIAL_UNREADABLE', message: 'Neon API Key 无法解密，请重新填写' };
+    }
+    snapshot = await collectNeonUsage({
+      apiKey,
+      organizationId: plain('organizationId') ?? undefined,
+      projectId: plain('projectId') ?? undefined,
+      selfMeasuredStorageBytes: await selfMeasuredDatabaseBytes(),
+      now,
+    });
+  }
+
+  await writePlatformSnapshot(provider, mergeWithPrevious(snapshot, previous));
+  // 记一次历史：平台不给序列的指标（Neon 存储）靠它算趋势。
+  await recordUsageHistory(
+    provider,
+    snapshot.metrics.map((metric) => ({ metricKey: metric.key, used: metric.used })),
+    now,
+  );
+  return { ok: true };
+}
+
+/** 定时采样入口（Vercel Cron 每天调一次）。只读外部接口，写入的是我们自己两张表。 */
+export async function handlePlatformUsageWorker(req: VercelRequest, res: VercelResponse): Promise<void> {
+  if (req.method !== 'GET') {
+    res.status(405).json({ ok: false, code: 'METHOD_NOT_ALLOWED', error: 'Method not allowed' });
+    return;
+  }
+  const secret = (process.env.PLATFORM_USAGE_WORKER_SECRET ?? '').trim();
+  if (secret) {
+    const bearer = String(req.headers.authorization ?? '')
+      .replace(/^Bearer\s+/i, '')
+      .trim();
+    const header = String(req.headers['x-cron-secret'] ?? '').trim();
+    if (bearer !== secret && header !== secret) {
+      res.status(401).json({ ok: false, code: 'WORKER_UNAUTHORIZED', error: '采样 worker 密钥不正确' });
+      return;
+    }
+  }
+
+  try {
+    const environment = detectPlatformEnvironment();
+    const now = Date.now();
+    const refreshed: string[] = [];
+    const skipped: Array<{ provider: string; reason: string }> = [];
+    for (const provider of ['vercel', 'neon'] as const) {
+      if (!providerEnabled(environment, provider)) continue;
+      const outcome = await refreshProvider(provider, now);
+      if (outcome.ok) refreshed.push(provider);
+      else if (isRefreshFailure(outcome)) skipped.push({ provider, reason: outcome.code });
+    }
+    res.json({ ok: true, refreshed, skipped });
   } catch (error) {
     sendDatabaseError(req, res, error, 'write');
   }

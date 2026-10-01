@@ -16,9 +16,14 @@ import SettingsCollapsibleCard from './SettingsCollapsibleCard';
 
 function formatNumber(value: number): string {
   if (!Number.isFinite(value)) return '—';
-  if (Math.abs(value) >= 100) return value.toFixed(0);
-  if (Math.abs(value) >= 10) return value.toFixed(1);
-  return value.toFixed(2);
+  const abs = Math.abs(value);
+  if (abs === 0) return '0';
+  if (abs >= 100) return value.toFixed(0);
+  if (abs >= 10) return value.toFixed(1);
+  if (abs >= 0.01) return value.toFixed(2);
+  if (abs >= 0.0001) return value.toFixed(4);
+  // 日均小到这种程度时，定点小数会显示成 0，反而看不出差别。
+  return value.toExponential(1);
 }
 
 function formatMetric(metric: PlatformMetric): string {
@@ -63,6 +68,10 @@ function forecastText(metric: PlatformMetric): string | null {
   }
   if (forecast.exhaustsWithinPeriod === false) {
     return `按 ${rate}${shake}${basis}，本周期不会用尽`;
+  }
+  // 没有周期信息时才会走到这里；天数大到没有意义就别说具体数字。
+  if (forecast.daysLeft != null && forecast.daysLeft > 365) {
+    return `按 ${rate}${shake}${basis}，一年内不会用尽`;
   }
   return `按 ${rate}${shake}${basis}，约还能撑 ${forecast.daysLeft} 天`;
 }

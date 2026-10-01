@@ -32,6 +32,9 @@ test('merged api entries keep their legacy urls working', async () => {
     '/api/redeploy',
     '/api/error-report',
     '/api/announcement-images',
+    '/api/platform-usage',
+    '/api/platform-usage-config',
+    '/api/platform-usage-refresh',
   ]) {
     assert.ok(rewrites.has(legacy), `缺少 ${legacy} 的 rewrite`);
   }
@@ -46,6 +49,9 @@ test('merged api entries keep their legacy urls working', async () => {
     ['redeploy', 'system'],
     ['announcement-images', 'announcements'],
     ['error-report', 'telemetry'],
+    ['platform-usage', 'system'],
+    ['platform-usage-config', 'system'],
+    ['platform-usage-refresh', 'system'],
   ]) {
     assert.match(routes, new RegExp(`['"]?${name}['"]?:\\s*'${module}'`), `${name} 应映射到 ${module}`);
   }

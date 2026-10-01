@@ -439,80 +439,121 @@ export default function CurrentExamPanel({
         </p>
       )}
 
-      <section className="exam-now__hero" aria-label="正在进行或即将开始的考试">
-        {view.running.length > 0 ? (
-          <>
-            {view.running.length > 1 && <p className="exam-now__concurrent">同时进行 {view.running.length} 场考试</p>}
-            <div className={`exam-now__grid${view.running.length > 1 ? ' is-multi' : ''}`}>
-              {view.running.map((session) => (
-                <SessionCard
-                  key={session.key}
-                  session={session}
-                  now={now}
-                  dayKey={dayKey}
-                  variant={view.running.length > 1 ? 'compact' : 'hero'}
-                />
+      <section className="exam-now__board" aria-label="当前考试态势">
+        <div className="exam-now__hero" aria-label="正在进行或即将开始的考试">
+          {view.running.length > 0 ? (
+            <>
+              {view.running.length > 1 && <p className="exam-now__concurrent">同时进行 {view.running.length} 场考试</p>}
+              <div className={`exam-now__grid${view.running.length > 1 ? ' is-multi' : ''}`}>
+                {view.running.map((session) => (
+                  <SessionCard
+                    key={session.key}
+                    session={session}
+                    now={now}
+                    dayKey={dayKey}
+                    variant={view.running.length > 1 ? 'compact' : 'hero'}
+                  />
+                ))}
+              </div>
+            </>
+          ) : view.overdue.length > 0 ? (
+            <>
+              {view.overdue.map((session) => (
+                <article key={session.key} className="exam-now-card is-hero is-overdue">
+                  <header>
+                    <span className="exam-now-pill is-overdue">{EXAM_SESSION_STATUS_LABELS.overdue}</span>
+                    <span className="exam-now-card__kind">{EXAM_SESSION_KIND_LABELS[session.kind]}</span>
+                  </header>
+                  <p className="exam-now-card__exam">{session.examName}</p>
+                  <h2>{session.subject}</h2>
+                  <p className="exam-now-card__hint">
+                    计划结束时间 {formatClockHm(session.effectiveEndAt)}{' '}
+                    已过，但考试仍未结束。请到「考试安排」结束或延长。
+                  </p>
+                  <p className="exam-now-card__elapsed">已超时 {formatCountdown(now - session.effectiveEndAt)}</p>
+                  <SessionFacts session={session} now={now} dayKey={dayKey} />
+                </article>
               ))}
+            </>
+          ) : headline?.status === 'ended' ? (
+            <article className="exam-now-card is-hero is-ended">
+              <header>
+                <span className="exam-now-pill is-ended">考试已结束</span>
+                <span className="exam-now-card__kind">{EXAM_SESSION_KIND_LABELS[headline.kind]}</span>
+              </header>
+              <p className="exam-now-card__exam">{headline.examName}</p>
+              <h2>{headline.subject}</h2>
+              <p className="exam-now-card__time">
+                {formatClockHm(headline.startAt)} — {formatClockHm(headline.effectiveEndAt)}
+              </p>
+              <p className="exam-now-card__hint">
+                {view.upcoming[0]
+                  ? `下一场：${view.upcoming[0].subject} · ${formatRelativeDay(view.upcoming[0].startAt, dayKey)} ${formatClockHm(view.upcoming[0].startAt)}`
+                  : '今天已没有后续考试安排。'}
+              </p>
+            </article>
+          ) : view.upcoming.length > 0 ? (
+            <article className="exam-now-card is-hero is-upcoming">
+              <span className="exam-now__section-label">下一场考试</span>
+              <p className="exam-now-card__exam">{view.upcoming[0].examName}</p>
+              <h2>{view.upcoming[0].subject}</h2>
+              <p className="exam-now-card__countdown">{formatCountdown(view.upcoming[0].startAt - now)}</p>
+              <p className="exam-now-card__countdown-label">
+                距离开始 · {formatRelativeDay(view.upcoming[0].startAt, dayKey)}{' '}
+                {formatClockHm(view.upcoming[0].startAt)}
+              </p>
+              <SessionFacts session={view.upcoming[0]} now={now} dayKey={dayKey} />
+            </article>
+          ) : (
+            <article className="exam-now-card is-hero is-empty">
+              <ClipboardList size={34} aria-hidden="true" />
+              <h2>当前无考试</h2>
+              <p className="exam-now-card__hint">
+                {view.hasAnyExamToday
+                  ? '今天的考试都已结束，未来一周也没有排期。'
+                  : '今天没有安排考试，未来一周也没有排期，可在「考试安排」新建。'}
+              </p>
+            </article>
+          )}
+        </div>
+
+        <aside className="exam-now__next-panel" aria-label="下一场考试队列">
+          <div className="exam-now__next-head">
+            <div>
+              <span className="exam-now__section-label">NEXT EXAMS</span>
+              <h2>下一场考试</h2>
             </div>
-          </>
-        ) : view.overdue.length > 0 ? (
-          <>
-            {view.overdue.map((session) => (
-              <article key={session.key} className="exam-now-card is-hero is-overdue">
-                <header>
-                  <span className="exam-now-pill is-overdue">{EXAM_SESSION_STATUS_LABELS.overdue}</span>
-                  <span className="exam-now-card__kind">{EXAM_SESSION_KIND_LABELS[session.kind]}</span>
-                </header>
-                <p className="exam-now-card__exam">{session.examName}</p>
-                <h2>{session.subject}</h2>
-                <p className="exam-now-card__hint">
-                  计划结束时间 {formatClockHm(session.effectiveEndAt)}{' '}
-                  已过，但考试仍未结束。请到「考试安排」结束或延长。
-                </p>
-                <p className="exam-now-card__elapsed">已超时 {formatCountdown(now - session.effectiveEndAt)}</p>
-                <SessionFacts session={session} now={now} dayKey={dayKey} />
-              </article>
-            ))}
-          </>
-        ) : headline?.status === 'ended' ? (
-          <article className="exam-now-card is-hero is-ended">
-            <header>
-              <span className="exam-now-pill is-ended">考试已结束</span>
-              <span className="exam-now-card__kind">{EXAM_SESSION_KIND_LABELS[headline.kind]}</span>
-            </header>
-            <p className="exam-now-card__exam">{headline.examName}</p>
-            <h2>{headline.subject}</h2>
-            <p className="exam-now-card__time">
-              {formatClockHm(headline.startAt)} — {formatClockHm(headline.effectiveEndAt)}
-            </p>
-            <p className="exam-now-card__hint">
-              {view.upcoming[0]
-                ? `下一场：${view.upcoming[0].subject} · ${formatRelativeDay(view.upcoming[0].startAt, dayKey)} ${formatClockHm(view.upcoming[0].startAt)}`
-                : '今天已没有后续考试安排。'}
-            </p>
-          </article>
-        ) : view.upcoming.length > 0 ? (
-          <article className="exam-now-card is-hero is-upcoming">
-            <span className="exam-now__section-label">下一场考试</span>
-            <p className="exam-now-card__exam">{view.upcoming[0].examName}</p>
-            <h2>{view.upcoming[0].subject}</h2>
-            <p className="exam-now-card__countdown">{formatCountdown(view.upcoming[0].startAt - now)}</p>
-            <p className="exam-now-card__countdown-label">
-              距离开始 · {formatRelativeDay(view.upcoming[0].startAt, dayKey)} {formatClockHm(view.upcoming[0].startAt)}
-            </p>
-            <SessionFacts session={view.upcoming[0]} now={now} dayKey={dayKey} />
-          </article>
-        ) : (
-          <article className="exam-now-card is-hero is-empty">
-            <ClipboardList size={34} aria-hidden="true" />
-            <h2>当前无考试</h2>
-            <p className="exam-now-card__hint">
-              {view.hasAnyExamToday
-                ? '今天的考试都已结束，未来一周也没有排期。'
-                : '今天没有安排考试，未来一周也没有排期，可在「考试安排」新建。'}
-            </p>
-          </article>
-        )}
+            <span className="exam-now__next-count">{view.upcoming.length} 场</span>
+          </div>
+          {view.upcoming.length > 0 ? (
+            <ol className="exam-now__next-queue">
+              {view.upcoming.slice(0, 4).map((session, index) => (
+                <li key={session.key} className={index === 0 ? 'is-next' : undefined}>
+                  <span className="exam-now__queue-index">{String(index + 1).padStart(2, '0')}</span>
+                  <div className="exam-now__queue-main">
+                    <strong>{session.subject}</strong>
+                    <span>{session.examName}</span>
+                  </div>
+                  <div className="exam-now__queue-time">
+                    <strong>{formatClockHm(session.startAt)}</strong>
+                    <span>{formatRelativeDay(session.startAt, dayKey)}</span>
+                  </div>
+                  <em>还有 {formatShortCountdown(session.startAt - now)}</em>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <div className="exam-now__next-empty">
+              <CalendarClock size={24} aria-hidden="true" />
+              <strong>暂无后续考试</strong>
+              <span>未来一周没有排期</span>
+            </div>
+          )}
+          <div className="exam-now__next-summary">
+            <span>今日已完成</span>
+            <strong>{view.previous ? '至少 1 场' : '暂无'}</strong>
+          </div>
+        </aside>
       </section>
 
       <section className="exam-now__timeline" aria-label="上一场、当前与下一场">
@@ -578,11 +619,9 @@ export default function CurrentExamPanel({
           <button
             type="button"
             className="admin-btn admin-btn--ghost"
-             disabled={
-               !headline ||
-               headline.kind === 'weekly' ||
-               (!canEdit && !(canEditQuick && headline.kind === 'temporary'))
-             }
+            disabled={
+              !headline || headline.kind === 'weekly' || (!canEdit && !(canEditQuick && headline.kind === 'temporary'))
+            }
             onClick={() => headline && onEditExam(headline.sourceId, headline.examName)}
           >
             <Pencil size={16} aria-hidden="true" />
@@ -618,9 +657,9 @@ export default function CurrentExamPanel({
               : `客户端 ${devices.online}/${devices.total} 在线${devices.inExam ? ` · ${devices.inExam} 台考试中` : ''}${
                   devicesStale ? ' · 可能滞后' : ''
                 }`
-             : canReadDevices
-               ? '客户端状态读取失败'
-               : '当前账号没有查看设备的权限'}
+            : canReadDevices
+              ? '客户端状态读取失败'
+              : '当前账号没有查看设备的权限'}
         </span>
         <span className="exam-now-status">
           最后同步 {lastSyncLabel}

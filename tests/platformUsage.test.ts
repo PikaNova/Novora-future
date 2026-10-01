@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { decryptSecret, encryptSecret, secretHint } from '../api/_platformUsage/crypto.js';
 import { detectPlatformEnvironment, isNeonConnectionString } from '../api/_platformUsage/environment.js';
-import { NEON_FREE_LIMITS } from '../api/_platformUsage/neon.js';
+import { collectNeonUsage, NEON_FREE_LIMITS, neonDeclarativeMetrics } from '../api/_platformUsage/neon.js';
 import { remainingCooldownSeconds, statusFromMetrics, type PlatformMetric } from '../api/_platformUsage/types.js';
 import {
   buildVercelMetrics,
@@ -82,6 +82,14 @@ test('Neon 免费额度常量与官方文档一致', () => {
   assert.equal(NEON_FREE_LIMITS.computeCuHours, 100);
   assert.equal(NEON_FREE_LIMITS.storageBytes, 500_000_000);
   assert.equal(NEON_FREE_LIMITS.transferBytes, 5_000_000_000);
+  assert.deepEqual(
+    neonDeclarativeMetrics().map((metric) => [metric.key, metric.limit, metric.unit, metric.percent]),
+    [
+      ['storage', 0.5, 'GB', null],
+      ['compute', 100, 'CU-hrs', null],
+      ['egress', 5, 'GB', null],
+    ],
+  );
 });
 
 test('读数状态阈值: 80% 警告、95% 严重、100% 超限', () => {
@@ -301,4 +309,70 @@ test('Vercel 失败态: 403 凭据问题、400 带出平台原话、空列表与
   );
   assert.equal(unknown.result.status, 'error');
   assert.match(unknown.result.message, /rows/);
+});
+
+/** Neon 侧的分路响应：按路径返回组织、项目列表、项目详情与分支。 */
+function neonRouter(routes: { orgs?: unknown; projects?: unknown; detail?: unknown; branches?: unknown }) {
+  return (url: string) => {
+    const parsed = new URL(url);
+    const target = parsed.pathname + parsed.search;
+    if (target.includes('/users/me/organizations')) {
+      return { status: 200, body: { organizations: routes.orgs ?? [] } };
+    }
+    if (target.includes('/projects?')) return { status: 200, body: { projects: routes.projects ?? [] } };
+    if (target.includes('/branches')) return { status: 200, body: { branches: routes.branches ?? [] } };
+    return { status: 200, body: { project: routes.detail ?? {} } };
+  };
+}
+
+test('Neon 多组织: 报错时直接把候选组织列出来，而不是只说「请指定」', async () => {
+  const { result } = await withStubbedFetch(
+    neonRouter({
+      orgs: [
+        { id: 'org-gentle-sun-57375728', name: "Vercel: jinzhiyuan0327's projects", plan: 'free' },
+        { id: 'org-super-dream-44126879', name: 'jinzhiyuan0327@163.com', plan: 'free' },
+      ],
+    }),
+    () => collectNeonUsage({ apiKey: 'k' }),
+  );
+  assert.equal(result.status, 'error');
+  assert.match(result.message, /org-gentle-sun-57375728/);
+  assert.match(result.message, /org-super-dream-44126879/);
+  assert.match(result.message, /请在设置里填写组织 ID/);
+});
+
+test('Neon 免费版: 只报能读到的存储，Compute 与流量不摆 0 出来', async () => {
+  const { result } = await withStubbedFetch(
+    neonRouter({
+      orgs: [{ id: 'org-super-dream-44126879', name: 'jinzhiyuan0327@163.com', plan: 'free' }],
+      projects: [{ id: 'shy-wave-87367033', name: 'novora-future' }],
+      detail: {
+        name: 'novora-future',
+        consumption_period_start: '2026-10-01T00:00:00Z',
+        consumption_period_end: '2026-11-01T00:00:00Z',
+        // 免费版实测：这些恒为 0。
+        compute_time_seconds: 0,
+        data_transfer_bytes: 0,
+        synthetic_storage_size: 33_480_704,
+      },
+      branches: [{ id: 'br-1', name: 'production', logical_size: 33_480_704 }],
+    }),
+    () => collectNeonUsage({ apiKey: 'k', now: Date.parse('2026-10-01T12:00:00Z') }),
+  );
+
+  assert.equal(result.status, 'ok');
+  assert.deepEqual(result.metrics, [
+    {
+      key: 'storage',
+      label: 'Storage（分支逻辑大小）',
+      used: 0.033,
+      limit: 0.5,
+      unit: 'GB',
+      percent: 6.6,
+      note: '项目：novora-future',
+    },
+  ]);
+  assert.match(result.message, /恒为 0/);
+  assert.equal(result.periodStart, '2026-10-01T00:00:00Z');
+  assert.equal(result.consoleUrl, 'https://console.neon.tech/app/projects/shy-wave-87367033');
 });

@@ -1,17 +1,17 @@
 // Neon 免费计划额度适配器。
 //
-// 事实边界（已核对官方文档）：
-// - `consumption_history/v2/projects` 这类按时间粒度的历史接口只对付费计划开放，
-//   这里完全不使用；
-// - `GET /projects/{project_id}` 的响应里带当前计费周期的用量字段
-//   （active_time_seconds / compute_time_seconds / written_data_bytes /
-//   data_transfer_bytes / consumption_period_start / consumption_period_end），
-//   官方没有标注计划限制，这是唯一可能读到当期用量的官方路径。
+// 2026-10-01 用真实免费账号实测（5 个项目交叉验证）之后的事实边界：
 //
-// 但官方也没有承诺免费计划一定填充这些字段。因此本适配器的定位是「尽力而为」：
-// 读到了就展示，读不到（报错或全为 0）就退回「只显示官方额度 + 控制台入口」，
-// 绝不用估算值冒充真实读数。存储这一项另有来自我们自己数据库的自测值兜底。
-import { statusFromMetrics, type PlatformMetric, type PlatformProviderSnapshot } from './types.js';
+//   - `consumption_history/*` 按时间粒度的历史接口只对付费计划开放，这里完全不用。
+//   - `GET /projects/{project_id}` 虽然文档里带 consumption 字段，但免费账号下
+//     `active_time_seconds` / `compute_time_seconds` / `written_data_bytes` /
+//     `data_transfer_bytes` / `data_storage_bytes_hour` / `cpu_used_sec` **全部恒为 0**，
+//     且 `quota` 为 null。所以 Compute 与公网传输在免费版读不出来。
+//   - 唯一有真实值的是存储：`synthetic_storage_size` 以及各分支的 `logical_size`。
+//
+// 因此这里的策略是：只报能读到的（存储），读不到的指标不摆一个 0 出来充数，
+// 而是在提示里说明「免费版读不到，请到控制台看」。
+import type { PlatformMetric, PlatformProviderSnapshot } from './types.js';
 
 const API_BASE = 'https://console.neon.tech/api/v2';
 const CONSOLE_BASE = 'https://console.neon.tech/app/projects';
@@ -27,8 +27,6 @@ export const NEON_FREE_LIMITS = {
 /** 单次刷新最多检查的项目数，避免把免费版的请求额度吃光。 */
 const MAX_PROJECTS = 5;
 
-/** 失败分支。用显式类型谓词收窄：本仓库 api 的 tsconfig 未开 strictNullChecks，
- *  仅靠 `ok: true/false` 字面量判别时编译器不保证收窄。 */
 type Failure = { ok: false; status: number; message: string };
 type NeonResponse<T> = { ok: true; data: T } | Failure;
 type OrganizationResult = { ok: true; id: string } | Failure;
@@ -73,12 +71,65 @@ function numeric(value: unknown): number | null {
   return null;
 }
 
+function toIso(value: unknown): string | null {
+  return typeof value === 'string' && value ? value : null;
+}
+
+type OrganizationOption = { id: string; name: string; plan: string };
+
+function organizationOptions(value: unknown): OrganizationOption[] {
+  const list = Array.isArray(value) ? value : [];
+  const options: OrganizationOption[] = [];
+  for (const item of list) {
+    const record = asRecord(item);
+    if (typeof record.id !== 'string' || !record.id) continue;
+    options.push({
+      id: record.id,
+      name: typeof record.name === 'string' && record.name ? record.name : record.id,
+      plan: typeof record.plan === 'string' ? record.plan : '',
+    });
+  }
+  return options;
+}
+
+/**
+ * 从 Key 可访问的组织里挑一个。
+ *
+ * 有多个组织时**把候选列在报错信息里**——「请在设置里指定组织 ID」而不告诉用户有哪些 ID，
+ * 等于把找 ID 的活儿又推回给用户，而这正是最容易卡住的一步。
+ */
+function pickOrganization(options: OrganizationOption[]): OrganizationResult {
+  if (options.length === 1) return { ok: true, id: options[0].id };
+  if (!options.length) return { ok: false, status: 0, message: '该 API Key 下没有可访问的 Neon 组织。' };
+  const listed = options
+    .slice(0, 6)
+    .map((option) => `${option.name}（${option.id}${option.plan ? `, ${option.plan}` : ''}）`)
+    .join('、');
+  return {
+    ok: false,
+    status: 0,
+    message: `该 API Key 可访问 ${options.length} 个组织，请在设置里填写组织 ID。可选：${listed}`,
+  };
+}
+
+async function resolveOrganization(apiKey: string, configured?: string): Promise<OrganizationResult> {
+  if (configured) return { ok: true, id: configured };
+
+  const personal = await neonGet<{ organizations?: unknown }>('/users/me/organizations', apiKey);
+  if (!isFailure(personal)) return pickOrganization(organizationOptions(personal.data.organizations));
+
+  // 组织级 API Key 访问不了 /users/me/*，退回组织列表接口。
+  const scoped = await neonGet<{ organizations?: unknown }>('/organizations', apiKey);
+  if (!isFailure(scoped)) return pickOrganization(organizationOptions(scoped.data.organizations));
+
+  return { ok: false, status: personal.status, message: personal.message };
+}
+
 export type NeonProjectUsage = {
   projectId: string;
   name: string;
   computeSeconds: number;
   transferBytes: number;
-  writtenBytes: number;
   storageBytes: number | null;
   periodStart: string | null;
   periodEnd: string | null;
@@ -93,32 +144,6 @@ export type NeonCollectInput = {
   now?: number;
 };
 
-function toIso(value: unknown): string | null {
-  return typeof value === 'string' && value ? value : null;
-}
-
-function organizationFromList(value: unknown): OrganizationResult {
-  const list = Array.isArray(value) ? value : [];
-  const ids = list
-    .map((item) => asRecord(item).id)
-    .filter((id): id is string => typeof id === 'string' && id.length > 0);
-  if (ids.length === 1) return { ok: true, id: ids[0] };
-  if (ids.length === 0) return { ok: false, status: 0, message: '该 API Key 下没有可访问的 Neon 组织。' };
-  return { ok: false, status: 0, message: '该 API Key 可访问多个组织，请在设置里指定组织 ID。' };
-}
-
-async function resolveOrganization(apiKey: string, configured?: string): Promise<OrganizationResult> {
-  if (configured) return { ok: true, id: configured };
-
-  const personal = await neonGet<{ organizations?: unknown }>('/users/me/organizations', apiKey);
-  if (!isFailure(personal)) return organizationFromList(personal.data.organizations);
-
-  const scoped = await neonGet<{ organizations?: unknown }>('/organizations', apiKey);
-  if (!isFailure(scoped)) return organizationFromList(scoped.data.organizations);
-
-  return { ok: false, status: personal.status, message: personal.message };
-}
-
 async function readProjectUsage(
   apiKey: string,
   projectId: string,
@@ -128,7 +153,8 @@ async function readProjectUsage(
   if (isFailure(detail)) return { error: detail.message };
   const project = asRecord(detail.data.project);
 
-  // 分支逻辑大小之和才是「当前存储」；单项缺失按未知处理，不按 0 处理。
+  // 分支逻辑大小才是「当前存储」。`synthetic_storage_size` 作为整包兜底，
+  // 我们自己测到的 pg_database_size 再兜一层（它只覆盖当前分支）。
   let storageBytes: number | null = null;
   const branches = await neonGet<{ branches?: unknown }>(`/projects/${encodeURIComponent(projectId)}/branches`, apiKey);
   if (!isFailure(branches)) {
@@ -144,6 +170,7 @@ async function readProjectUsage(
     }
     if (known > 0) storageBytes = total;
   }
+  if (storageBytes == null) storageBytes = numeric(project.synthetic_storage_size);
   if (storageBytes == null && typeof selfMeasuredStorageBytes === 'number' && selfMeasuredStorageBytes > 0) {
     storageBytes = selfMeasuredStorageBytes;
   }
@@ -153,52 +180,27 @@ async function readProjectUsage(
     name: typeof project.name === 'string' && project.name ? project.name : projectId,
     computeSeconds: numeric(project.compute_time_seconds) ?? 0,
     transferBytes: numeric(project.data_transfer_bytes) ?? 0,
-    writtenBytes: numeric(project.written_data_bytes) ?? 0,
     storageBytes,
     periodStart: toIso(project.consumption_period_start),
     periodEnd: toIso(project.consumption_period_end),
   };
 }
 
-function worstMetric(
-  key: string,
-  label: string,
-  unit: string,
-  limit: number,
-  readings: Array<{ project: string; used: number }>,
-): PlatformMetric | null {
-  if (!readings.length) return null;
-  let worst = readings[0];
-  for (const reading of readings) if (reading.used > worst.used) worst = reading;
-  const used = Number(worst.used.toFixed(3));
-  const roundedLimit = Number(limit.toFixed(3));
-  return {
-    key,
-    label,
-    used,
-    limit: roundedLimit,
-    unit,
-    percent: roundedLimit > 0 ? Number(((used / roundedLimit) * 100).toFixed(1)) : null,
-    note: readings.length > 1 ? `最高：${worst.project}` : undefined,
-  };
+function percentOf(used: number, limit: number): number | null {
+  if (!Number.isFinite(limit) || limit <= 0) return null;
+  return Number(((used / limit) * 100).toFixed(2));
 }
 
-function declarativeMetrics(): PlatformMetric[] {
+/** 没有读数时只列文档额度，且不给百分比。 */
+export function neonDeclarativeMetrics(): PlatformMetric[] {
   return [
+    { key: 'storage', label: 'Storage', used: 0, limit: NEON_FREE_LIMITS.storageBytes / GB, unit: 'GB', percent: null },
     {
       key: 'compute',
       label: 'Compute',
       used: 0,
       limit: NEON_FREE_LIMITS.computeCuHours,
       unit: 'CU-hrs',
-      percent: null,
-    },
-    {
-      key: 'storage',
-      label: 'Storage',
-      used: 0,
-      limit: NEON_FREE_LIMITS.storageBytes / GB,
-      unit: 'GB',
       percent: null,
     },
     {
@@ -212,6 +214,8 @@ function declarativeMetrics(): PlatformMetric[] {
   ];
 }
 
+const UNREADABLE_NOTE = 'Compute 与公网传输在免费版接口里恒为 0，读不出来，请到 Neon 控制台查看。';
+
 export async function collectNeonUsage(input: NeonCollectInput): Promise<PlatformProviderSnapshot> {
   const now = input.now ?? Date.now();
   const base: PlatformProviderSnapshot = {
@@ -222,7 +226,7 @@ export async function collectNeonUsage(input: NeonCollectInput): Promise<Platfor
     observedAt: null,
     periodStart: null,
     periodEnd: null,
-    metrics: declarativeMetrics(),
+    metrics: neonDeclarativeMetrics(),
     consoleUrl: input.projectId
       ? `${CONSOLE_BASE}/${encodeURIComponent(input.projectId)}`
       : 'https://console.neon.tech',
@@ -273,60 +277,83 @@ export async function collectNeonUsage(input: NeonCollectInput): Promise<Platfor
     else usages.push(usage);
   }
   if (!usages.length) {
-    return {
-      ...base,
-      status: 'error',
-      message: lastError || 'Neon 项目用量读取失败。',
-    };
+    return { ...base, status: 'error', message: lastError || 'Neon 项目用量读取失败。' };
   }
 
   const metrics: PlatformMetric[] = [];
-  const compute = worstMetric(
-    'compute',
-    'Compute',
-    'CU-hrs',
-    NEON_FREE_LIMITS.computeCuHours,
-    usages.map((usage) => ({ project: usage.name, used: usage.computeSeconds / 3600 })),
-  );
-  if (compute) metrics.push(compute);
 
+  // 存储：唯一在免费版能读到的真实指标。
   const storageReadings = usages
     .filter((usage): usage is NeonProjectUsage & { storageBytes: number } => usage.storageBytes != null)
-    .map((usage) => ({ project: usage.name, used: usage.storageBytes / GB }));
-  const storage = worstMetric('storage', 'Storage', 'GB', NEON_FREE_LIMITS.storageBytes / GB, storageReadings);
-  if (storage) {
+    .map((usage) => ({ project: usage.name, bytes: usage.storageBytes }));
+  if (storageReadings.length) {
+    const worst = storageReadings.reduce((a, b) => (b.bytes > a.bytes ? b : a));
+    const used = Number((worst.bytes / GB).toFixed(3));
+    const limit = NEON_FREE_LIMITS.storageBytes / GB;
     metrics.push({
-      ...storage,
-      note: storage.note ? `${storage.note} · 含分支逻辑大小` : '含分支逻辑大小',
+      key: 'storage',
+      label: 'Storage（分支逻辑大小）',
+      used,
+      limit,
+      unit: 'GB',
+      percent: percentOf(used, limit),
+      note: storageReadings.length > 1 ? `最高：${worst.project}` : `项目：${worst.project}`,
     });
   }
 
-  const egress = worstMetric(
-    'egress',
-    'Public network transfer',
-    'GB',
-    NEON_FREE_LIMITS.transferBytes / GB,
-    usages.map((usage) => ({ project: usage.name, used: usage.transferBytes / GB })),
-  );
-  if (egress) metrics.push(egress);
+  // 下面两项只在接口真的给出非零值时才出现——免费版恒为 0，摆出来等于谎报「没用量」。
+  const computeSeconds = Math.max(...usages.map((usage) => usage.computeSeconds));
+  if (computeSeconds > 0) {
+    const used = Number((computeSeconds / 3600).toFixed(3));
+    metrics.push({
+      key: 'compute',
+      label: 'Compute',
+      used,
+      limit: NEON_FREE_LIMITS.computeCuHours,
+      unit: 'CU-hrs',
+      percent: percentOf(used, NEON_FREE_LIMITS.computeCuHours),
+    });
+  }
+  const transferBytes = Math.max(...usages.map((usage) => usage.transferBytes));
+  if (transferBytes > 0) {
+    const used = Number((transferBytes / GB).toFixed(3));
+    const limit = NEON_FREE_LIMITS.transferBytes / GB;
+    metrics.push({
+      key: 'egress',
+      label: 'Public network transfer',
+      used,
+      limit,
+      unit: 'GB',
+      percent: percentOf(used, limit),
+    });
+  }
 
   if (!metrics.length) {
-    return { ...base, status: 'unsupported', message: 'Neon 未返回可识别的用量字段，请到 Neon 控制台核对。' };
+    return { ...base, status: 'unsupported', message: `Neon 未返回可识别的用量字段。${UNREADABLE_NOTE}` };
   }
 
   const periodStart = usages.find((usage) => usage.periodStart)?.periodStart ?? null;
   const periodEnd = usages.find((usage) => usage.periodEnd)?.periodEnd ?? null;
   const scopeNote =
     allIds.length > projectIds.length ? `仅检查前 ${projectIds.length} 个项目（共 ${allIds.length} 个）。` : '';
+  const notes = [UNREADABLE_NOTE];
+  if (scopeNote) notes.push(scopeNote);
 
+  const storageMetric = metrics.find((metric) => metric.key === 'storage');
   return {
     ...base,
-    status: statusFromMetrics(metrics),
-    message: ['数据来自 Neon 项目接口，可能有最多 1 小时延迟。', scopeNote].filter(Boolean).join(' '),
+    status:
+      storageMetric?.percent != null && storageMetric.percent >= 95
+        ? 'critical'
+        : storageMetric?.percent != null && storageMetric.percent >= 80
+          ? 'warning'
+          : 'ok',
+    message: `数据来自 Neon 项目接口，可能有最多 1 小时延迟。${notes.join(' ')}`,
     observedAt: now,
     periodStart,
     periodEnd,
     metrics,
     accountLabel: organization.id,
+    consoleUrl: `${CONSOLE_BASE}/${encodeURIComponent(usages[0].projectId)}`,
   };
 }

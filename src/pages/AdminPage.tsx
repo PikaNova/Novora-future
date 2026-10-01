@@ -931,6 +931,13 @@ export default function AdminPage() {
    * 有科目的草稿不打扰用户，照旧保留。
    */
   const closeMajorWizard = () => {
+    // 编辑器里的「设置」复用这个弹窗，但它只是重命名设置，不是新建向导。
+    // 关闭设置应回到当前分考试编辑器，不能把正在编辑的考试当成空草稿追问。
+    if (majorModal?.mode !== 'add') {
+      setMajorModal(null);
+      setMajorError('');
+      return;
+    }
     const draft = wizardActiveMajor;
     const isBlankDraft = wizardDraftCreated && Boolean(draft?.id) && wizardItems.length === 0;
     const reset = () => {

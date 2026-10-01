@@ -285,8 +285,11 @@ export default function ExamRecordsPanel({
         // 日程轴按时间窗一次取全：窗口内不再分页，避免同一个日期分组被切到两页。
         page: boardActive ? 1 : page,
         pageSize: boardActive ? 100 : pageSize,
-        preset,
-        includeArchived: preset === 'history' && showArchived,
+        // 日程轴 / 班级网格的行来自本地快照，状态要按记录层的最新生命周期给：板块预设会把
+        // 已结束、已归档的记录挡在返回之外，只按计划时间猜就会把刚归档的考试显示成「进行中」。
+        // 所以这里只按时间窗取数、不套预设，让暂停 / 延长 / 结束 / 归档都能落到行状态上。
+        preset: boardActive ? undefined : preset,
+        includeArchived: boardActive ? true : preset === 'history' && showArchived,
         q: query.trim() || undefined,
         gradeId: gradeId || undefined,
         classIds: gradeId ? classIdsByGrade.get(gradeId) : undefined,

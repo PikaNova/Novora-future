@@ -18,7 +18,15 @@ import type { ScheduleWindowKey } from './examListFilterMemory';
 
 export type ScheduleRowKind = 'major' | 'quick' | 'weekly' | 'draft';
 
-export type ScheduleRowStatus = 'draft' | 'scheduled' | 'imminent' | 'ongoing' | 'paused' | 'ended' | 'suppressed';
+export type ScheduleRowStatus =
+  | 'draft'
+  | 'scheduled'
+  | 'imminent'
+  | 'ongoing'
+  | 'paused'
+  | 'ended'
+  | 'archived'
+  | 'suppressed';
 
 export type ScheduleRow = {
   key: string;
@@ -128,6 +136,7 @@ export const SCHEDULE_ROW_STATUS_LABELS: Record<ScheduleRowStatus, string> = {
   ongoing: '进行中',
   paused: '已暂停',
   ended: '已结束',
+  archived: '已归档',
   suppressed: '已被大型考试暂停',
 };
 
@@ -217,12 +226,24 @@ function statusFromRecord(
   now: number,
 ): ScheduleRowStatus {
   if (displayStatus === 'draft') return 'draft';
-  if (displayStatus === 'ended' || displayStatus === 'archived') return 'ended';
+  if (displayStatus === 'archived') return 'archived';
+  if (displayStatus === 'ended') return 'ended';
   if (displayStatus === 'ongoing') return pausedAt != null ? 'paused' : 'ongoing';
   // published：再按时间细分出「即将开始」，让近场更醒目。
   const effectiveEndAt = endAt == null ? null : endAt + Math.max(0, pausedMs ?? 0);
   const byTime = timeStatusOf(startAt, effectiveEndAt, now);
   return byTime;
+}
+
+/**
+ * 记录层没有这一场时的兜底：列表按板块取数（例如「考试安排」只取未开始的），已结束、
+ * 已归档、暂停中的考试都拿不到记录。这时必须看本地快照自己记的结束 / 归档 / 暂停时间，
+ * 否则一场刚归档的考试会一直按计划时间被算成「进行中」。
+ */
+function statusWithoutRecord(session: ExamSession, now: number): ScheduleRowStatus {
+  if (session.endedAt != null) return session.archivedAt != null ? 'archived' : 'ended';
+  if (session.pausedAt != null) return 'paused';
+  return timeStatusOf(session.startAt, session.endAt, now);
 }
 
 function sessionToRow(
@@ -233,11 +254,21 @@ function sessionToRow(
 ): ScheduleRow {
   const record = session.recordId ? recordsById.get(session.recordId) : undefined;
   const kind: ScheduleRowKind = session.kind === 'weekly' ? 'weekly' : session.kind === 'temporary' ? 'quick' : 'major';
+  // 快速考试（临时统一考试）一场一科：记录层的窗口就是这一行的时间。记录比本地快照先拿到
+  // 刚做完的延长，同一天时优先用记录窗口，列表不用等下一次快照同步才改时间。
+  const recordWindowIsSameDay =
+    kind === 'quick' &&
+    record?.startAt != null &&
+    record.endAt != null &&
+    getShanghaiDateKey(record.startAt) === getShanghaiDateKey(session.startAt) &&
+    getShanghaiDateKey(record.endAt) === getShanghaiDateKey(session.endAt);
+  const startAt = recordWindowIsSameDay ? (record.startAt as number) : session.startAt;
+  const endAt = recordWindowIsSameDay ? (record.endAt as number) : session.endAt;
   const status: ScheduleRowStatus = suppressed
     ? 'suppressed'
     : record
-      ? statusFromRecord(record.displayStatus, session.startAt, session.endAt, record.pausedAt, record.pausedMs, now)
-      : timeStatusOf(session.startAt, session.endAt, now);
+      ? statusFromRecord(record.displayStatus, startAt, endAt, record.pausedAt, record.pausedMs, now)
+      : statusWithoutRecord(session, now);
   return {
     key: session.key,
     kind,
@@ -249,8 +280,8 @@ function sessionToRow(
     scopeLabel: session.scope.label,
     gradeIds: session.scope.gradeIds,
     classIds: session.scope.classIds,
-    startAt: session.startAt,
-    endAt: session.endAt,
+    startAt,
+    endAt,
     pausedAt: record?.pausedAt ?? session.pausedAt,
     pausedMs: record?.pausedMs ?? session.pausedMs,
     itemCount: record?.itemCount ?? 0,

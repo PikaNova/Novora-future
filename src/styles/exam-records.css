@@ -446,6 +446,11 @@
   outline: 2px solid rgba(59, 143, 208, 0.55);
   outline-offset: 2px;
 }
+.exam-records-search:focus-within {
+  /* 搜索框由容器统一绘制焦点态，避免容器和内部 input 叠出双层边框。 */
+  outline: none;
+  border-color: rgba(89, 184, 241, 0.72);
+}
 .exam-records-search input {
   flex: 1 1 auto;
   width: 100%;
@@ -455,6 +460,9 @@
   background: transparent;
   color: inherit;
   font: inherit;
+}
+.exam-records-search input:focus-visible {
+  outline: none;
 }
 .exam-records-feedback,
 .exam-records-empty {

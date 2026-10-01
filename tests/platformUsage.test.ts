@@ -130,6 +130,7 @@ test('刷新冷却: 由上次刷新时间推算剩余秒数，向上取整', () 
 // 2026-10-01 真实账号返回的字段名与量级（120 天窗口的实际汇总值）。
 const REQUESTS_BUCKETS = [
   {
+    date: '2026-09-30T00:00:00Z',
     request_hit_count: 281_708,
     request_miss_count: 1_120_230,
     bandwidth_outgoing_bytes: 3_441_000_000,
@@ -140,7 +141,13 @@ const REQUESTS_BUCKETS = [
   },
 ];
 const BUILDS_BUCKETS = [
-  { build_completed_count: 3, build_failed_count: 1, build_build_seconds: 600, build_queued_seconds: 60 },
+  {
+    date: '2026-09-13T00:00:00Z',
+    build_completed_count: 3,
+    build_failed_count: 1,
+    build_build_seconds: 600,
+    build_queued_seconds: 60,
+  },
 ];
 
 test('Vercel 分桶求和: 逐桶累加，数值字符串也认，缺失与非数值按 0', () => {
@@ -154,22 +161,25 @@ test('Vercel 分桶求和: 逐桶累加，数值字符串也认，缺失与非�
 
 test('Vercel 读数: 列出接口能提供的全部指标', () => {
   const metrics = buildVercelMetrics({ requests: REQUESTS_BUCKETS, builds: BUILDS_BUCKETS });
-  assert.deepEqual(metrics, [
-    {
-      key: 'cdn_requests',
-      label: 'CDN 请求（缓存命中 + 回源）',
-      used: 1_401_938,
-      limit: null,
-      unit: '次',
-      percent: null,
-    },
-    { key: 'bandwidth_outgoing', label: '出站带宽（CDN → 用户）', used: 3.441, limit: null, unit: 'GB', percent: null },
-    { key: 'bandwidth_incoming', label: '入站带宽（源站 → CDN）', used: 1.792, limit: null, unit: 'GB', percent: null },
-    { key: 'function_invocations', label: '函数调用次数', used: 1_087_960, limit: null, unit: '次', percent: null },
-    { key: 'function_gb_hours', label: '函数内存时长', used: 29.333, limit: null, unit: 'GB-hrs', percent: null },
-    { key: 'monitoring_metrics', label: '监控指标', used: 5, limit: null, unit: '次', percent: null },
-    { key: 'builds', label: '构建次数', used: 4, limit: null, unit: '次', percent: null },
-    { key: 'build_minutes', label: '构建耗时', used: 11, limit: null, unit: '分钟', percent: null },
+  assert.deepEqual(
+    metrics.map((metric) => [metric.key, metric.used, metric.limit, metric.unit, metric.percent]),
+    [
+      ['cdn_requests', 1_401_938, null, '次', null],
+      ['bandwidth_outgoing', 3.441, null, 'GB', null],
+      ['bandwidth_incoming', 1.792, null, 'GB', null],
+      ['function_invocations', 1_087_960, null, '次', null],
+      ['function_gb_hours', 29.333, null, 'GB-hrs', null],
+      ['monitoring_metrics', 5, null, '次', null],
+      ['builds', 4, null, '次', null],
+      ['build_minutes', 11, null, '分钟', null],
+    ],
+  );
+  // 分桶序列要保留下来（预测靠它），单位换算也必须与 used 一致。
+  assert.deepEqual(metrics.find((metric) => metric.key === 'bandwidth_outgoing')?.series, [
+    { date: '2026-09-30T00:00:00Z', value: 3.441 },
+  ]);
+  assert.deepEqual(metrics.find((metric) => metric.key === 'cdn_requests')?.series, [
+    { date: '2026-09-30T00:00:00Z', value: 1_401_938 },
   ]);
   // 这个端点不返回额度上限，任何指标都不该凭空出现百分比。
   assert.equal(

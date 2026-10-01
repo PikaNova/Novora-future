@@ -9,7 +9,8 @@ import { authSql, requireActor } from '../_auth.js';
 import { sendDatabaseError } from '../_apiError.js';
 import { decryptSecret, encryptSecret, secretHint } from './crypto.js';
 import { detectPlatformEnvironment, type PlatformEnvironment } from './environment.js';
-import { collectNeonUsage } from './neon.js';
+import { forecastUsage, type ForecastPoint } from './forecast.js';
+import { collectNeonUsage, NEON_FREE_LIMITS } from './neon.js';
 import {
   clearPlatformConfig,
   encryptionSecret,
@@ -18,12 +19,15 @@ import {
   readPlatformSnapshot,
   writePlatformConfig,
   writePlatformSnapshot,
+  type StoredPlatformConfig,
   type StoredPlatformSnapshot,
 } from './store.js';
 import {
   isPlatformProviderId,
   remainingCooldownSeconds,
+  statusFromMetrics,
   type PlatformConfigFieldSpec,
+  type PlatformCustomMetric,
   type PlatformMetric,
   type PlatformProviderId,
   type PlatformProviderSnapshot,
@@ -136,9 +140,100 @@ function parseMetrics(value: unknown): PlatformMetric[] {
       unit: typeof record.unit === 'string' ? record.unit : '',
       percent: typeof record.percent === 'number' && Number.isFinite(record.percent) ? record.percent : null,
       note: typeof record.note === 'string' && record.note ? record.note : undefined,
+      series: parseSeries(record.series),
     });
   }
   return metrics;
+}
+
+function parseSeries(value: unknown): ForecastPoint[] {
+  if (!Array.isArray(value)) return [];
+  const points: ForecastPoint[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+    const record = item as Record<string, unknown>;
+    const date = typeof record.date === 'string' ? record.date : null;
+    const point = typeof record.value === 'number' && Number.isFinite(record.value) ? record.value : null;
+    if (!date || point == null) continue;
+    points.push({ date, value: point });
+  }
+  return points;
+}
+
+/**
+ * 留空时的免费版默认上限。
+ *
+ * Vercel 只有官方 Hobby 文档明确写过的那两项有默认值（Fast Data Transfer 100 GB、
+ * Provisioned Memory 360 GB-hrs）；接口本身不返回任何上限，其余指标一律留空，
+ * 由管理员按控制台填。
+ */
+const DEFAULT_LIMITS: Record<PlatformProviderId, Record<string, number>> = {
+  vercel: {
+    bandwidth_outgoing: 100,
+    function_gb_hours: 360,
+    active_cpu: 4,
+  },
+  neon: {
+    storage: NEON_FREE_LIMITS.storageBytes / 1_000_000_000,
+    compute: NEON_FREE_LIMITS.computeCuHours,
+    egress: NEON_FREE_LIMITS.transferBytes / 1_000_000_000,
+  },
+};
+
+function percentOf(used: number, limit: number | null): number | null {
+  if (limit == null || !Number.isFinite(limit) || limit <= 0) return null;
+  return Number(((used / limit) * 100).toFixed(2));
+}
+
+/**
+ * 把「上限」和「预测」套到读数上。
+ *
+ * 上限优先级：用户手填 > 免费版默认值 > 读数自带的（接口基本不给）。
+ * 预测放在这里而不是刷新时算，是为了改上限能立刻看到新的天数，不必再等一次刷新。
+ */
+function decorateMetrics(
+  provider: PlatformProviderId,
+  metrics: PlatformMetric[],
+  config: StoredPlatformConfig | null,
+  snapshot: StoredPlatformSnapshot | null,
+  now: number,
+): PlatformMetric[] {
+  const defaults = DEFAULT_LIMITS[provider];
+  const overrides = config?.limits ?? {};
+  const decorated: PlatformMetric[] = metrics.map((metric) => {
+    const limit = overrides[metric.key] ?? defaults[metric.key] ?? metric.limit ?? null;
+    return {
+      key: metric.key,
+      label: metric.label,
+      used: metric.used,
+      limit,
+      unit: metric.unit,
+      percent: percentOf(metric.used, limit),
+      note: metric.note,
+      forecast: forecastUsage({
+        used: metric.used,
+        limit,
+        series: metric.series,
+        periodStart: snapshot?.periodStart ?? null,
+        periodEnd: snapshot?.periodEnd ?? null,
+        now,
+      }),
+    };
+  });
+
+  // 手工录入的指标没有序列，只算占比，不编造趋势。
+  for (const item of config?.custom ?? []) {
+    decorated.push({
+      key: item.key,
+      label: item.label,
+      used: item.used,
+      limit: item.limit,
+      unit: item.unit,
+      percent: percentOf(item.used, item.limit),
+      note: '手工录入',
+    });
+  }
+  return decorated;
 }
 
 const KNOWN_STATUSES: readonly PlatformStatus[] = [
@@ -151,6 +246,9 @@ const KNOWN_STATUSES: readonly PlatformStatus[] = [
   'rate_limited',
   'error',
 ];
+
+/** 这几个状态是由读数推出来的，套上上限后需要重算；其余是失败态，原样保留。 */
+const DATA_STATUSES: readonly PlatformStatus[] = ['ok', 'warning', 'critical'];
 
 function toSnapshot(provider: PlatformProviderId, stored: StoredPlatformSnapshot): PlatformProviderSnapshot {
   const status = KNOWN_STATUSES.includes(stored.status) ? stored.status : 'error';
@@ -179,6 +277,8 @@ async function buildProviderView(provider: PlatformProviderId, enabled: boolean)
       hint: null,
       updatedAt: null,
       nextRefreshInSeconds: 0,
+      limits: {},
+      custom: [],
       fields: FIELD_SPECS[provider],
       consoleUrl: CONSOLE_URLS[provider],
       snapshot: null,
@@ -186,17 +286,32 @@ async function buildProviderView(provider: PlatformProviderId, enabled: boolean)
   }
   const [stored, snapshot] = await Promise.all([readPlatformConfig(provider), readPlatformSnapshot(provider)]);
   const configured = Boolean(stored && Object.keys(stored.fields).length > 0);
+  const now = Date.now();
+  const base = configured && snapshot ? toSnapshot(provider, snapshot) : null;
+  // 上限与预测都在视图层套用：改上限能立刻反映到天数上，不必等下一次刷新。
+  const decorated = base ? decorateMetrics(provider, base.metrics, stored, snapshot, now) : null;
+  const view =
+    base && decorated
+      ? {
+          ...base,
+          metrics: decorated,
+          // 百分比变了，状态要跟着重算；失败态（凭据错误等）保持原样。
+          status: DATA_STATUSES.includes(base.status) ? statusFromMetrics(decorated) : base.status,
+        }
+      : null;
   return {
     provider,
     enabled: true,
     configured,
     hint: configured ? stored?.hint || null : null,
     updatedAt: stored?.updatedAt ?? null,
-    nextRefreshInSeconds: remainingCooldownSeconds(snapshot?.updatedAt, Date.now()),
+    nextRefreshInSeconds: remainingCooldownSeconds(snapshot?.updatedAt, now),
+    limits: stored?.limits ?? {},
+    custom: stored?.custom ?? [],
     fields: FIELD_SPECS[provider],
     consoleUrl: snapshot?.consoleUrl || CONSOLE_URLS[provider],
     // 未配置时不回放历史快照，避免清除凭据后仍显示旧数字。
-    snapshot: configured && snapshot ? toSnapshot(provider, snapshot) : null,
+    snapshot: view,
   };
 }
 
@@ -285,8 +400,12 @@ export async function handlePlatformUsageConfig(req: VercelRequest, res: VercelR
         : {};
     const specs = FIELD_SPECS[provider];
     const provided = specs.filter((spec) => Object.prototype.hasOwnProperty.call(values, spec.key));
-    if (!provided.length) {
-      res.status(400).json({ ok: false, code: 'NO_FIELDS', error: '没有需要保存的字段' });
+
+    // 上限与手工指标都整体替换：留空的条目直接消失，即回落到免费版默认值。
+    const hasLimits = Boolean(body.limits && typeof body.limits === 'object' && !Array.isArray(body.limits));
+    const hasCustom = Array.isArray(body.custom);
+    if (!provided.length && !hasLimits && !hasCustom) {
+      res.status(400).json({ ok: false, code: 'NO_FIELDS', error: '没有需要保存的内容' });
       return;
     }
 
@@ -307,15 +426,67 @@ export async function handlePlatformUsageConfig(req: VercelRequest, res: VercelR
       fields[spec.key] = encryptSecret(raw, secret);
     }
 
-    for (const spec of specs) {
-      if (spec.required && !fields[spec.key]) {
-        res.status(400).json({ ok: false, code: 'FIELD_REQUIRED', error: `请填写${spec.label}` });
-        return;
+    // 只改上限/手工指标时不必重填凭据，所以必填校验只在本次提交了凭据字段时做。
+    if (provided.length) {
+      for (const spec of specs) {
+        if (spec.required && !fields[spec.key]) {
+          res.status(400).json({ ok: false, code: 'FIELD_REQUIRED', error: `请填写${spec.label}` });
+          return;
+        }
+      }
+    }
+
+    const limits: Record<string, number> = hasLimits ? {} : { ...(existing?.limits ?? {}) };
+    if (hasLimits) {
+      for (const [key, value] of Object.entries(body.limits as Record<string, unknown>)) {
+        const metricKey = key.trim().slice(0, 64);
+        if (!metricKey) continue;
+        const raw = typeof value === 'string' ? value.trim() : value;
+        if (raw === '' || raw == null) continue; // 留空 = 用免费版默认值
+        const parsed = Number(raw);
+        if (!Number.isFinite(parsed) || parsed <= 0) {
+          res.status(400).json({ ok: false, code: 'INVALID_LIMIT', error: `上限必须是大于 0 的数字（${metricKey}）` });
+          return;
+        }
+        limits[metricKey] = parsed;
+      }
+    }
+
+    const custom: PlatformCustomMetric[] = [];
+    if (hasCustom) {
+      for (const item of (body.custom as unknown[]).slice(0, 20)) {
+        if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+        const record = item as Record<string, unknown>;
+        const label = String(record.label ?? '').trim();
+        if (!label) continue;
+        const used = Number(record.used);
+        if (!Number.isFinite(used) || used < 0) {
+          res.status(400).json({ ok: false, code: 'INVALID_METRIC', error: `自定义指标「${label}」的已用量无效` });
+          return;
+        }
+        const limitRaw = record.limit;
+        const limitValue = limitRaw === '' || limitRaw == null ? null : Number(limitRaw);
+        if (limitValue != null && (!Number.isFinite(limitValue) || limitValue <= 0)) {
+          res.status(400).json({ ok: false, code: 'INVALID_METRIC', error: `自定义指标「${label}」的上限无效` });
+          return;
+        }
+        custom.push({
+          key: `custom_${custom.length + 1}`,
+          label: label.slice(0, 80),
+          used,
+          unit: String(record.unit ?? '')
+            .trim()
+            .slice(0, 12),
+          limit: limitValue,
+        });
       }
     }
 
     const secretPlain = decryptSecret(fields[SECRET_FIELD[provider]] ?? '', secret) ?? '';
-    await writePlatformConfig(provider, fields, secretHint(secretPlain), actor.id);
+    await writePlatformConfig(provider, fields, secretHint(secretPlain), actor.id, {
+      limits,
+      custom: hasCustom ? custom : (existing?.custom ?? []),
+    });
     res.json(await buildPlatformUsagePayload());
   } catch (error) {
     sendDatabaseError(req, res, error, 'write');

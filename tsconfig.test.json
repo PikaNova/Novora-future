@@ -45,6 +45,7 @@
     "api/_platformUsage/crypto.ts",
     "api/_platformUsage/vercel.ts",
     "api/_platformUsage/neon.ts",
+    "api/_platformUsage/forecast.ts",
     "api/_system/time.ts",
     "api/_system/updateCheck.ts",
     "api/_system/redeploy.ts",

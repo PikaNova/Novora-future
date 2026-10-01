@@ -4,13 +4,22 @@
 // 与 api/_exams/db.ts、api/_auth/db.ts 的做法一致。
 import type { DbClient } from '../_dbAdapter.js';
 import { authSql, ensureAuthTables } from '../_auth.js';
-import { isPlatformProviderId, type PlatformProviderId, type PlatformStatus } from './types.js';
+import {
+  isPlatformProviderId,
+  type PlatformCustomMetric,
+  type PlatformProviderId,
+  type PlatformStatus,
+} from './types.js';
 
 export type StoredPlatformConfig = {
   /** 字段名 → 密文（`v1.iv.tag.ct`）。 */
   fields: Record<string, string>;
   /** 主密钥字段的尾号提示，用于「已配置」展示。 */
   hint: string;
+  /** 指标上限覆盖值（非密钥，明文存）。 */
+  limits: Record<string, number>;
+  /** 手工录入的指标。 */
+  custom: PlatformCustomMetric[];
   updatedAt: number;
 };
 
@@ -40,10 +49,12 @@ export function ensurePlatformUsageTables(): Promise<void> {
           provider TEXT PRIMARY KEY,
           fields JSONB NOT NULL DEFAULT '{}',
           hint TEXT NOT NULL DEFAULT '',
+          extra JSONB NOT NULL DEFAULT '{}',
           updated_by BIGINT,
           updated_at BIGINT NOT NULL
         )
       `;
+      await sql`ALTER TABLE platform_usage_config ADD COLUMN IF NOT EXISTS extra JSONB NOT NULL DEFAULT '{}'`;
       await sql`
         CREATE TABLE IF NOT EXISTS platform_usage_snapshots (
           provider TEXT PRIMARY KEY,
@@ -120,16 +131,38 @@ export async function encryptionSecret(): Promise<string> {
 export async function readPlatformConfig(provider: PlatformProviderId): Promise<StoredPlatformConfig | null> {
   await ensurePlatformUsageTables();
   const rows =
-    await authSql()`SELECT fields, hint, updated_at FROM platform_usage_config WHERE provider=${provider} LIMIT 1`;
+    await authSql()`SELECT fields, hint, extra, updated_at FROM platform_usage_config WHERE provider=${provider} LIMIT 1`;
   const row = rows[0];
   if (!row) return null;
   const fields: Record<string, string> = {};
   for (const [key, value] of Object.entries(asObject(row.fields))) {
     if (typeof value === 'string') fields[key] = value;
   }
+  const extra = asObject(row.extra);
+  const limits: Record<string, number> = {};
+  for (const [key, value] of Object.entries(asObject(extra.limits))) {
+    const parsed = toNumber(value);
+    if (parsed != null && parsed > 0) limits[key] = parsed;
+  }
+  const custom: PlatformCustomMetric[] = [];
+  for (const item of asStringArray(extra.custom)) {
+    const record = asObject(item);
+    const used = toNumber(record.used);
+    if (typeof record.label !== 'string' || !record.label.trim() || used == null) continue;
+    const limit = toNumber(record.limit);
+    custom.push({
+      key: typeof record.key === 'string' && record.key ? record.key : `custom_${custom.length + 1}`,
+      label: record.label.trim().slice(0, 80),
+      used: Math.max(0, used),
+      unit: typeof record.unit === 'string' ? record.unit.trim().slice(0, 12) : '',
+      limit: limit != null && limit > 0 ? limit : null,
+    });
+  }
   return {
     fields,
     hint: typeof row.hint === 'string' ? row.hint : '',
+    limits,
+    custom,
     updatedAt: toNumber(row.updated_at) ?? 0,
   };
 }
@@ -139,15 +172,20 @@ export async function writePlatformConfig(
   fields: Record<string, string>,
   hint: string,
   actorId: number,
+  extra: { limits: Record<string, number>; custom: PlatformCustomMetric[] },
 ): Promise<void> {
   await ensurePlatformUsageTables();
   const now = Date.now();
   await authSql()`
-    INSERT INTO platform_usage_config (provider, fields, hint, updated_by, updated_at)
-    VALUES (${provider}, ${JSON.stringify(fields)}::jsonb, ${hint}, ${actorId}, ${now})
+    INSERT INTO platform_usage_config (provider, fields, hint, extra, updated_by, updated_at)
+    VALUES (
+      ${provider}, ${JSON.stringify(fields)}::jsonb, ${hint},
+      ${JSON.stringify({ limits: extra.limits, custom: extra.custom })}::jsonb, ${actorId}, ${now}
+    )
     ON CONFLICT (provider) DO UPDATE SET
       fields = EXCLUDED.fields,
       hint = EXCLUDED.hint,
+      extra = EXCLUDED.extra,
       updated_by = EXCLUDED.updated_by,
       updated_at = EXCLUDED.updated_at
   `;

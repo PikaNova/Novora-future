@@ -1,3 +1,5 @@
+import type { ForecastPoint, ForecastResult } from './forecast.js';
+
 // 平台额度面板的对外契约。前端只依赖这里的形状，不感知具体平台的原始响应。
 
 export type PlatformProviderId = 'vercel' | 'neon';
@@ -25,6 +27,10 @@ export type PlatformMetric = {
   /** 已用百分比（0-100+）；limit 为 null 时为 null。 */
   percent: number | null;
   note?: string;
+  /** 源数据的分桶序列。只存在于服务端保存的快照里，不随视图返回给前端。 */
+  series?: ForecastPoint[];
+  /** 服务端按当前上限算出的预测。只随视图返回。 */
+  forecast?: ForecastResult;
 };
 
 export type PlatformProviderSnapshot = {
@@ -52,6 +58,15 @@ export type PlatformConfigFieldSpec = {
   secret: boolean;
 };
 
+/** 用户手工录入的指标：公开接口拿不到的那几项（Functions Storage 之类）。 */
+export type PlatformCustomMetric = {
+  key: string;
+  label: string;
+  used: number;
+  unit: string;
+  limit: number | null;
+};
+
 export type PlatformProviderView = {
   provider: PlatformProviderId;
   /** 该平台在当前部署环境下是否启用（本地部署两者都为 false）。 */
@@ -62,6 +77,10 @@ export type PlatformProviderView = {
   updatedAt: number | null;
   /** 距离下次可刷新还剩的秒数；0 表示现在就能刷新。 */
   nextRefreshInSeconds: number;
+  /** 指标 key → 用户设定的上限；没有条目表示沿用内置默认值。 */
+  limits: Record<string, number>;
+  /** 手工录入的指标，与自动读数一起展示。 */
+  custom: PlatformCustomMetric[];
   fields: PlatformConfigFieldSpec[];
   consoleUrl: string;
   snapshot: PlatformProviderSnapshot | null;

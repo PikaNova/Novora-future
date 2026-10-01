@@ -19,6 +19,7 @@
 //   3. 出站/入站带宽的口径与面板的 Fast Data Transfer / Fast Origin Transfer
 //      并不一致（实测同一窗口 3.44 GB vs 面板 5.6 GB），因此按接口自身的
 //      语义命名，不冒用面板的名字。
+import type { ForecastPoint } from './forecast.js';
 import type { PlatformMetric, PlatformProviderSnapshot } from './types.js';
 
 const API_BASE = 'https://api.vercel.com';
@@ -147,6 +148,28 @@ export function sumBuckets(data: unknown, fields: readonly string[]): number {
   return total;
 }
 
+/**
+ * 逐桶取值，供预测用。`used` 用 sumBuckets 求（保持四舍五入口径一致），
+ * 这里额外保留每一天的量，好让「还能用几天」按真实分布算而不是拿一个平均外推。
+ */
+export function bucketSeries(data: unknown, fields: readonly string[], scale?: number): ForecastPoint[] {
+  if (!Array.isArray(data)) return [];
+  const points: ForecastPoint[] = [];
+  for (const bucket of data) {
+    if (!bucket || typeof bucket !== 'object') continue;
+    const record = bucket as Record<string, unknown>;
+    const date = typeof record.date === 'string' ? record.date : null;
+    if (!date) continue;
+    let value = 0;
+    for (const field of fields) {
+      const parsed = toNumber(record[field]);
+      if (parsed != null) value += parsed;
+    }
+    points.push({ date, value: scale ? value / scale : value });
+  }
+  return points;
+}
+
 /** 只描述结构骨架（键名与类型，不含数值），用于遇到未知响应时把形状回显到面板上。 */
 export function describeShape(node: unknown, depth = 0): string {
   if (depth > 3) return '…';
@@ -167,6 +190,7 @@ export function buildVercelMetrics(dataByType: Partial<Record<VercelUsageType, u
   for (const def of VERCEL_METRICS) {
     const raw = sumBuckets(dataByType[def.source], def.fields);
     const used = def.scale ? raw / def.scale : raw;
+    const series = bucketSeries(dataByType[def.source], def.fields, def.scale);
     metrics.push({
       key: def.key,
       label: def.label,
@@ -174,6 +198,8 @@ export function buildVercelMetrics(dataByType: Partial<Record<VercelUsageType, u
       limit: null,
       unit: def.unit,
       percent: null,
+      // 没有序列就不带这个字段，免得快照里堆一堆空数组。
+      ...(series.length ? { series } : {}),
     });
   }
   return metrics;
